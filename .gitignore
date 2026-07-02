@@ -1,0 +1,42 @@
+# Android Studio / Kotlin / Gradle
+*.iml
+.gradle/
+.idea/
+local.properties
+build/
+app/build/
+captures/
+.externalNativeBuild/
+.cxx/
+*.apk
+*.aab
+*.ap_
+*.dex
+*.class
+bin/
+gen/
+out/
+.navigation/
+
+# VS Code
+.vscode/
+*.code-workspace
+
+# OS / MacOS / Windows
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Archivos de logs temporales
+*.log
+*.sqlite
+*.db-shm
+*.db-wal
+
+# Configuración del entorno
+.env
+
+# Scripts temporales del agente
+step*.ps1
+update*.ps1
+scaffold.ps1
