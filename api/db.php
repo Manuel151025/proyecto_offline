@@ -1,8 +1,8 @@
 <?php
-$host = 'localhost';
-$db = 'minsalud_encuestas';
-$user = 'root'; // Ajustar según configuración de tu servidor
-$pass = '';     // Ajustar según configuración de tu servidor
+$host    = getenv('DB_HOST') ?: 'localhost';
+$db      = getenv('DB_NAME') ?: 'minsalud_encuestas';
+$user    = getenv('DB_USER') ?: 'root';
+$pass    = getenv('DB_PASS') ?: '';
 $charset = 'utf8mb4';
 
 $dsn = "mysql:host=$host;dbname=$db;charset=$charset";

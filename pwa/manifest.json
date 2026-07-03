@@ -1,0 +1,19 @@
+{
+  "name": "Encuestas MinSalud",
+  "short_name": "Encuestas",
+  "description": "Sistema de encuestas demográficas offline-first para el Ministerio de Salud",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#1565C0",
+  "theme_color": "#1565C0",
+  "icons": [
+    {
+      "src": "icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#1565C0" />
+  <meta name="description" content="Sistema de encuestas demográficas offline-first — MinSalud" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Encuestas" />
+
+  <title>Encuestas MinSalud</title>
+
+  <link rel="manifest" href="./manifest.json" />
+  <link rel="icon" href="./icons/icon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="./icons/icon.svg" />
+  <link rel="stylesheet" href="./css/styles.css" />
+</head>
+<body>
+  <div id="app-shell">
+    <header class="app-header">
+      <span class="app-title">Encuestas MinSalud</span>
+      <span class="online-badge" id="online-badge" title="Estado de conexión"></span>
+    </header>
+
+    <main id="app-root"></main>
+
+    <nav class="bottom-nav" aria-label="Navegación principal">
+      <button class="nav-item" data-route="/personas" aria-label="Lista de personas">
+        <span class="nav-icon">&#128100;</span>
+        <span>Personas</span>
+      </button>
+      <button class="nav-item" data-route="/nueva" aria-label="Registrar persona">
+        <span class="nav-icon">&#10133;</span>
+        <span>Registrar</span>
+      </button>
+      <button class="nav-item" data-route="/sync" aria-label="Estado de sincronización">
+        <span class="nav-icon">&#8635;</span>
+        <span>Sync</span>
+      </button>
+    </nav>
+  </div>
+
+  <script type="module" src="./js/app.js"></script>
+  <script>
+    const badge = document.getElementById('online-badge');
+    function updateBadge() {
+      badge.classList.toggle('offline', !navigator.onLine);
+      badge.title = navigator.onLine ? 'En línea' : 'Sin conexión';
+    }
+    updateBadge();
+    window.addEventListener('online', updateBadge);
+    window.addEventListener('offline', updateBadge);
+  </script>
+</body>
+</html>

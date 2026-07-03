@@ -1,7 +1,9 @@
 <?php
 header("Content-Type: application/json; charset=UTF-8");
-header("Access-Control-Allow-Methods: POST");
+header("Access-Control-Allow-Origin: *");
+header("Access-Control-Allow-Methods: POST, OPTIONS");
 header("Access-Control-Allow-Headers: Content-Type, Authorization");
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(200); exit; }
 
 require_once '../db.php';
 
@@ -22,15 +24,15 @@ try {
     $stmtPersonaCheck = $pdo->prepare("SELECT updated_at FROM personas WHERE tipo_documento = ? AND numero_documento = ? FOR UPDATE");
     $stmtPersonaInsert = $pdo->prepare("
         INSERT INTO personas (
-            tipo_documento, numero_documento, nombres, apellidos, fecha_nacimiento, 
-            telefono, email, direccion, eps, ocupacion, estrato, municipio_codigo, 
+            tipo_documento, numero_documento, nombres, apellidos, fecha_nacimiento,
+            telefono, email, direccion, vereda, eps, ocupacion, estrato, municipio_codigo,
             updated_at, device_id, deleted_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ");
     $stmtPersonaUpdate = $pdo->prepare("
-        UPDATE personas SET 
-            nombres = ?, apellidos = ?, fecha_nacimiento = ?, telefono = ?, email = ?, 
-            direccion = ?, eps = ?, ocupacion = ?, estrato = ?, municipio_codigo = ?, 
+        UPDATE personas SET
+            nombres = ?, apellidos = ?, fecha_nacimiento = ?, telefono = ?, email = ?,
+            direccion = ?, vereda = ?, eps = ?, ocupacion = ?, estrato = ?, municipio_codigo = ?,
             updated_at = ?, device_id = ?, deleted_at = ?
         WHERE tipo_documento = ? AND numero_documento = ?
     ");
@@ -45,19 +47,19 @@ try {
             if ($p['updated_at'] > $existing['updated_at']) {
                 $stmtPersonaUpdate->execute([
                     $p['nombres'], $p['apellidos'], $p['fecha_nacimiento'], $p['telefono'],
-                    $p['email'], $p['direccion'], $p['eps'], $p['ocupacion'], $p['estrato'],
-                    $p['municipio_codigo'], $p['updated_at'], $p['device_id'], $p['deleted_at'],
-                    $p['tipo_documento'], $p['numero_documento']
+                    $p['email'], $p['direccion'], $p['vereda'] ?? null, $p['eps'], $p['ocupacion'],
+                    $p['estrato'], $p['municipio_codigo'], $p['updated_at'], $p['device_id'],
+                    $p['deleted_at'], $p['tipo_documento'], $p['numero_documento']
                 ]);
             }
             // Si el entrante es más viejo (updated_at menor o igual), lo ignoramos pacíficamente.
         } else {
             // No existe, insertar
             $stmtPersonaInsert->execute([
-                $p['tipo_documento'], $p['numero_documento'], $p['nombres'], $p['apellidos'], 
-                $p['fecha_nacimiento'], $p['telefono'], $p['email'], $p['direccion'], 
-                $p['eps'], $p['ocupacion'], $p['estrato'], $p['municipio_codigo'], 
-                $p['updated_at'], $p['device_id'], $p['deleted_at']
+                $p['tipo_documento'], $p['numero_documento'], $p['nombres'], $p['apellidos'],
+                $p['fecha_nacimiento'], $p['telefono'], $p['email'], $p['direccion'],
+                $p['vereda'] ?? null, $p['eps'], $p['ocupacion'], $p['estrato'],
+                $p['municipio_codigo'], $p['updated_at'], $p['device_id'], $p['deleted_at']
             ]);
         }
     }

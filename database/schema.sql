@@ -32,6 +32,7 @@ CREATE TABLE IF NOT EXISTS personas (
     telefono VARCHAR(20) NULL,
     email VARCHAR(100) NULL,
     direccion VARCHAR(150) NULL,
+    vereda VARCHAR(100) NULL,
     eps VARCHAR(50) NULL,
     ocupacion VARCHAR(100) NULL,
     estrato INT NULL,

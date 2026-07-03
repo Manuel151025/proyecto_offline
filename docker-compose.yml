@@ -1,0 +1,34 @@
+version: '3.8'
+
+services:
+  app:
+    build: .
+    container_name: encuestas_offline_app
+    restart: always
+    ports:
+      - "8898:80"
+    volumes:
+      - .:/var/www/html
+    environment:
+      DB_HOST: db
+      DB_NAME: minsalud_encuestas
+      DB_USER: encuestas_user
+      DB_PASS: ${DB_PASS}
+    depends_on:
+      - db
+
+  db:
+    image: mysql:8.0
+    container_name: encuestas_offline_db
+    restart: always
+    environment:
+      MYSQL_DATABASE: minsalud_encuestas
+      MYSQL_USER: encuestas_user
+      MYSQL_PASSWORD: ${DB_PASS}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASS}
+    volumes:
+      - encuestas_offline_db_data:/var/lib/mysql
+      - ./database/schema.sql:/docker-entrypoint-initdb.d/init.sql
+
+volumes:
+  encuestas_offline_db_data:
