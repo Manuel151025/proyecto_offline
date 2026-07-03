@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Clipboard body -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M28,36L80,36L80,86L28,86Z"/>
+    <!-- Clip bar -->
+    <path
+        android:fillColor="#90CAF9"
+        android:pathData="M40,28L68,28L68,42L40,42Z"/>
+    <!-- Survey lines -->
+    <path
+        android:fillColor="#1565C0"
+        android:pathData="M36,52L72,52L72,56L36,56Z"/>
+    <path
+        android:fillColor="#1565C0"
+        android:pathData="M36,63L72,63L72,67L36,67Z"/>
+    <path
+        android:fillColor="#1565C0"
+        android:pathData="M36,74L56,74L56,78L36,78Z"/>
+    <!-- Checkmark -->
+    <path
+        android:fillColor="#4CAF50"
+        android:pathData="M60,70L65,78L76,62L80,65L65,85L56,73Z"/>
+</vector>
