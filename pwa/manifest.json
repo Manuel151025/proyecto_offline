@@ -1,6 +1,6 @@
 {
-  "name": "Encuestas MinSalud",
-  "short_name": "Encuestas",
+  "name": "ColOffline",
+  "short_name": "ColOffline",
   "description": "Sistema de encuestas demográficas offline-first para el Ministerio de Salud",
   "start_url": "./index.html",
   "scope": "./",
