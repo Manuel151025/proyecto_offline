@@ -14,6 +14,7 @@ services:
       DB_NAME: minsalud_encuestas
       DB_USER: encuestas_user
       DB_PASS: ${DB_PASS}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
     depends_on:
       - db
 

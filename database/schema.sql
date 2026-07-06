@@ -16,6 +16,8 @@ INSERT IGNORE INTO municipios (codigo, nombre, departamento) VALUES
 CREATE TABLE IF NOT EXISTS encuestadores (
     id INT AUTO_INCREMENT PRIMARY KEY,
     nombre VARCHAR(100) NOT NULL,
+    numero_documento VARCHAR(20) NULL UNIQUE,
+    password_hash VARCHAR(255) NULL,
     activo TINYINT(1) DEFAULT 1
 );
 

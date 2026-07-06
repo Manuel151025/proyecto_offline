@@ -2,9 +2,13 @@ import { getPersona, savePersona, addSyncItem, softDeletePersona, getMunicipios 
 import { navigate } from '../router.js';
 import { generateUUID, getDeviceId, nowMs, dateToMs, msToDateInput, showToast } from '../utils.js';
 import { registerBackgroundSync } from '../sync.js';
+import { getSession } from '../session.js';
 
 const TIPOS_DOC = ['CC', 'TI', 'RC', 'CE', 'PP', 'NIT', 'PE'];
-const ID_ENCUESTADOR = 1;
+
+function currentEncuestadorId() {
+  return getSession()?.encuestadorId || 1;
+}
 
 export async function render(container, params) {
   const isEdit = !!(params.tipo && params.numero);
@@ -224,7 +228,7 @@ async function handleSubmit(isEdit, existing) {
       id: generateUUID(),
       tipo_documento: tipo,
       numero_documento: numero,
-      id_encuestador: ID_ENCUESTADOR,
+      id_encuestador: currentEncuestadorId(),
       fecha_encuesta: ts,
       device_id: getDeviceId(),
       accion: isEdit ? 'ACTUALIZACION' : 'REGISTRO'
@@ -259,7 +263,7 @@ async function confirmDelete(tipo, numero) {
       id: generateUUID(),
       tipo_documento: tipo,
       numero_documento: numero,
-      id_encuestador: ID_ENCUESTADOR,
+      id_encuestador: currentEncuestadorId(),
       fecha_encuesta: ts,
       device_id: getDeviceId(),
       accion: 'ELIMINACION'
