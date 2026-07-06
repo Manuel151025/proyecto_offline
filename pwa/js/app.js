@@ -2,19 +2,29 @@ import { onRoute, initRouter, navigate } from './router.js';
 import { render as renderLista } from './screens/lista-personas.js';
 import { render as renderFormulario } from './screens/formulario-encuesta.js';
 import { render as renderSync } from './screens/estado-sincronizacion.js';
+import { render as renderLogin } from './screens/login.js';
 import { getMunicipios, saveMunicipios } from './db.js';
 import { fetchMunicipios } from './api.js';
 import { syncNow } from './sync.js';
 import { showToast } from './utils.js';
+import { hasActiveSession } from './session.js';
 
 const appRoot = document.getElementById('app-root');
 
 function getRoot() { return appRoot; }
 
-onRoute('/personas', () => renderLista(getRoot()));
-onRoute('/nueva', () => renderFormulario(getRoot(), {}));
-onRoute('/editar/:tipo/:numero', params => renderFormulario(getRoot(), params));
-onRoute('/sync', () => renderSync(getRoot()));
+function protect(handler) {
+  return params => {
+    if (!hasActiveSession()) { navigate('/login'); return; }
+    handler(params);
+  };
+}
+
+onRoute('/login', () => renderLogin(getRoot()));
+onRoute('/personas', protect(() => renderLista(getRoot())));
+onRoute('/nueva', protect(() => renderFormulario(getRoot(), {})));
+onRoute('/editar/:tipo/:numero', protect(params => renderFormulario(getRoot(), params)));
+onRoute('/sync', protect(() => renderSync(getRoot())));
 
 async function loadMunicipios() {
   try {
@@ -56,12 +66,21 @@ function setupBottomNav() {
   });
 }
 
+function updateChrome() {
+  const hash = window.location.hash.replace('#', '') || '/personas';
+  const isLogin = hash === '/login';
+  document.querySelector('.app-header')?.classList.toggle('chrome-hidden', isLogin);
+  document.querySelector('.bottom-nav')?.classList.toggle('chrome-hidden', isLogin);
+}
+
 async function init() {
   registerSW();
   setupBottomNav();
   setupOnlineSync();
+  window.addEventListener('hashchange', updateChrome);
   await loadMunicipios();
   initRouter();
+  updateChrome();
   autoSync();
 }
 

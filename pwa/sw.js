@@ -1,4 +1,4 @@
-const CACHE = 'encuestas-v1';
+const CACHE = 'encuestas-v2';
 
 const ASSETS = [
   './index.html',
@@ -10,10 +10,12 @@ const ASSETS = [
   './js/api.js',
   './js/sync.js',
   './js/router.js',
+  './js/session.js',
   './js/app.js',
   './js/screens/lista-personas.js',
   './js/screens/formulario-encuesta.js',
-  './js/screens/estado-sincronizacion.js'
+  './js/screens/estado-sincronizacion.js',
+  './js/screens/login.js'
 ];
 
 self.addEventListener('install', e => {

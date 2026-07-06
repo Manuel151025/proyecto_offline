@@ -1,5 +1,5 @@
 const DB_NAME = 'encuestas_minsalud';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 let dbInstance = null;
 
@@ -18,6 +18,9 @@ function openDB() {
       if (!db.objectStoreNames.contains('sync_queue')) {
         const qs = db.createObjectStore('sync_queue', { keyPath: 'id', autoIncrement: true });
         qs.createIndex('by_status', 'status');
+      }
+      if (!db.objectStoreNames.contains('credenciales')) {
+        db.createObjectStore('credenciales', { keyPath: 'documento' });
       }
     };
     req.onsuccess = e => { dbInstance = e.target.result; resolve(dbInstance); };
@@ -174,4 +177,19 @@ export async function getSyncCounts() {
     error: all.filter(i => i.status === 'ERROR').length,
     total: all.length
   };
+}
+
+// --- Credenciales (login offline) ---
+
+export async function getCredencial(documento) {
+  return openDB().then(db => new Promise((resolve, reject) => {
+    const t = db.transaction('credenciales', 'readonly');
+    const req = t.objectStore('credenciales').get(documento);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = e => reject(e.target.error);
+  }));
+}
+
+export async function saveCredencial(cred) {
+  return request('credenciales', 'readwrite', store => store.put(cred));
 }
