@@ -763,6 +763,18 @@ html, body {
   max-width: 260px;
 }
 
+.login-demo-note {
+  margin-top: 14px;
+  padding: 10px 12px;
+  border: 1px dashed rgba(14,122,65,0.35);
+  border-radius: 10px;
+  background: rgba(232,245,233,0.6);
+  color: var(--login-green-dark);
+  font-size: 0.78rem;
+  text-align: center;
+  line-height: 1.5;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .login-screen,
   .login-blob-1,

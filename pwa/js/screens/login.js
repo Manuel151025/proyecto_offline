@@ -68,6 +68,10 @@ export async function render(container) {
         <span id="login-submit-label">Ingresar</span>
       </button>
     </form>
+    <div class="login-demo-note">
+      <strong>Cuenta de prueba (docente)</strong><br>
+      Documento: <b>1000000001</b> &middot; Contrase&ntilde;a: <b>Demo2026Salud</b>
+    </div>
   `;
 
   const docInput = document.getElementById('login-doc');
