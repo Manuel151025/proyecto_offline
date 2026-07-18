@@ -9,9 +9,9 @@ import retrofit2.http.GET
 import retrofit2.http.POST
 
 interface ApiService {
-    @POST("api/personas/sync")
+    @POST("api/personas/sync.php")
     suspend fun syncData(@Body payload: SyncRequestDto): Response<SyncResponseDto>
 
-    @GET("api/municipios")
+    @GET("api/municipios/index.php")
     suspend fun getMunicipios(): Response<List<MunicipioDto>>
 }

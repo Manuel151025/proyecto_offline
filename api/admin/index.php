@@ -57,9 +57,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 header('Location: index.php');
                 exit;
             } catch (PDOException $e) {
+                error_log('[admin] ' . $e->getMessage());
                 $error = ($e->getCode() === '23000')
                     ? 'Ese número de documento ya está registrado'
-                    : 'Error al guardar: ' . $e->getMessage();
+                    : 'Error al guardar. Intenta de nuevo.';
             }
         }
     }

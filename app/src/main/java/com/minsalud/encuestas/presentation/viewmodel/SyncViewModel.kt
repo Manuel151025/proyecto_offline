@@ -28,7 +28,7 @@ class SyncViewModel @Inject constructor(
     private val _uiState = MutableStateFlow(SyncUiState())
     val uiState: StateFlow<SyncUiState> = _uiState.asStateFlow()
 
-    // Este es solo para sincronizaciÃ³n manual provocada por el usuario (el Worker lo hace en background de todos modos)
+    // Este es solo para sincronización manual provocada por el usuario (el Worker lo hace en background de todos modos)
     fun onSincronizarManual() {
         viewModelScope.launch {
             _uiState.value = _uiState.value.copy(isSyncing = true, message = null)
@@ -37,7 +37,7 @@ class SyncViewModel @Inject constructor(
                 is Result.Success -> {
                     _uiState.value = _uiState.value.copy(
                         isSyncing = false,
-                        message = "SincronizaciÃ³n manual encolada o completada"
+                        message = "Sincronización manual encolada o completada"
                     )
                 }
                 is Result.Error -> {

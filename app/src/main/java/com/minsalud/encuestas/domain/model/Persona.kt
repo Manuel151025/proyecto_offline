@@ -9,6 +9,7 @@ data class Persona(
     val telefono: String?,
     val email: String?,
     val direccion: String?,
+    val vereda: String?,
     val eps: String?,
     val ocupacion: String?,
     val estrato: Int?,

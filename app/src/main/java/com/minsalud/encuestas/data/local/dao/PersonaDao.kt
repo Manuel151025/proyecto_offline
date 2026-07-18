@@ -16,4 +16,7 @@ interface PersonaDao {
 
     @Query("SELECT * FROM personas WHERE deleted_at IS NULL")
     fun getAllPersonas(): Flow<List<PersonaEntity>>
+
+    @Query("SELECT * FROM personas WHERE deleted_at IS NULL ORDER BY updated_at DESC")
+    suspend fun getAllPersonasList(): List<PersonaEntity>
 }

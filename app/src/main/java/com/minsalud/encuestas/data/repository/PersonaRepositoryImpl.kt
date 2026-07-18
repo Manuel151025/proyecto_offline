@@ -4,6 +4,7 @@ import com.minsalud.encuestas.data.local.dao.PersonaDao
 import com.minsalud.encuestas.data.mapper.toDomain
 import com.minsalud.encuestas.data.mapper.toEntity
 import com.minsalud.encuestas.domain.model.Persona
+import com.minsalud.encuestas.domain.model.TipoDocumento
 import com.minsalud.encuestas.domain.repository.PersonaRepository
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map

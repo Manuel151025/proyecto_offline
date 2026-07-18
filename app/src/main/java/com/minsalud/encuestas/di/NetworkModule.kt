@@ -1,5 +1,6 @@
 ﻿package com.minsalud.encuestas.di
 
+import com.google.gson.GsonBuilder
 import com.minsalud.encuestas.data.remote.api.ApiService
 import dagger.Module
 import dagger.Provides
@@ -60,10 +61,13 @@ object NetworkModule {
     @Provides
     @Singleton
     fun provideRetrofit(okHttpClient: OkHttpClient): Retrofit {
+        // serializeNulls: envía TODOS los campos (incluso null) para que el backend
+        // no dispare warnings de "clave indefinida" que corromperían el JSON de respuesta.
+        val gson = GsonBuilder().serializeNulls().create()
         return Retrofit.Builder()
-            .baseUrl("https://encuestas.manuelcardenas.online/api/")
+            .baseUrl("https://encuestas.manuelcardenas.online/")
             .client(okHttpClient)
-            .addConverterFactory(GsonConverterFactory.create())
+            .addConverterFactory(GsonConverterFactory.create(gson))
             .build()
     }
 

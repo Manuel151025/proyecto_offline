@@ -1,15 +1,22 @@
 const BASE_URL = '../api';
 
 export async function login(numero_documento, password) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10000);
   let res;
   try {
     res = await fetch(`${BASE_URL}/auth/login.php`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ numero_documento, password })
+      body: JSON.stringify({ numero_documento, password }),
+      signal: controller.signal
     });
-  } catch (_) {
-    throw new Error('No se pudo conectar con el servidor');
+  } catch (err) {
+    throw new Error(err.name === 'AbortError'
+      ? 'El servidor no respondió. Verifica tu conexión.'
+      : 'No se pudo conectar con el servidor');
+  } finally {
+    clearTimeout(timeout);
   }
   const data = await res.json().catch(() => ({}));
   if (!res.ok || !data.success) throw new Error(data.message || 'Documento o contraseña incorrectos');

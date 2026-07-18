@@ -143,6 +143,13 @@ export async function getPendingSync() {
   }));
 }
 
+// Items que deben (re)intentarse: pendientes + los que fallaron antes.
+// Sin esto, un fallo transitorio deja los registros en ERROR para siempre.
+export async function getRetriableSync() {
+  const all = await getAllSyncItems();
+  return all.filter(i => i.status === 'PENDING' || i.status === 'ERROR');
+}
+
 export async function updateSyncItems(ids, status) {
   const db = await openDB();
   return new Promise((resolve, reject) => {

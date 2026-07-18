@@ -11,7 +11,7 @@ class RegistrarEncuestaUseCase(
     suspend operator fun invoke(encuesta: Encuesta): Result<Unit> {
         return try {
             if (encuesta.id.isBlank() || encuesta.numeroDocumento.isBlank()) {
-                return Result.Error(DomainError.InvalidData("Datos de encuesta invÃ¡lidos"))
+                return Result.Error(DomainError.InvalidData("Datos de encuesta inválidos"))
             }
             encuestaRepository.saveEncuesta(encuesta)
             Result.Success(Unit)

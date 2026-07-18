@@ -38,6 +38,10 @@ abstract class RepositoryModule {
 
     @Binds
     @Singleton
+    abstract fun bindAuthRepository(impl: AuthRepositoryImpl): AuthRepository
+
+    @Binds
+    @Singleton
     abstract fun bindTimeProvider(impl: TimeProviderImpl): TimeProvider
 
     @Binds

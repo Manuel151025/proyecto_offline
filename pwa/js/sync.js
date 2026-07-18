@@ -1,4 +1,4 @@
-import { getPendingSync, updateSyncItems, markPersonasSynced } from './db.js';
+import { getRetriableSync, updateSyncItems, markPersonasSynced } from './db.js';
 import { syncData } from './api.js';
 
 let syncing = false;
@@ -7,8 +7,9 @@ export async function syncNow() {
   if (syncing) return { synced: 0, message: 'Sincronización en curso' };
   syncing = true;
 
+  let ids = [];
   try {
-    const pending = await getPendingSync();
+    const pending = await getRetriableSync();
     if (pending.length === 0) return { synced: 0, message: 'Sin pendientes' };
 
     const personas = pending.map(i => {
@@ -16,7 +17,7 @@ export async function syncNow() {
       return clean;
     });
     const encuestas = pending.map(i => i.encuesta);
-    const ids = pending.map(i => i.id);
+    ids = pending.map(i => i.id);
     const personaKeys = pending.map(i => [i.persona.tipo_documento, i.persona.numero_documento]);
 
     await syncData({ personas, encuestas });
@@ -25,8 +26,7 @@ export async function syncNow() {
 
     return { synced: ids.length, message: `${ids.length} registro(s) sincronizados` };
   } catch (err) {
-    const pending = await getPendingSync();
-    const ids = pending.map(i => i.id);
+    // Marcamos ERROR solo los que intentamos ahora; getRetriableSync los volverá a tomar.
     if (ids.length) await updateSyncItems(ids, 'ERROR');
     throw err;
   } finally {

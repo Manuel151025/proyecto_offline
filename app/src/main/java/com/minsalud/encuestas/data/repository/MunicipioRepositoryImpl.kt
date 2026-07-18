@@ -1,6 +1,7 @@
 ﻿package com.minsalud.encuestas.data.repository
 
 import com.minsalud.encuestas.data.local.dao.MunicipioDao
+import com.minsalud.encuestas.data.local.seed.MunicipiosSeed
 import com.minsalud.encuestas.data.mapper.toDomain
 import com.minsalud.encuestas.data.remote.api.ApiService
 import com.minsalud.encuestas.domain.model.Municipio
@@ -29,6 +30,12 @@ class MunicipioRepositoryImpl @Inject constructor(
             }
         } catch (e: Exception) {
             // Manejado silenciosamente, se mostrarÃ¡ listado local
+        }
+    }
+
+    override suspend fun seedMunicipiosIfEmpty() {
+        if (municipioDao.count() == 0) {
+            municipioDao.insertAll(MunicipiosSeed.data)
         }
     }
 }

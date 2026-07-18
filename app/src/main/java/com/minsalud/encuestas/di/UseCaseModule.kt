@@ -56,6 +56,21 @@ object UseCaseModule {
     ): SincronizarMunicipiosUseCase = SincronizarMunicipiosUseCase(municipioRepository)
 
     @Provides
+    fun provideSeedMunicipiosUseCase(
+        municipioRepository: MunicipioRepository
+    ): SeedMunicipiosUseCase = SeedMunicipiosUseCase(municipioRepository)
+
+    @Provides
+    fun provideLoginUseCase(
+        authRepository: AuthRepository
+    ): LoginUseCase = LoginUseCase(authRepository)
+
+    @Provides
+    fun provideObtenerPendientesUseCase(
+        syncRepository: SyncRepository
+    ): ObtenerPendientesUseCase = ObtenerPendientesUseCase(syncRepository)
+
+    @Provides
     fun provideGenerarReporteUseCase(
         reporteRepository: ReporteRepository
     ): GenerarReporteUseCase = GenerarReporteUseCase(reporteRepository)

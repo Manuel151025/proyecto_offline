@@ -11,6 +11,7 @@ import com.minsalud.encuestas.domain.model.ColaSincronizacion
 import com.minsalud.encuestas.domain.model.DomainError
 import com.minsalud.encuestas.domain.repository.SyncRepository
 import com.minsalud.encuestas.data.mapper.toEntity
+import kotlinx.coroutines.flow.Flow
 import java.io.IOException
 import javax.inject.Inject
 
@@ -24,6 +25,8 @@ class SyncRepositoryImpl @Inject constructor(
     override suspend fun addToOutbox(item: ColaSincronizacion) {
         colaDao.insertColaSincronizacion(item.toEntity())
     }
+
+    override fun pendingPersonaKeys(): Flow<List<String>> = colaDao.getPendingPersonaKeys()
 
     override suspend fun sincronizarPendientes() {
         val pendientes = colaDao.getPendientes()
@@ -40,7 +43,7 @@ class SyncRepositoryImpl @Inject constructor(
                     continue
                 }
 
-                val personaEntity = personaDao.getPersona(encuestaEntity.tipoDocumento, encuestaEntity.numeroDocumento)
+                val personaEntity = personaDao.getPersona(encuestaEntity.tipoDocumento.name, encuestaEntity.numeroDocumento)
                 if (personaEntity == null) {
                     colaDao.marcarError(item.idCola, "Persona eliminada localmente")
                     continue
@@ -55,6 +58,7 @@ class SyncRepositoryImpl @Inject constructor(
                     telefono = personaEntity.telefono,
                     email = personaEntity.email,
                     direccion = personaEntity.direccion,
+                    vereda = personaEntity.vereda,
                     eps = personaEntity.eps,
                     ocupacion = personaEntity.ocupacion,
                     estrato = personaEntity.estrato,

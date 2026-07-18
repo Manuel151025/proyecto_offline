@@ -16,6 +16,7 @@ data class PersonaEntity(
     @ColumnInfo(name = "telefono") val telefono: String?,
     @ColumnInfo(name = "email") val email: String?,
     @ColumnInfo(name = "direccion") val direccion: String?,
+    @ColumnInfo(name = "vereda") val vereda: String?,
     @ColumnInfo(name = "eps") val eps: String?,
     @ColumnInfo(name = "ocupacion") val ocupacion: String?,
     @ColumnInfo(name = "estrato") val estrato: Int?,

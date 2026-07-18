@@ -20,7 +20,9 @@ class EncuestasApp : Application(), Configuration.Provider {
 
     override fun onCreate() {
         super.onCreate()
-        // Programar sincronización periódica tan pronto arranca la App
+        // Sincronización periódica de respaldo + un intento inmediato (se ejecuta
+        // apenas haya red gracias a la constraint CONNECTED) para vaciar pendientes.
         SyncWorkerScheduler.schedulePeriodicSync(this)
+        SyncWorkerScheduler.triggerImmediateSync(this)
     }
 }

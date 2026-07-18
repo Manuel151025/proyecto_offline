@@ -1,4 +1,4 @@
-const CACHE = 'encuestas-v2';
+const CACHE = 'encuestas-v4';
 
 const ASSETS = [
   './index.html',

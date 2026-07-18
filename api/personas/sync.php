@@ -92,10 +92,11 @@ try {
 
 } catch (Exception $e) {
     $pdo->rollBack();
+    error_log('[sync] ' . $e->getMessage());
     http_response_code(500);
     echo json_encode([
-        "success" => false, 
-        "message" => "Error durante sincronización: " . $e->getMessage()
+        "success" => false,
+        "message" => "Error durante la sincronización. Intenta de nuevo."
     ]);
 }
 ?>

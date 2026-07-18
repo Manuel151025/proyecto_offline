@@ -16,6 +16,7 @@ data class PersonaSyncDto(
     @SerializedName("telefono") val telefono: String?,
     @SerializedName("email") val email: String?,
     @SerializedName("direccion") val direccion: String?,
+    @SerializedName("vereda") val vereda: String?,
     @SerializedName("eps") val eps: String?,
     @SerializedName("ocupacion") val ocupacion: String?,
     @SerializedName("estrato") val estrato: Int?,

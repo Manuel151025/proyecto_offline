@@ -14,4 +14,7 @@ interface MunicipioDao {
 
     @Query("SELECT * FROM municipios")
     fun getAllMunicipios(): Flow<List<MunicipioEntity>>
+
+    @Query("SELECT COUNT(*) FROM municipios")
+    suspend fun count(): Int
 }

@@ -1,15 +1,4 @@
-CREATE DATABASE IF NOT EXISTS minsalud_encuestas;
-USE minsalud_encuestas;
-
-CREATE TABLE IF NOT EXISTS municipios (
-    codigo VARCHAR(10) PRIMARY KEY,
-    nombre VARCHAR(100) NOT NULL,
-    departamento VARCHAR(100) NOT NULL
-);
-
--- Municipios de Colombia (DIVIPOLA/DANE): los 33 departamentos con su capital y
--- principales municipios. ON DUPLICATE KEY UPDATE lo hace idempotente y corrige
--- filas ya existentes (p. ej. el departamento de Bogotá D.C.).
+-- Seed independiente de municipios (idempotente). Generado desde schema.sql.
 INSERT INTO municipios (codigo, nombre, departamento) VALUES
 ('11001', 'Bogotá D.C.', 'Bogotá D.C.'),
 -- Antioquia
@@ -206,51 +195,3 @@ INSERT INTO municipios (codigo, nombre, departamento) VALUES
 ('99524', 'La Primavera', 'Vichada'),
 ('99773', 'Cumaribo', 'Vichada')
 ON DUPLICATE KEY UPDATE nombre = VALUES(nombre), departamento = VALUES(departamento);
-
-CREATE TABLE IF NOT EXISTS encuestadores (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    nombre VARCHAR(100) NOT NULL,
-    numero_documento VARCHAR(20) NULL UNIQUE,
-    password_hash VARCHAR(255) NULL,
-    activo TINYINT(1) DEFAULT 1
-);
-
--- Cuenta de prueba (docente). Documento: 1000000001 · Contraseña: Demo2026Salud
-INSERT IGNORE INTO encuestadores (id, nombre, numero_documento, password_hash, activo)
-VALUES (1, 'Docente Demo', '1000000001', '$2y$10$qmWUgVcOwT/wYnYzdxTXTOx3DNFdKnOUhaNdI/TneSZsbySFu24PC', 1);
-
--- Tabla personas (Clave compuesta: tipo_documento, numero_documento)
--- Esta es la tabla central del Last-Write-Wins
-CREATE TABLE IF NOT EXISTS personas (
-    tipo_documento VARCHAR(10) NOT NULL,
-    numero_documento VARCHAR(20) NOT NULL,
-    nombres VARCHAR(100) NOT NULL,
-    apellidos VARCHAR(100) NOT NULL,
-    fecha_nacimiento BIGINT NULL,
-    telefono VARCHAR(20) NULL,
-    email VARCHAR(100) NULL,
-    direccion VARCHAR(150) NULL,
-    vereda VARCHAR(100) NULL,
-    eps VARCHAR(50) NULL,
-    ocupacion VARCHAR(100) NULL,
-    estrato INT NULL,
-    municipio_codigo VARCHAR(10) NULL,
-    updated_at BIGINT NOT NULL,  -- CRÍTICO PARA EL ALGORITMO LWW
-    device_id VARCHAR(50) NOT NULL,
-    deleted_at BIGINT NULL,
-    PRIMARY KEY (tipo_documento, numero_documento),
-    FOREIGN KEY (municipio_codigo) REFERENCES municipios(codigo)
-);
-
-CREATE TABLE IF NOT EXISTS encuestas (
-    id VARCHAR(50) PRIMARY KEY, -- UUID generado en el dispositivo
-    tipo_documento VARCHAR(10) NOT NULL,
-    numero_documento VARCHAR(20) NOT NULL,
-    id_encuestador INT NOT NULL,
-    fecha_encuesta BIGINT NOT NULL,
-    device_id VARCHAR(50) NOT NULL,
-    accion VARCHAR(20) NOT NULL,
-    server_sync_time BIGINT NOT NULL, -- Hora en que el servidor la procesó
-    FOREIGN KEY (tipo_documento, numero_documento) REFERENCES personas(tipo_documento, numero_documento),
-    FOREIGN KEY (id_encuestador) REFERENCES encuestadores(id)
-);
