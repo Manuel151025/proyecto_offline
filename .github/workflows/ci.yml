@@ -42,15 +42,22 @@ jobs:
       # Publica el error como anotación del check. El contenido del log solo es
       # accesible con autenticación, mientras que las anotaciones son públicas:
       # así el motivo del fallo se ve desde el PR sin abrir la ejecución.
+      #
+      # Las líneas van numeradas con `nl` a propósito: GitHub deduplica
+      # anotaciones con el mismo texto y sin numerar se pierden las líneas
+      # repetidas y el orden, que es justo donde está la causa raíz.
       - name: Publicar causa del fallo
         if: failure()
         run: |
           for archivo in /tmp/gradle-test.log /tmp/gradle-assemble.log; do
             [ -f "$archivo" ] || continue
-            sed -n '/FAILURE: Build failed/,$p' "$archivo" | head -40 \
-              | while IFS= read -r linea; do
-                  [ -n "$linea" ] && echo "::error::$linea"
-                done
+            {
+              sed -n '/FAILURE: Build failed/,$p' "$archivo" | head -35
+              echo "--- causas anidadas ---"
+              grep -F "Caused by" "$archivo" | head -10
+            } | nl -ba | while IFS= read -r linea; do
+                echo "::error::$linea"
+              done
           done
 
       - name: Publicar reporte de pruebas
