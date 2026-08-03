@@ -1,0 +1,97 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+# Cancela ejecuciones anteriores de la misma rama para no gastar minutos de más.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  android:
+    name: Android · pruebas y compilación
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # AGP 8.2 requiere JDK 17; con JDK 21 falla JdkImageTransform.
+      - name: Configurar JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Configurar Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Ejecutar pruebas unitarias
+        run: ./gradlew testDebugUnitTest --stacktrace
+
+      - name: Compilar APK de depuración
+        run: ./gradlew assembleDebug --stacktrace
+
+      - name: Publicar reporte de pruebas
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reporte-pruebas-android
+          path: app/build/reports/tests/testDebugUnitTest/
+          retention-days: 7
+
+  php:
+    name: API · análisis estático PHP
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configurar PHP 8.2
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: pdo, pdo_mysql, mbstring
+
+      - name: Validar sintaxis de todos los archivos PHP
+        run: |
+          set -e
+          encontrados=0
+          while IFS= read -r archivo; do
+            php -l "$archivo"
+            encontrados=$((encontrados + 1))
+          done < <(find api -name '*.php' -type f)
+          echo "✓ $encontrados archivos PHP validados"
+
+      # Solo llamadas reales a header(); los comentarios pueden mencionar el patrón.
+      - name: Verificar que no quede CORS permisivo
+        run: |
+          if grep -rnE "header\(['\"]Access-Control-Allow-Origin:[[:space:]]*\*" api/; then
+            echo "::error::Se encontró CORS permisivo (*). Usa aplicarCors() de api/cors.php."
+            exit 1
+          fi
+          echo "✓ Sin CORS permisivo"
+
+      - name: Verificar que los endpoints de escritura exijan autenticación
+        run: |
+          if ! grep -q "requerirAutenticacion" api/personas/sync.php; then
+            echo "::error::api/personas/sync.php debe exigir un token de autenticación."
+            exit 1
+          fi
+          echo "✓ Endpoint de sincronización protegido"
+
+  pwa:
+    name: PWA · integridad del modo offline
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configurar Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Verificar caché del service worker y manifest
+        run: node scripts/check-pwa-assets.mjs
