@@ -29,6 +29,26 @@ class SessionManager @Inject constructor(
             .apply()
     }
 
+    /**
+     * Token de API para autenticar la sincronización. Se emite en el login en
+     * línea y sobrevive a los inicios de sesión sin conexión, porque el trabajo
+     * de campo ocurre offline y la cola se envía cuando vuelve la red.
+     * Devuelve null si no hay token o si ya venció.
+     */
+    fun token(): String? {
+        val token = prefs.getString(KEY_TOKEN, null) ?: return null
+        val expiraEn = prefs.getLong(KEY_TOKEN_EXP, 0L)
+        if (expiraEn > 0L && System.currentTimeMillis() / 1000 > expiraEn) return null
+        return token
+    }
+
+    fun saveToken(token: String, expiraEn: Long) {
+        prefs.edit()
+            .putString(KEY_TOKEN, token)
+            .putLong(KEY_TOKEN_EXP, expiraEn)
+            .apply()
+    }
+
     fun clear() {
         // No borramos la preferencia de tema al cerrar sesión.
         val theme = themeMode()
@@ -47,5 +67,7 @@ class SessionManager @Inject constructor(
         const val KEY_NOMBRE = "nombre"
         const val KEY_DOC = "documento"
         const val KEY_THEME = "theme_mode"
+        const val KEY_TOKEN = "api_token"
+        const val KEY_TOKEN_EXP = "api_token_expira_en"
     }
 }

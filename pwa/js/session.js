@@ -20,3 +20,17 @@ export function clearSession() {
 export function hasActiveSession() {
   return !!getSession();
 }
+
+/**
+ * Token de API para autenticar la sincronización.
+ * Se emite al iniciar sesión en línea; el login offline lo recupera de la
+ * credencial guardada en IndexedDB, de modo que un encuestador que entra sin
+ * red conserva el token emitido la última vez que estuvo conectado.
+ * Devuelve null si no hay token o si ya venció (expira_en va en segundos).
+ */
+export function getToken() {
+  const session = getSession();
+  if (!session?.token) return null;
+  if (session.expiraEn && Date.now() / 1000 > session.expiraEn) return null;
+  return session.token;
+}

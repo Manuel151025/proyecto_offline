@@ -1,6 +1,8 @@
 ﻿package com.minsalud.encuestas.di
 
 import com.google.gson.GsonBuilder
+import com.minsalud.encuestas.BuildConfig
+import com.minsalud.encuestas.data.local.prefs.SessionManager
 import com.minsalud.encuestas.data.remote.api.ApiService
 import dagger.Module
 import dagger.Provides
@@ -27,18 +29,35 @@ object NetworkModule {
     @Singleton
     fun provideLoggingInterceptor(): HttpLoggingInterceptor {
         return HttpLoggingInterceptor().apply {
-            level = HttpLoggingInterceptor.Level.BODY
+            // En release no se vuelca el cuerpo: el login lleva la contraseña
+            // en claro y las demás peticiones el token de sesión.
+            level = if (BuildConfig.DEBUG) {
+                HttpLoggingInterceptor.Level.BODY
+            } else {
+                HttpLoggingInterceptor.Level.NONE
+            }
+            redactHeader("Authorization")
         }
     }
 
+    /**
+     * Adjunta el token de sesión a cada petición saliente. El login se excluye
+     * porque es justamente el endpoint que emite el token.
+     */
     @Provides
     @Singleton
     @AuthInterceptor
-    fun provideAuthInterceptor(): Interceptor {
+    fun provideAuthInterceptor(sessionManager: SessionManager): Interceptor {
         return Interceptor { chain ->
-            val request = chain.request().newBuilder()
-                // .addHeader("Authorization", "Bearer TOKEN")
-                .build()
+            val original = chain.request()
+            val token = sessionManager.token()
+
+            val request = if (token != null && !original.url.encodedPath.endsWith("login.php")) {
+                original.newBuilder().addHeader("Authorization", "Bearer $token").build()
+            } else {
+                original
+            }
+
             chain.proceed(request)
         }
     }

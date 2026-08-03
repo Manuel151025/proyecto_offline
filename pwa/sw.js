@@ -1,4 +1,7 @@
-const CACHE = 'encuestas-v4';
+// Subir esta versión en cada cambio de JS/CSS: el fetch es cache-first, así que
+// sin bump los navegadores seguirían sirviendo los archivos viejos.
+// v5: api.js y session.js ahora envían el token de autenticación en la sincronización.
+const CACHE = 'encuestas-v5';
 
 const ASSETS = [
   './index.html',

@@ -254,3 +254,17 @@ CREATE TABLE IF NOT EXISTS encuestas (
     FOREIGN KEY (tipo_documento, numero_documento) REFERENCES personas(tipo_documento, numero_documento),
     FOREIGN KEY (id_encuestador) REFERENCES encuestadores(id)
 );
+
+-- Sesiones de API (tokens opacos). Ver api/auth_token.php.
+-- Solo se guarda el hash SHA-256 del token: una filtración de esta tabla
+-- no permite suplantar a ningún encuestador.
+CREATE TABLE IF NOT EXISTS sesiones (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    token_hash CHAR(64) NOT NULL UNIQUE,
+    id_encuestador INT NOT NULL,
+    creado_en BIGINT NOT NULL,
+    expira_en BIGINT NOT NULL,
+    ultimo_uso BIGINT NULL,
+    INDEX idx_sesiones_expira (expira_en),
+    FOREIGN KEY (id_encuestador) REFERENCES encuestadores(id) ON DELETE CASCADE
+);

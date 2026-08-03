@@ -1,44 +1,50 @@
 <?php
-header("Content-Type: application/json; charset=UTF-8");
-header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Methods: POST, OPTIONS");
-header("Access-Control-Allow-Headers: Content-Type");
-if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') { http_response_code(200); exit; }
+require_once __DIR__ . '/../cors.php';
+aplicarCors('POST, OPTIONS');
 
-require_once '../db.php';
+require_once __DIR__ . '/../db.php';
+require_once __DIR__ . '/../auth_token.php';
+
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    responderError(405, 'Método no permitido');
+}
 
 $data = json_decode(file_get_contents('php://input'), true);
-$documento = trim($data['numero_documento'] ?? '');
+if (!is_array($data)) {
+    responderError(400, 'Payload inválido');
+}
+
+$documento = trim((string)($data['numero_documento'] ?? ''));
 $password = (string)($data['password'] ?? '');
 
 if ($documento === '' || $password === '') {
-    http_response_code(400);
-    echo json_encode(["success" => false, "message" => "Documento y contraseña son requeridos"]);
-    exit;
+    responderError(400, 'Documento y contraseña son requeridos');
 }
 
 try {
-    $stmt = $pdo->prepare("SELECT id, nombre, password_hash, activo FROM encuestadores WHERE numero_documento = ?");
+    $stmt = $pdo->prepare('SELECT id, nombre, password_hash, activo FROM encuestadores WHERE numero_documento = ?');
     $stmt->execute([$documento]);
     $encuestador = $stmt->fetch();
 
     if (!$encuestador || !$encuestador['activo'] || !$encuestador['password_hash']
         || !password_verify($password, $encuestador['password_hash'])) {
-        http_response_code(401);
-        echo json_encode(["success" => false, "message" => "Documento o contraseña incorrectos"]);
-        exit;
+        // Mensaje genérico: no revelamos si el documento existe o no.
+        responderError(401, 'Documento o contraseña incorrectos');
     }
 
+    $sesion = emitirToken($pdo, (int)$encuestador['id']);
+
     echo json_encode([
-        "success" => true,
-        "encuestador" => [
-            "id" => (int)$encuestador['id'],
-            "nombre" => $encuestador['nombre'],
-            "numero_documento" => $documento
-        ]
+        'success' => true,
+        'token' => $sesion['token'],
+        'expira_en' => $sesion['expira_en'],
+        'encuestador' => [
+            'id' => (int)$encuestador['id'],
+            'nombre' => $encuestador['nombre'],
+            'numero_documento' => $documento,
+        ],
     ]);
 } catch (Exception $e) {
-    http_response_code(500);
-    echo json_encode(["success" => false, "message" => "Error de servidor"]);
+    error_log('[login] ' . $e->getMessage());
+    responderError(500, 'Error de servidor');
 }
-?>
