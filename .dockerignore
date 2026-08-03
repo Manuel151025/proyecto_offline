@@ -1,0 +1,53 @@
+# Contexto de build de la imagen PHP/Apache.
+#
+# El docroot del contenedor es /var/www/html y el Dockerfile hace `COPY . /var/www/html/`,
+# asi que TODO lo que entre aqui queda publicado por HTTP. Este archivo recorta el
+# contexto a lo unico que Apache necesita en runtime: api/ y pwa/.
+#
+# Nota: .dockerignore solo filtra el contexto de build de la IMAGEN. No afecta a los
+# bind mounts de docker-compose (p. ej. ./database/schema.sql -> docker-entrypoint-initdb.d
+# del servicio db, que sigue funcionando igual).
+
+# --- Secretos y control de versiones ---
+.git/
+.gitignore
+.env
+.env.*
+# La negacion va DESPUES de .env.* para que si aplique.
+!.env.example
+
+# --- Ficheros de despliegue (no se sirven; Docker lee el Dockerfile aparte) ---
+Dockerfile
+.dockerignore
+docker-compose*.yml
+
+# --- Scripts de scaffolding del proyecto ---
+*.ps1
+
+# --- Proyecto Android: nada de esto lo usa el contenedor ---
+app/
+gradle/
+gradlew
+gradlew.bat
+gradle.properties
+*.kts
+*.gradle
+.gradle/
+local.properties
+
+# --- Entornos de desarrollo ---
+.idea/
+.vscode/
+
+# --- Documentacion y material de diseno ---
+*.md
+design_handoff_login/
+
+# --- Esquema y seeds SQL ---
+# Seguro de excluir: ningun PHP lee database/ en runtime. api/setup/migrate.php
+# lleva su SQL embebido precisamente por esto. El servicio db sigue recibiendo
+# schema.sql por bind mount desde el host, no desde la imagen.
+#
+# NO quitar esta exclusion: el docroot es /var/www/html, asi que cualquier .sql
+# que entre en la imagen queda descargable por HTTP.
+database/

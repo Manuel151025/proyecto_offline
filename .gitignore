@@ -35,6 +35,9 @@ Desktop.ini
 
 # Configuración del entorno
 .env
+.env.*
+# La negación va DESPUÉS de .env.* para que sí aplique.
+!.env.example
 
 # Scripts temporales del agente
 step*.ps1
