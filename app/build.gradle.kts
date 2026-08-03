@@ -5,6 +5,14 @@ plugins {
     id("com.google.dagger.hilt.android")
 }
 
+// AGP 8.2 requiere JDK 17. Fijar el toolchain hace la compilación reproducible
+// aunque el equipo (o el runner de CI) tenga instalada otra versión de Java.
+java {
+    toolchain {
+        languageVersion.set(JavaLanguageVersion.of(17))
+    }
+}
+
 android {
     namespace = "com.minsalud.encuestas"
     compileSdk = 34
@@ -37,6 +45,13 @@ android {
     }
     buildFeatures {
         compose = true
+        // Necesario para BuildConfig.DEBUG: en release no se registran los
+        // cuerpos HTTP (contienen contraseñas y el token de sesión).
+        buildConfig = true
+    }
+
+    testOptions {
+        unitTests.isReturnDefaultValues = true
     }
     composeOptions {
         kotlinCompilerExtensionVersion = "1.5.8"
@@ -85,6 +100,9 @@ dependencies {
     
     // Test
     testImplementation("junit:junit:4.13.2")
+    testImplementation("io.mockk:mockk:1.13.9")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
+    testImplementation("com.squareup.retrofit2:retrofit:2.9.0")
     androidTestImplementation("androidx.test.ext:junit:1.1.5")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.5.1")
     androidTestImplementation(platform("androidx.compose:compose-bom:2024.02.00"))
