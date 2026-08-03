@@ -30,10 +30,28 @@ jobs:
         uses: gradle/actions/setup-gradle@v3
 
       - name: Ejecutar pruebas unitarias
-        run: ./gradlew testDebugUnitTest --stacktrace
+        run: |
+          set -o pipefail
+          ./gradlew testDebugUnitTest --stacktrace 2>&1 | tee /tmp/gradle-test.log
 
       - name: Compilar APK de depuración
-        run: ./gradlew assembleDebug --stacktrace
+        run: |
+          set -o pipefail
+          ./gradlew assembleDebug --stacktrace 2>&1 | tee /tmp/gradle-assemble.log
+
+      # Publica el error como anotación del check. El contenido del log solo es
+      # accesible con autenticación, mientras que las anotaciones son públicas:
+      # así el motivo del fallo se ve desde el PR sin abrir la ejecución.
+      - name: Publicar causa del fallo
+        if: failure()
+        run: |
+          for archivo in /tmp/gradle-test.log /tmp/gradle-assemble.log; do
+            [ -f "$archivo" ] || continue
+            sed -n '/FAILURE: Build failed/,$p' "$archivo" | head -40 \
+              | while IFS= read -r linea; do
+                  [ -n "$linea" ] && echo "::error::$linea"
+                done
+          done
 
       - name: Publicar reporte de pruebas
         if: always()
