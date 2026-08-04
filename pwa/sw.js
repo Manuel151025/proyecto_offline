@@ -1,10 +1,11 @@
 // Subir esta versión en cada cambio de JS/CSS: el fetch es cache-first, así que
 // sin bump los navegadores seguirían sirviendo los archivos viejos.
+// v9: el HTML pasa a red-primero (servirlo obsoleto dejaba la app sin CSS).
 // v8: rediseño institucional del login y paleta unificada.
 // v7: .hidden pasa a !important (el spinner del login se veía siempre).
 // v6: styles.css se dividió en 7 hojas por responsabilidad.
 // v5: api.js y session.js ahora envían el token de autenticación en la sincronización.
-const CACHE = 'encuestas-v8';
+const CACHE = 'encuestas-v9';
 
 const ASSETS = [
   './index.html',
@@ -59,6 +60,32 @@ self.addEventListener('fetch', e => {
     return;
   }
 
+  // El HTML va por RED PRIMERO, con la caché como respaldo.
+  //
+  // Antes iba por caché primero, igual que el resto, y eso rompió la app al
+  // dividir styles.css: los navegadores servían el index.html viejo, que
+  // enlazaba una hoja que ya no existe, y la app quedaba sin ningún estilo.
+  // El HTML es el índice de todo lo demás, así que servirlo obsoleto puede
+  // dejar referencias colgando; conviene que sea lo primero en refrescarse.
+  //
+  // El modo offline se conserva: si no hay red, se responde desde la caché.
+  if (e.request.mode === 'navigate' || e.request.destination === 'document') {
+    e.respondWith(
+      fetch(e.request)
+        .then(res => {
+          if (res.ok) {
+            const clone = res.clone();
+            caches.open(CACHE).then(c => c.put('./index.html', clone));
+          }
+          return res;
+        })
+        .catch(() => caches.match('./index.html'))
+    );
+    return;
+  }
+
+  // El resto (CSS, JS, iconos) sí va por caché primero: son recursos estáticos
+  // y la versión de CACHE se encarga de invalidarlos cuando cambian.
   e.respondWith(
     caches.match(e.request).then(cached =>
       cached || fetch(e.request).then(res => {
