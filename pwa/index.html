@@ -15,7 +15,15 @@
   <link rel="manifest" href="./manifest.json" />
   <link rel="icon" href="./icons/icon.svg" type="image/svg+xml" />
   <link rel="apple-touch-icon" href="./icons/icon.svg" />
-  <link rel="stylesheet" href="./css/styles.css" />
+  <!-- El orden importa: la cascada de CSS depende de él. Estos archivos salieron
+       de un styles.css de 791 líneas y concatenados en este orden lo reproducen. -->
+  <link rel="stylesheet" href="./css/base.css" />
+  <link rel="stylesheet" href="./css/layout.css" />
+  <link rel="stylesheet" href="./css/components.css" />
+  <link rel="stylesheet" href="./css/forms.css" />
+  <link rel="stylesheet" href="./css/sync.css" />
+  <link rel="stylesheet" href="./css/feedback.css" />
+  <link rel="stylesheet" href="./css/login.css" />
 </head>
 <body>
   <div id="app-shell">

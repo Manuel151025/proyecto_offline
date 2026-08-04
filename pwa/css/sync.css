@@ -1,0 +1,58 @@
+/* Pantalla de estado de sincronización.
+   Extraído de styles.css; el orden de carga en index.html preserva la cascada. */
+
+/* ---- Sync screen ---- */
+.sync-screen { display: flex; flex-direction: column; gap: 16px; padding-top: 16px; padding-bottom: 32px; }
+
+.sync-status-card {
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 16px;
+  box-shadow: var(--shadow);
+  border: 1px solid var(--divider);
+}
+.sync-connection { display: flex; align-items: center; gap: 10px; font-size: 0.9rem; font-weight: 500; }
+.connection-dot { width: 12px; height: 12px; border-radius: 50%; background: #ccc; flex-shrink: 0; transition: background 0.3s; }
+.connection-dot.online { background: #4CAF50; box-shadow: 0 0 0 3px rgba(76,175,80,0.2); }
+.connection-dot.offline { background: #F44336; box-shadow: 0 0 0 3px rgba(244,67,54,0.2); }
+
+.sync-counts { display: flex; gap: 12px; }
+.count-card {
+  flex: 1;
+  background: var(--surface);
+  border-radius: var(--radius);
+  padding: 16px 10px;
+  text-align: center;
+  box-shadow: var(--shadow);
+  border: 1px solid var(--divider);
+}
+.count-number { font-size: 2rem; font-weight: 700; line-height: 1; }
+.count-label { font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 4px; color: var(--on-surface-secondary); }
+.count-pending .count-number { color: var(--warning); }
+.count-sent .count-number { color: var(--success); }
+.count-error .count-number { color: var(--error); }
+
+.btn-sync { font-size: 1rem; padding: 14px; }
+
+.sync-history-title {
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.8px;
+  color: var(--on-surface-secondary);
+  margin-top: 4px;
+}
+
+.sync-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--divider);
+  gap: 12px;
+}
+.sync-item:last-child { border-bottom: none; }
+.sync-item-info { min-width: 0; }
+.sync-item-name { font-size: 0.9rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sync-item-meta { font-size: 0.75rem; color: var(--on-surface-secondary); margin-top: 2px; }
+

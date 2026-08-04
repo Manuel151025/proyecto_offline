@@ -1,0 +1,89 @@
+/* Estructura: cabecera, área de contenido y navegación inferior.
+   Extraído de styles.css; el orden de carga en index.html preserva la cascada. */
+
+/* ---- Header ---- */
+.app-header {
+  background: var(--primary);
+  color: var(--on-primary);
+  padding: 0 16px;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+  z-index: 10;
+}
+
+.app-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+}
+
+.online-badge {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  background: #81C784;
+  border: 2px solid rgba(255,255,255,0.5);
+  transition: background 0.3s;
+}
+.online-badge.offline { background: #EF9A9A; }
+
+/* ---- Main content ---- */
+#app-root {
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+}
+
+.screen {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.screen-content {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 12px 16px 80px;
+}
+
+/* ---- Bottom nav ---- */
+.bottom-nav {
+  display: flex;
+  background: var(--surface);
+  border-top: 1px solid var(--divider);
+  height: 60px;
+  flex-shrink: 0;
+}
+
+.nav-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  cursor: pointer;
+  color: var(--on-surface-secondary);
+  font-size: 0.68rem;
+  font-weight: 500;
+  letter-spacing: 0.3px;
+  border: none;
+  background: none;
+  padding: 8px 0;
+  transition: color 0.2s;
+  -webkit-tap-highlight-color: transparent;
+}
+.nav-item:hover { color: var(--primary); }
+.nav-item.active { color: var(--primary); }
+.nav-item.active .nav-icon { transform: scale(1.1); }
+
+.nav-icon {
+  font-size: 1.4rem;
+  line-height: 1;
+  transition: transform 0.2s;
+}
+
