@@ -135,9 +135,23 @@ try {
     $stmt->execute([password_hash('Demo2026Salud', PASSWORD_BCRYPT)]);
     $pasos[] = ['ok', 'cuenta demo lista (1000000001 / Demo2026Salud)'];
 
-    // --- Diagnóstico de municipios ---
-    // No se siembran aquí: el seed vive en database/, que no viaja en la imagen.
-    // Se reporta el conteo para saber si hace falta actuar.
+    // --- Semilla de municipios ---
+    // El seed viaja como .php (municipios_seed.php) porque .dockerignore
+    // excluye database/ de la imagen. Es una sola sentencia INSERT con
+    // ON DUPLICATE KEY UPDATE, así que repetirla no duplica ni pierde filas.
+    $antes = (int)$pdo->query('SELECT COUNT(*) FROM municipios')->fetchColumn();
+    $archivoSeed = __DIR__ . '/municipios_seed.php';
+
+    if (is_file($archivoSeed)) {
+        $sqlSeed = require $archivoSeed;
+        $pdo->exec($sqlSeed);
+        $despues = (int)$pdo->query('SELECT COUNT(*) FROM municipios')->fetchColumn();
+        $nuevos = $despues - $antes;
+        $pasos[] = [$nuevos > 0 ? 'nuevo' : 'ok', "municipios sembrados (+$nuevos, total $despues)"];
+    } else {
+        $pasos[] = ['ok', 'AVISO: no se encontró municipios_seed.php, no se sembraron municipios'];
+    }
+
     $municipios = (int)$pdo->query('SELECT COUNT(*) FROM municipios')->fetchColumn();
     $departamentos = (int)$pdo->query('SELECT COUNT(DISTINCT departamento) FROM municipios')->fetchColumn();
 
@@ -150,15 +164,15 @@ try {
 
     $html .= "<p><strong>Municipios:</strong> $municipios en $departamentos departamentos.</p>";
     if ($municipios < 100) {
-        $html .= '<p class="aviso">El catálogo de municipios se ve incompleto. '
+        $html .= '<p class="aviso">El catálogo de municipios sigue incompleto. '
                . 'La sincronización falla con error de clave foránea si un registro '
                . 'usa un <code>municipio_codigo</code> que no existe aquí. '
-               . 'Hay que sembrar <code>database/seeds/municipios.sql</code> por otra vía.</p>';
+               . 'Verifica que <code>api/setup/municipios_seed.php</code> se haya desplegado.</p>';
     }
 
-    $html .= '<p class="aviso"><strong>Siguiente paso:</strong> borra este archivo '
-           . '(<code>api/setup/migrate.php</code>) del repositorio y vuelve a desplegar, '
-           . 'o cambia <code>ADMIN_PASSWORD</code>.</p>';
+    $html .= '<p class="aviso"><strong>Siguiente paso:</strong> borra del repositorio '
+           . '<code>api/setup/migrate.php</code> y <code>api/setup/municipios_seed.php</code>, '
+           . 'vuelve a desplegar, y cambia <code>ADMIN_PASSWORD</code>.</p>';
 
     render($html);
 
