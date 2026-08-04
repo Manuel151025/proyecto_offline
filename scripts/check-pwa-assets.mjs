@@ -52,6 +52,22 @@ try {
   errores.push(`manifest.json no es JSON válido: ${e.message}`);
 }
 
+// El HTML debe servirse red-primero. Con caché primero, un index.html obsoleto
+// sigue enlazando archivos que quizá ya no existen y la app se queda sin CSS.
+// Pasó de verdad al dividir styles.css, así que se vigila.
+if (!/request\.mode === 'navigate'/.test(sw)) {
+  errores.push('sw.js debe tratar la navegación aparte (red primero); si no, un index.html obsoleto rompe la app');
+}
+
+// Cada versión de caché debe quedar anotada, para poder reconstruir qué
+// cambió en cada despliegue cuando algo falla en un cliente concreto.
+const version = sw.match(/const CACHE = 'encuestas-(v\d+)'/);
+if (!version) {
+  errores.push('No se pudo leer la versión de CACHE en sw.js');
+} else if (!new RegExp(`// ${version[1]}:`).test(sw)) {
+  errores.push(`CACHE está en ${version[1]} pero no hay una línea "// ${version[1]}:" que explique el cambio`);
+}
+
 if (errores.length) {
   console.error('✗ Verificación de la PWA fallida:');
   errores.forEach(e => console.error(`  - ${e}`));
