@@ -10,25 +10,32 @@ const DOC_REGEX = /^[0-9]{6,12}$/;
 export async function render(container) {
   container.innerHTML = `
     <div class="login-screen">
-      <span class="login-blob login-blob-1"></span>
-      <span class="login-blob login-blob-2"></span>
-      <div class="login-header">
-        <div class="login-logo">
-          <svg width="66" height="66" viewBox="0 0 192 192" aria-hidden="true">
-            <circle cx="96" cy="96" r="96" fill="#ffffff"/>
-            <rect x="82" y="52" width="28" height="88" rx="6" fill="#0E7A41"/>
-            <rect x="52" y="82" width="88" height="28" rx="6" fill="#0E7A41"/>
-          </svg>
+      <div class="login-bar"></div>
+      <div class="login-container">
+        <header class="login-header">
+          <div class="login-logo">
+            <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M10 3h4v7h7v4h-7v7h-4v-7H3v-4h7z" fill="#ffffff"/>
+            </svg>
+          </div>
+          <div>
+            <h1 class="login-brand">ColOffline</h1>
+            <p class="login-subtitle">Ministerio de Salud &middot; Encuestas demogr&aacute;ficas</p>
+          </div>
+        </header>
+
+        <div class="login-card">
+          <div class="login-card-head">
+            <h2 class="login-card-title">Iniciar sesi&oacute;n</h2>
+            <span class="login-conn" id="login-conn-pill">
+              <span class="login-conn-dot"></span>
+              <span id="login-conn-text">En l&iacute;nea</span>
+            </span>
+          </div>
+          <div id="login-body"></div>
         </div>
-        <div class="login-brand">ColOffline</div>
-        <div class="login-subtitle">Ministerio de Salud &middot; Encuestas demogr&aacute;ficas</div>
-      </div>
-      <div class="login-card">
-        <div class="login-conn-pill" id="login-conn-pill">
-          <span class="login-conn-dot"></span>
-          <span id="login-conn-text">En l&iacute;nea</span>
-        </div>
-        <div id="login-body"></div>
+
+        <p class="login-foot">Los datos se guardan en el dispositivo y se sincronizan al recuperar la conexi&oacute;n.</p>
       </div>
     </div>
   `;
@@ -47,19 +54,22 @@ export async function render(container) {
     </div>
     <form id="login-form" novalidate>
       <div class="login-field">
-        <input type="text" id="login-doc" inputmode="numeric" maxlength="12" placeholder=" " autocomplete="username" />
         <label for="login-doc">N&uacute;mero de documento</label>
+        <input type="text" id="login-doc" inputmode="numeric" maxlength="12"
+               placeholder="6 a 12 d&iacute;gitos" autocomplete="username" />
       </div>
-      <div class="login-field login-field-pass">
-        <input type="password" id="login-pass" placeholder=" " autocomplete="current-password" />
+      <div class="login-field">
         <label for="login-pass">Contrase&ntilde;a</label>
-        <button type="button" class="login-eye" id="login-eye">Ver</button>
+        <div class="login-input-group">
+          <input type="password" id="login-pass" placeholder="Tu contrase&ntilde;a" autocomplete="current-password" />
+          <button type="button" class="login-eye" id="login-eye" aria-label="Mostrar contrase&ntilde;a">Ver</button>
+        </div>
       </div>
-      <div class="login-error hidden" id="login-error"></div>
+      <div class="login-error hidden" id="login-error" role="alert"></div>
       <div class="login-row">
-        <button type="button" class="login-switch on" id="login-remember" aria-pressed="true">
-          <span class="login-switch-track"><span class="login-switch-knob"></span></span>
-          <span class="login-switch-label">Recordar sesi&oacute;n</span>
+        <button type="button" class="login-check on" id="login-remember" aria-pressed="true">
+          <span class="login-check-box"></span>
+          <span>Recordar sesi&oacute;n</span>
         </button>
         <a href="#" class="login-forgot" id="login-forgot">&iquest;Olvidaste tu contrase&ntilde;a?</a>
       </div>
@@ -68,9 +78,9 @@ export async function render(container) {
         <span id="login-submit-label">Ingresar</span>
       </button>
     </form>
-    <div class="login-demo-note">
-      <strong>Cuenta de prueba (docente)</strong><br>
-      Documento: <b>1000000001</b> &middot; Contrase&ntilde;a: <b>Demo2026Salud</b>
+    <div class="login-demo">
+      <strong>Cuenta de prueba</strong><br>
+      Documento <code>1000000001</code> &middot; Contrase&ntilde;a <code>Demo2026Salud</code>
     </div>
   `;
 
@@ -94,6 +104,7 @@ export async function render(container) {
     const show = passInput.type === 'password';
     passInput.type = show ? 'text' : 'password';
     eyeBtn.textContent = show ? 'Ocultar' : 'Ver';
+    eyeBtn.setAttribute('aria-label', show ? 'Ocultar contraseña' : 'Mostrar contraseña');
   });
 
   rememberBtn.addEventListener('click', () => {
@@ -211,7 +222,7 @@ export async function render(container) {
       <div class="login-success">
         <div class="login-success-icon">
           <svg width="38" height="38" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <path d="M4 12.5 L9.5 18 L20 6.5" stroke="#0E7A41" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="login-check-path"/>
+            <path d="M4 12.5 L9.5 18 L20 6.5" stroke="#1B7A4B" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" class="login-check-path"/>
           </svg>
         </div>
         <div class="login-success-title">&iexcl;Bienvenido!</div>

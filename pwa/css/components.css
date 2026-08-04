@@ -46,14 +46,17 @@
 }
 .persona-card:active { transform: scale(0.98); box-shadow: none; }
 
+/* Fondo tenue con texto de marca en lugar de blanco sobre azul claro: esa
+   combinación daba 2.87:1 de contraste, por debajo del mínimo AA de 4.5:1. */
 .persona-avatar {
   width: 44px; height: 44px;
   border-radius: 50%;
-  background: var(--primary-light);
-  color: var(--on-primary);
+  background: var(--primary-tint);
+  color: var(--primary);
+  border: 1px solid var(--divider);
   display: flex; align-items: center; justify-content: center;
   font-weight: 700;
-  font-size: 1rem;
+  font-size: 0.95rem;
   flex-shrink: 0;
 }
 
