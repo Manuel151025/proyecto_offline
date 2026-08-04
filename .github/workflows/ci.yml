@@ -107,6 +107,14 @@ jobs:
           fi
           echo "✓ Endpoint de sincronización protegido"
 
+      - name: Verificar que el login limite los intentos
+        run: |
+          if ! grep -q "exigirLimiteIntentos" api/auth/login.php; then
+            echo "::error::api/auth/login.php debe limitar los intentos fallidos (fuerza bruta)."
+            exit 1
+          fi
+          echo "✓ Login con límite de intentos"
+
   pwa:
     name: PWA · integridad del modo offline
     runs-on: ubuntu-latest

@@ -2,6 +2,9 @@
 session_start();
 require_once '../db.php';
 
+/** Longitud mínima al crear o cambiar la contraseña de un encuestador. */
+const MIN_LONGITUD_PASSWORD = 10;
+
 $adminPassword = getenv('ADMIN_PASSWORD');
 if (!$adminPassword) {
     http_response_code(500);
@@ -40,6 +43,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $error = 'Nombre y número de documento son obligatorios';
         } elseif ($id === '' && $password === '') {
             $error = 'La contraseña es obligatoria para cuentas nuevas';
+        } elseif ($password !== '' && mb_strlen($password) < MIN_LONGITUD_PASSWORD) {
+            // Solo se valida al fijar o cambiar la contraseña: las cuentas
+            // existentes no quedan bloqueadas por una regla nueva.
+            $error = 'La contraseña debe tener al menos ' . MIN_LONGITUD_PASSWORD . ' caracteres';
         } else {
             try {
                 if ($id !== '') {
