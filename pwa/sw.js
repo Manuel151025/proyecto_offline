@@ -1,13 +1,20 @@
 // Subir esta versión en cada cambio de JS/CSS: el fetch es cache-first, así que
 // sin bump los navegadores seguirían sirviendo los archivos viejos.
+// v6: styles.css se dividió en 7 hojas por responsabilidad.
 // v5: api.js y session.js ahora envían el token de autenticación en la sincronización.
-const CACHE = 'encuestas-v5';
+const CACHE = 'encuestas-v6';
 
 const ASSETS = [
   './index.html',
   './manifest.json',
   './icons/icon.svg',
-  './css/styles.css',
+  './css/base.css',
+  './css/layout.css',
+  './css/components.css',
+  './css/forms.css',
+  './css/sync.css',
+  './css/feedback.css',
+  './css/login.css',
   './js/utils.js',
   './js/db.js',
   './js/api.js',

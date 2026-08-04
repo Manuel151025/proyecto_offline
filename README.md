@@ -12,6 +12,113 @@ El proyecto respeta rigurosamente **Clean Architecture**:
 - **Domain**: Kotlin puro. Contiene los Casos de Uso (Use Cases), Modelos (Entities de negocio puras), abstracciones transaccionales y envolturas `Result<T>`. Totalmente agnóstico del framework.
 - **Data**: Implementa los Repositorios de Dominio, manejando la persistencia local (Room) y la red (Retrofit). Utiliza Mappers para traducir hacia y desde el Dominio.
 
+### Componentes y responsabilidades
+
+Dos clientes independientes escriben contra la misma API. Cada uno tiene su propia base local y su propia cola, porque ambos deben funcionar sin conexión.
+
+```mermaid
+graph TB
+    subgraph Android["📱 App Android (Kotlin)"]
+        direction TB
+        AP["Presentation<br/><i>Compose · ViewModels</i><br/>Sin lógica de negocio"]
+        AD["Domain<br/><i>14 casos de uso · Result&lt;T&gt;</i><br/>Kotlin puro, sin framework"]
+        ADA["Data<br/><i>Repositorios · Mappers</i>"]
+        ARoom[("Room<br/><i>SQLite local</i>")]
+        AW["SyncWorker<br/><i>WorkManager</i>"]
+        AP --> AD
+        ADA -.implementa.-> AD
+        ADA --> ARoom
+        AW --> AD
+    end
+
+    subgraph PWA["🌐 PWA (JavaScript)"]
+        direction TB
+        PS["Pantallas<br/><i>login · lista · formulario · sync</i>"]
+        PSync["sync.js<br/><i>Cola de reintentos</i>"]
+        PIDB[("IndexedDB<br/><i>personas · cola · credenciales</i>")]
+        PSW["Service Worker<br/><i>Caché offline</i>"]
+        PS --> PSync
+        PS --> PIDB
+        PSync --> PIDB
+    end
+
+    subgraph API["⚙️ API REST (PHP)"]
+        direction TB
+        CORS["cors.php<br/><i>Lista blanca de orígenes</i>"]
+        AUTH["auth_token.php<br/><i>Emite y valida tokens</i>"]
+        LOGIN["auth/login.php<br/><i>bcrypt → token</i>"]
+        SYNC["personas/sync.php<br/><i>Valida · LWW · transacción</i>"]
+        MUNI["municipios/index.php"]
+        ADMIN["admin/index.php<br/><i>Panel · CSRF</i>"]
+        LOGIN --> AUTH
+        SYNC --> AUTH
+    end
+
+    DB[("🗄️ MySQL<br/><i>personas · encuestas<br/>encuestadores · sesiones</i>")]
+
+    AW -->|"HTTPS + Bearer"| SYNC
+    ADA -->|"login"| LOGIN
+    PSync -->|"HTTPS + Bearer"| SYNC
+    PS -->|"login"| LOGIN
+
+    LOGIN --> DB
+    SYNC --> DB
+    MUNI --> DB
+    ADMIN --> DB
+
+    style AD fill:#0E7A41,color:#fff
+    style AUTH fill:#C62828,color:#fff
+    style SYNC fill:#C62828,color:#fff
+    style DB fill:#1565C0,color:#fff
+```
+
+**Reglas que sostienen el diseño:**
+
+| Componente | Responsabilidad | Qué NO hace |
+|---|---|---|
+| `Domain` (Android) | Reglas de negocio y validaciones | No conoce Room, Retrofit ni Android |
+| `Data` (Android) | Persistencia y red; implementa las interfaces del dominio | No decide reglas de negocio |
+| `SyncWorker` | Reintentos con backoff cuando hay red | No transforma datos |
+| `auth_token.php` | Emitir y validar tokens | No autoriza por rol (no hay roles) |
+| `sync.php` | Validar payload, resolver LWW, transacción atómica | No confía en el `id_encuestador` del cliente |
+| Service Worker | Servir la app sin conexión | No cachea `/api/` |
+
+### Flujo de una encuesta, de campo a servidor
+
+```mermaid
+sequenceDiagram
+    participant U as Encuestador
+    participant A as App (local)
+    participant C as Cola (outbox)
+    participant S as sync.php
+    participant D as MySQL
+
+    U->>A: Guarda el formulario
+    Note over A,C: Una sola transacción atómica
+    A->>A: Persiste persona + encuesta
+    A->>C: Encola evento PENDING
+    A-->>U: Guardado ✓ (sin esperar red)
+
+    Note over C,S: Más tarde, al recuperar señal
+    C->>S: POST + Authorization: Bearer
+    alt Token inválido o ausente
+        S-->>C: 401 → no se reintenta solo
+    else Token válido
+        S->>S: Valida campos y tamaño del lote
+        S->>D: BEGIN
+        alt updated_at entrante es más reciente
+            S->>D: UPDATE persona (gana el más nuevo)
+        else El servidor tiene una versión más nueva
+            S->>D: Ignora el entrante
+        end
+        S->>D: INSERT IGNORE encuesta
+        S->>D: COMMIT
+        S-->>C: 200 → marca SENT
+    end
+```
+
+El registro **nunca** queda solo en memoria: si la app muere entre el guardado y el envío, la cola sobrevive en disco y el `SyncWorker` la retoma.
+
 ## Tecnologías Utilizadas (App Android)
 - **Kotlin & Coroutines/Flow**: Asincronía y reactividad.
 - **Jetpack Compose**: UI declarativa (Material Design 3).
@@ -82,6 +189,24 @@ Las pruebas cubren autenticación (`AuthRepositoryImplTest`), reglas de negocio 
 
 `check-pwa-assets.mjs` verifica que todo archivo listado en `pwa/sw.js` exista y que los recursos de `index.html` estén cacheados. Sin esa comprobación, dividir o renombrar un archivo rompe la app **sin conexión** — un fallo invisible al probar en línea.
 
+## Estilos de la PWA
+
+`styles.css` tenía 791 líneas. Se dividió en siete hojas por responsabilidad:
+
+| Archivo | Líneas | Contenido |
+|---|---:|---|
+| `base.css` | 56 | Tokens de diseño, reset, contenedor |
+| `layout.css` | 86 | Cabecera, contenido, navegación inferior |
+| `components.css` | 109 | Búsqueda, tarjetas, insignias, FAB, estado vacío |
+| `forms.css` | 106 | Pantalla de formulario y botones |
+| `sync.css` | 55 | Pantalla de sincronización |
+| `feedback.css` | 40 | Toasts, errores, visibilidad del chrome |
+| `login.css` | 339 | Pantalla de inicio de sesión |
+
+⚠️ **El orden de los `<link>` en `index.html` es significativo.** Cuando dos reglas tienen la misma especificidad gana la última, así que los archivos se cortaron en rangos contiguos y concatenarlos en ese orden reproduce el `styles.css` original byte a byte. Reordenar los `<link>` cambia la apariencia.
+
+Al tocar cualquier hoja hay que **subir la versión de `CACHE` en `pwa/sw.js`**: el `fetch` es cache-first y sin ese cambio los navegadores seguirían sirviendo la versión anterior.
+
 ## Integración Continua
 `.github/workflows/ci.yml` se ejecuta en cada push y pull request a `main`:
 
@@ -99,6 +224,9 @@ proyecto_offline/
 │   ├── cors.php          # Política CORS centralizada (lista blanca)
 │   └── auth_token.php    # Emisión y validación de tokens
 ├── pwa/                  # Progressive Web App (offline-first)
+│   ├── css/              # 7 hojas por responsabilidad (ver nota abajo)
+│   ├── js/screens/       # Una pantalla por archivo
+│   └── sw.js             # Service worker: caché offline
 ├── database/             # Scripts SQL (esquema y migraciones)
 ├── scripts/              # Verificaciones usadas por CI
 ├── .github/workflows/    # Integración continua

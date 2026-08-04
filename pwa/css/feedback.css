@@ -1,0 +1,43 @@
+/* Avisos al usuario: toasts, errores y visibilidad del chrome.
+   Extraído de styles.css; el orden de carga en index.html preserva la cascada. */
+
+/* ---- Toast ---- */
+#toast-container {
+  position: fixed;
+  bottom: 70px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: min(90vw, 420px);
+}
+
+.toast {
+  padding: 12px 18px;
+  border-radius: 10px;
+  font-size: 0.88rem;
+  font-weight: 500;
+  box-shadow: var(--shadow-lg);
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 0.25s, transform 0.25s;
+  color: var(--on-primary);
+}
+.toast-show { opacity: 1; transform: translateY(0); }
+.toast-success { background: var(--success); }
+.toast-error { background: var(--error); }
+.toast-info { background: var(--info); }
+
+/* ---- Error / loading ---- */
+.error-state {
+  text-align: center;
+  padding: 40px 24px;
+  color: var(--error);
+  font-size: 0.9rem;
+}
+
+/* ---- App chrome (header/bottom-nav) visibility ---- */
+.chrome-hidden { display: none; }
+

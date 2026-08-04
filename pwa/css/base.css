@@ -1,0 +1,59 @@
+/* Tokens de diseño, reset y contenedor de la app.
+   Extraído de styles.css; el orden de carga en index.html preserva la cascada. */
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --primary: #1565C0;
+  --primary-dark: #003c8f;
+  --primary-light: #5e92f3;
+  --secondary: #00695C;
+  --on-primary: #ffffff;
+  --surface: #ffffff;
+  --bg: #F0F4F8;
+  --on-surface: #1a1a2e;
+  --on-surface-secondary: #5a6070;
+  --divider: #e0e4ea;
+  --error: #C62828;
+  --error-bg: #FFEBEE;
+  --warning: #E65100;
+  --warning-bg: #FFF3E0;
+  --success: #2E7D32;
+  --success-bg: #E8F5E9;
+  --info: #0277BD;
+  --info-bg: #E1F5FE;
+  --radius: 12px;
+  --shadow: 0 2px 8px rgba(0,0,0,0.1);
+  --shadow-lg: 0 4px 20px rgba(0,0,0,0.15);
+
+  /* Paleta verde del login (independiente de --primary) */
+  --login-green: #19A45B;
+  --login-green-dark: #0E7A41;
+  --login-green-bright: #2BB673;
+  --login-green-deep: #0A5C31;
+  --login-green-deep-2: #116B3F;
+  --login-field-border: #d5e3da;
+  --login-label-idle: #8a94a3;
+}
+
+.hidden { display: none; }
+
+html, body {
+  height: 100%;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 16px;
+  color: var(--on-surface);
+  background: var(--bg);
+  overflow: hidden;
+}
+
+#app-shell {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  max-width: 480px;
+  margin: 0 auto;
+  background: var(--surface);
+  box-shadow: var(--shadow-lg);
+}
+

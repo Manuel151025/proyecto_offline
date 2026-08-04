@@ -1,0 +1,112 @@
+/* Piezas reutilizables: búsqueda, tarjetas, insignias, FAB, estado vacío.
+   Extraído de styles.css; el orden de carga en index.html preserva la cascada. */
+
+/* ---- Search bar ---- */
+.screen-top {
+  padding: 12px 16px 4px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--divider);
+  flex-shrink: 0;
+}
+
+.search-bar {
+  display: flex;
+  align-items: center;
+  background: var(--bg);
+  border-radius: 24px;
+  padding: 8px 14px;
+  gap: 8px;
+}
+.search-icon { color: var(--on-surface-secondary); font-size: 1rem; }
+.search-bar input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  outline: none;
+  font-size: 0.9rem;
+  color: var(--on-surface);
+}
+
+/* ---- Cards / Persona list ---- */
+.card {
+  background: var(--surface);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  margin-bottom: 10px;
+  padding: 14px;
+  border: 1px solid var(--divider);
+}
+
+.persona-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  cursor: pointer;
+  transition: box-shadow 0.15s, transform 0.1s;
+}
+.persona-card:active { transform: scale(0.98); box-shadow: none; }
+
+.persona-avatar {
+  width: 44px; height: 44px;
+  border-radius: 50%;
+  background: var(--primary-light);
+  color: var(--on-primary);
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 700;
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+
+.persona-info { flex: 1; min-width: 0; }
+.persona-name { font-weight: 600; font-size: 0.95rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.persona-doc { font-size: 0.8rem; color: var(--on-surface-secondary); margin-top: 2px; }
+.persona-meta { font-size: 0.75rem; color: var(--on-surface-secondary); margin-top: 1px; }
+
+.persona-status { flex-shrink: 0; }
+
+/* ---- Badges ---- */
+.badge {
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 99px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+.badge-success, .status-sent { background: var(--success-bg); color: var(--success); }
+.badge-warning, .status-pending { background: var(--warning-bg); color: var(--warning); }
+.badge-error, .status-error { background: var(--error-bg); color: var(--error); }
+
+/* ---- FAB ---- */
+.fab {
+  position: fixed;
+  bottom: 72px;
+  right: calc(50% - 240px + 16px);
+  width: 56px; height: 56px;
+  border-radius: 50%;
+  background: var(--primary);
+  color: var(--on-primary);
+  border: none;
+  font-size: 1.6rem;
+  cursor: pointer;
+  box-shadow: var(--shadow-lg);
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.2s, transform 0.1s;
+  z-index: 20;
+}
+@media (max-width: 480px) {
+  .fab { right: 16px; }
+}
+.fab:active { transform: scale(0.94); }
+.fab:hover { background: var(--primary-dark); }
+
+/* ---- Empty state ---- */
+.empty-state {
+  text-align: center;
+  padding: 48px 24px;
+  color: var(--on-surface-secondary);
+}
+.empty-icon { font-size: 3rem; display: block; margin-bottom: 12px; }
+.empty-title { font-size: 1rem; font-weight: 600; margin-bottom: 6px; color: var(--on-surface); }
+.empty-sub { font-size: 0.85rem; }
+
