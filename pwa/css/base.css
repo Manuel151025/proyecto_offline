@@ -36,7 +36,11 @@
   --login-label-idle: #8a94a3;
 }
 
-.hidden { display: none; }
+/* Utilidad: debe ganar siempre. Sin !important pierde contra cualquier clase
+   que declare `display` más abajo en la cascada, porque ambas tienen la misma
+   especificidad (una clase) y decide el orden. Le pasaba a .login-spinner, que
+   quedaba visible en permanencia y parecía que el login estaba cargando. */
+.hidden { display: none !important; }
 
 html, body {
   height: 100%;
