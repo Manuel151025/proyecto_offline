@@ -4,6 +4,7 @@ aplicarCors('POST, OPTIONS');
 
 require_once __DIR__ . '/../db.php';
 require_once __DIR__ . '/../auth_token.php';
+require_once __DIR__ . '/../rate_limit.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     responderError(405, 'Método no permitido');
@@ -22,15 +23,23 @@ if ($documento === '' || $password === '') {
 }
 
 try {
+    // Se comprueba antes de tocar la contraseña, y para cualquier documento
+    // exista o no, para que el bloqueo no delate qué cuentas son reales.
+    exigirLimiteIntentos($pdo, $documento);
+
     $stmt = $pdo->prepare('SELECT id, nombre, password_hash, activo FROM encuestadores WHERE numero_documento = ?');
     $stmt->execute([$documento]);
     $encuestador = $stmt->fetch();
 
     if (!$encuestador || !$encuestador['activo'] || !$encuestador['password_hash']
         || !password_verify($password, $encuestador['password_hash'])) {
+        registrarIntentoFallido($pdo, $documento);
         // Mensaje genérico: no revelamos si el documento existe o no.
         responderError(401, 'Documento o contraseña incorrectos');
     }
+
+    // Credenciales correctas: se borra el historial de fallos.
+    limpiarIntentos($pdo, $documento);
 
     $sesion = emitirToken($pdo, (int)$encuestador['id']);
 

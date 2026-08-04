@@ -268,3 +268,13 @@ CREATE TABLE IF NOT EXISTS sesiones (
     INDEX idx_sesiones_expira (expira_en),
     FOREIGN KEY (id_encuestador) REFERENCES encuestadores(id) ON DELETE CASCADE
 );
+
+-- Intentos fallidos de inicio de sesión (anti fuerza bruta). Ver api/rate_limit.php.
+-- Se cuenta por documento, no por IP: detrás del proxy inverso todas las
+-- peticiones comparten la misma IP y limitar por ella bloquearía a todos.
+CREATE TABLE IF NOT EXISTS intentos_login (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    documento VARCHAR(20) NOT NULL,
+    creado_en BIGINT NOT NULL,
+    INDEX idx_intentos_documento (documento, creado_en)
+);
