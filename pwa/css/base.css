@@ -3,40 +3,52 @@
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
+/* Paleta institucional única. Antes el login tenía su propia gama verde
+   mientras el resto de la app era azul: dos identidades en un mismo producto.
+   Ahora todo parte de --primary, así que cambiar la marca es cambiar un token. */
 :root {
-  --primary: #1565C0;
-  --primary-dark: #003c8f;
-  --primary-light: #5e92f3;
-  --secondary: #00695C;
+  /* Marca */
+  --primary: #12467E;
+  --primary-dark: #0C325C;
+  --primary-hover: #16599E;
+  --primary-tint: #EEF3F9;
+  --primary-light: #7A9BC4;
   --on-primary: #ffffff;
-  --surface: #ffffff;
-  --bg: #F0F4F8;
-  --on-surface: #1a1a2e;
-  --on-surface-secondary: #5a6070;
-  --divider: #e0e4ea;
-  --error: #C62828;
-  --error-bg: #FFEBEE;
-  --warning: #E65100;
-  --warning-bg: #FFF3E0;
-  --success: #2E7D32;
-  --success-bg: #E8F5E9;
-  --info: #0277BD;
-  --info-bg: #E1F5FE;
-  --radius: 12px;
-  --shadow: 0 2px 8px rgba(0,0,0,0.1);
-  --shadow-lg: 0 4px 20px rgba(0,0,0,0.15);
 
-  /* Paleta verde del login (independiente de --primary) */
-  --login-green: #19A45B;
-  --login-green-dark: #0E7A41;
-  --login-green-bright: #2BB673;
-  --login-green-deep: #0A5C31;
-  --login-green-deep-2: #116B3F;
-  --login-field-border: #d5e3da;
-  --login-label-idle: #8a94a3;
+  /* Superficies y texto */
+  --surface: #ffffff;
+  --surface-alt: #F7F9FC;
+  --bg: #F2F5F9;
+  --on-surface: #16202C;
+  --on-surface-secondary: #5B6878;
+  --on-surface-muted: #8695A8;
+  --divider: #DCE3EC;
+  --border-input: #C3CDDA;
+
+  /* Estados semánticos */
+  --error: #B3261E;
+  --error-bg: #FCEEEE;
+  --warning: #A15C00;
+  --warning-bg: #FDF3E4;
+  --success: #1B7A4B;
+  --success-bg: #E8F5EE;
+  --info: #12467E;
+  --info-bg: #EEF3F9;
+
+  /* Forma y profundidad. Sombras contenidas: lo institucional pide sobriedad,
+     no relieve. La elevación se sugiere con bordes finos, no con desenfoques. */
+  --radius: 10px;
+  --radius-sm: 8px;
+  --shadow: 0 1px 2px rgba(22,32,44,0.06), 0 1px 3px rgba(22,32,44,0.08);
+  --shadow-lg: 0 4px 12px rgba(22,32,44,0.08), 0 1px 3px rgba(22,32,44,0.06);
+  --focus-ring: 0 0 0 3px rgba(18,70,126,0.16);
 }
 
-.hidden { display: none; }
+/* Utilidad: debe ganar siempre. Sin !important pierde contra cualquier clase
+   que declare `display` más abajo en la cascada, porque ambas tienen la misma
+   especificidad (una clase) y decide el orden. Le pasaba a .login-spinner, que
+   quedaba visible en permanencia y parecía que el login estaba cargando. */
+.hidden { display: none !important; }
 
 html, body {
   height: 100%;
@@ -45,6 +57,7 @@ html, body {
   color: var(--on-surface);
   background: var(--bg);
   overflow: hidden;
+  -webkit-font-smoothing: antialiased;
 }
 
 #app-shell {
@@ -57,3 +70,11 @@ html, body {
   box-shadow: var(--shadow-lg);
 }
 
+/* Respeta a quien pide menos animación en su sistema operativo. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

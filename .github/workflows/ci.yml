@@ -128,3 +128,17 @@ jobs:
 
       - name: Verificar caché del service worker y manifest
         run: node scripts/check-pwa-assets.mjs
+
+      # Los módulos ES no se pueden validar con `node --check` tal cual, hay que
+      # presentarlos con extensión .mjs para que Node los trate como módulos.
+      - name: Validar sintaxis de los módulos JavaScript
+        run: |
+          set -e
+          tmp=$(mktemp -d)
+          n=0
+          while IFS= read -r archivo; do
+            cp "$archivo" "$tmp/$(basename "${archivo%.js}").mjs"
+            node --check "$tmp/$(basename "${archivo%.js}").mjs"
+            n=$((n + 1))
+          done < <(find pwa -name '*.js' -type f)
+          echo "✓ $n módulos validados"
