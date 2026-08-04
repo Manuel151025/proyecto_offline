@@ -129,15 +129,19 @@ export async function render(container) {
 
     try {
       const offline = !navigator.onLine;
-      let encuestadorId, nombre;
+      let encuestadorId, nombre, token, expiraEn;
 
       if (!offline) {
-        const encuestador = await login(doc, pass);
-        encuestadorId = encuestador.id;
-        nombre = encuestador.nombre;
+        const sesion = await login(doc, pass);
+        encuestadorId = sesion.encuestador.id;
+        nombre = sesion.encuestador.nombre;
+        token = sesion.token;
+        expiraEn = sesion.expiraEn;
         const salt = randomSalt();
         const passwordHash = await sha256Hex(salt + pass);
-        await saveCredencial({ documento: doc, passwordHash, salt, encuestadorId, nombre, updated_at: Date.now() });
+        // El token viaja con la credencial para que el próximo login sin red
+        // pueda recuperarlo y seguir sincronizando al volver la conexión.
+        await saveCredencial({ documento: doc, passwordHash, salt, encuestadorId, nombre, token, expiraEn, updated_at: Date.now() });
       } else {
         const cred = await getCredencial(doc);
         if (!cred) throw new Error('Documento o contraseña incorrectos');
@@ -145,9 +149,11 @@ export async function render(container) {
         if (hash !== cred.passwordHash) throw new Error('Documento o contraseña incorrectos');
         encuestadorId = cred.encuestadorId;
         nombre = cred.nombre;
+        token = cred.token;
+        expiraEn = cred.expiraEn;
       }
 
-      setSession({ documento: doc, encuestadorId, nombre, offline, remember, createdAt: Date.now() });
+      setSession({ documento: doc, encuestadorId, nombre, token, expiraEn, offline, remember, createdAt: Date.now() });
       showSuccess(offline);
     } catch (err) {
       setLoading(false);

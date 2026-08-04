@@ -7,14 +7,13 @@ services:
     restart: always
     ports:
       - "8898:80"
-    volumes:
-      - .:/var/www/html
     environment:
       DB_HOST: db
       DB_NAME: minsalud_encuestas
       DB_USER: encuestas_user
       DB_PASS: ${DB_PASS}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS}
     depends_on:
       - db
 

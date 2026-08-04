@@ -1,3 +1,5 @@
+import { getToken } from './session.js';
+
 const BASE_URL = '../api';
 
 export async function login(numero_documento, password) {
@@ -20,7 +22,7 @@ export async function login(numero_documento, password) {
   }
   const data = await res.json().catch(() => ({}));
   if (!res.ok || !data.success) throw new Error(data.message || 'Documento o contraseña incorrectos');
-  return data.encuestador;
+  return { encuestador: data.encuestador, token: data.token, expiraEn: data.expira_en };
 }
 
 export async function fetchMunicipios() {
@@ -30,12 +32,26 @@ export async function fetchMunicipios() {
 }
 
 export async function syncData(payload) {
+  const token = getToken();
+  if (!token) {
+    throw new Error('Sesión sin token válido. Inicia sesión con conexión para poder sincronizar.');
+  }
+
   const res = await fetch(`${BASE_URL}/personas/sync.php`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`
+    },
     body: JSON.stringify(payload)
   });
+
+  if (res.status === 401 || res.status === 403) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.message || 'Tu sesión expiró. Inicia sesión de nuevo.');
+  }
   if (!res.ok) throw new Error(`Error HTTP ${res.status}`);
+
   const data = await res.json();
   if (!data.success) throw new Error(data.message || 'Error en sincronización');
   return data;
