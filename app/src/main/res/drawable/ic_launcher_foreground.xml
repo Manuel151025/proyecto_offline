@@ -14,13 +14,13 @@
         android:pathData="M40,28L68,28L68,42L40,42Z"/>
     <!-- Survey lines -->
     <path
-        android:fillColor="#1565C0"
+        android:fillColor="#12467E"
         android:pathData="M36,52L72,52L72,56L36,56Z"/>
     <path
-        android:fillColor="#1565C0"
+        android:fillColor="#12467E"
         android:pathData="M36,63L72,63L72,67L36,67Z"/>
     <path
-        android:fillColor="#1565C0"
+        android:fillColor="#12467E"
         android:pathData="M36,74L56,74L56,78L36,78Z"/>
     <!-- Checkmark -->
     <path

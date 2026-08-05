@@ -19,8 +19,8 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.minsalud.encuestas.presentation.theme.BrandGreen
-import com.minsalud.encuestas.presentation.theme.BrandGreenDark
+import com.minsalud.encuestas.presentation.theme.BrandPrimary
+import com.minsalud.encuestas.presentation.theme.BrandPrimaryDark
 import com.minsalud.encuestas.presentation.viewmodel.LoginViewModel
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -38,7 +38,7 @@ fun LoginScreen(
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .background(BrandGreen)
+            .background(BrandPrimary)
     ) {
         // Encabezado de marca
         Column(
@@ -56,7 +56,7 @@ fun LoginScreen(
                 Icon(
                     Icons.Default.Add,
                     contentDescription = null,
-                    tint = BrandGreen,
+                    tint = BrandPrimary,
                     modifier = Modifier.size(44.dp).rotate(0f)
                 )
             }
@@ -154,7 +154,7 @@ fun LoginScreen(
                         Text(
                             "Cuenta de prueba (docente)",
                             style = MaterialTheme.typography.labelLarge,
-                            color = BrandGreenDark,
+                            color = BrandPrimaryDark,
                             fontWeight = FontWeight.Bold
                         )
                         Spacer(Modifier.height(4.dp))

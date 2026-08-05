@@ -20,11 +20,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.minsalud.encuestas.domain.model.Persona
-import com.minsalud.encuestas.presentation.theme.BrandGreen
-import com.minsalud.encuestas.presentation.theme.BrandGreenDark
-import com.minsalud.encuestas.presentation.theme.BrandGreenLight
-import com.minsalud.encuestas.presentation.theme.WarnAmber
-import com.minsalud.encuestas.presentation.theme.WarnAmberBg
+import com.minsalud.encuestas.presentation.theme.BrandPrimary
+import com.minsalud.encuestas.presentation.theme.BrandPrimaryDark
+import com.minsalud.encuestas.presentation.theme.BrandPrimaryTint
+import com.minsalud.encuestas.presentation.theme.StatusSuccess
+import com.minsalud.encuestas.presentation.theme.StatusSuccessBg
+import com.minsalud.encuestas.presentation.theme.StatusWarning
+import com.minsalud.encuestas.presentation.theme.StatusWarningBg
 import com.minsalud.encuestas.presentation.viewmodel.ListaPersonasViewModel
 import com.minsalud.encuestas.presentation.viewmodel.PersonaUi
 
@@ -144,10 +146,10 @@ private fun PersonaCard(item: PersonaUi, onClick: () -> Unit) {
             Box(
                 modifier = Modifier
                     .size(46.dp)
-                    .background(BrandGreenLight, CircleShape),
+                    .background(BrandPrimaryTint, CircleShape),
                 contentAlignment = Alignment.Center
             ) {
-                Text(iniciales.ifBlank { "?" }, color = BrandGreenDark, fontWeight = FontWeight.Bold)
+                Text(iniciales.ifBlank { "?" }, color = BrandPrimaryDark, fontWeight = FontWeight.Bold)
             }
             Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
@@ -170,8 +172,8 @@ private fun PersonaCard(item: PersonaUi, onClick: () -> Unit) {
 
 @Composable
 private fun SyncBadge(pendiente: Boolean) {
-    val bg = if (pendiente) WarnAmberBg else BrandGreenLight
-    val fg = if (pendiente) WarnAmber else BrandGreen
+    val bg = if (pendiente) StatusWarningBg else StatusSuccessBg
+    val fg = if (pendiente) StatusWarning else StatusSuccess
     val label = if (pendiente) "Pendiente" else "Sincronizado"
     Box(
         modifier = Modifier
@@ -191,10 +193,10 @@ private fun EmptyState(modifier: Modifier = Modifier) {
         Box(
             modifier = Modifier
                 .size(72.dp)
-                .background(BrandGreenLight, CircleShape),
+                .background(BrandPrimaryTint, CircleShape),
             contentAlignment = Alignment.Center
         ) {
-            Icon(Icons.Default.Add, contentDescription = null, tint = BrandGreen, modifier = Modifier.size(36.dp))
+            Icon(Icons.Default.Add, contentDescription = null, tint = BrandPrimary, modifier = Modifier.size(36.dp))
         }
         Spacer(Modifier.height(16.dp))
         Text("Sin personas registradas", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
