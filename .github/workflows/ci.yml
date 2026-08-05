@@ -126,6 +126,28 @@ jobs:
           fi
           echo "✓ Login con límite de intentos"
 
+      - name: Verificar que el cierre de sesión revoque el token
+        run: |
+          if [ ! -f api/auth/logout.php ] || ! grep -q "DELETE FROM sesiones" api/auth/logout.php; then
+            echo "::error::Sin revocación, cerrar sesión deja el token válido 30 días en el servidor."
+            exit 1
+          fi
+          echo "✓ Cierre de sesión con revocación"
+
+      - name: Verificar cabeceras de seguridad y sesión del panel admin
+        run: |
+          for cabecera in X-Content-Type-Options X-Frame-Options Referrer-Policy; do
+            if ! grep -q "$cabecera" api/cors.php; then
+              echo "::error::Falta la cabecera $cabecera en api/cors.php"
+              exit 1
+            fi
+          done
+          if ! grep -q "session_regenerate_id" api/admin/index.php; then
+            echo "::error::El panel admin debe regenerar el id de sesión al autenticar (fijación de sesión)."
+            exit 1
+          fi
+          echo "✓ Cabeceras de seguridad y sesión del panel"
+
   pwa:
     name: PWA · integridad del modo offline
     runs-on: ubuntu-latest

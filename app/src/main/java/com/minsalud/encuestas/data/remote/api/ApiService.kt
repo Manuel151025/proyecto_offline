@@ -14,6 +14,10 @@ interface ApiService {
     @POST("api/auth/login.php")
     suspend fun login(@Body credenciales: LoginRequestDto): Response<LoginResponseDto>
 
+    /** Revoca el token actual. El interceptor lo adjunta automáticamente. */
+    @POST("api/auth/logout.php")
+    suspend fun logout(): Response<Unit>
+
     @POST("api/personas/sync.php")
     suspend fun syncData(@Body payload: SyncRequestDto): Response<SyncResponseDto>
 

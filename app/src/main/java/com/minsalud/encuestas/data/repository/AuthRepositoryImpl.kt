@@ -72,6 +72,23 @@ class AuthRepositoryImpl @Inject constructor(
         }
     }
 
+    /**
+     * Revoca el token en el servidor y borra la sesión local.
+     *
+     * La revocación es en el mejor esfuerzo: si no hay red, la sesión local se
+     * cierra igual. Dejar al encuestador dentro de la app porque no había señal
+     * sería peor que no revocar; el token caducará solo por vigencia.
+     */
+    override suspend fun logout() {
+        try {
+            apiService.logout()
+        } catch (e: Exception) {
+            // Sin conexión o servidor caído: no impide cerrar sesión.
+        } finally {
+            sessionManager.clear()
+        }
+    }
+
     private fun loginLocal(documento: String, password: String): Result<Encuestador> {
         val cuenta = cuentas.find { it.documento == documento }
         return if (cuenta != null && cuenta.passHash == sha256(password)) {

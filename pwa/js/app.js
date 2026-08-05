@@ -4,7 +4,7 @@ import { render as renderFormulario } from './screens/formulario-encuesta.js';
 import { render as renderSync } from './screens/estado-sincronizacion.js';
 import { render as renderLogin } from './screens/login.js';
 import { getMunicipios, saveMunicipios } from './db.js';
-import { fetchMunicipios } from './api.js';
+import { fetchMunicipios, logout } from './api.js';
 import { syncNow } from './sync.js';
 import { showToast } from './utils.js';
 import { hasActiveSession, clearSession, getToken } from './session.js';
@@ -83,7 +83,10 @@ function setupLogout() {
   });
 }
 
-export function cerrarSesion(mensaje) {
+export async function cerrarSesion(mensaje) {
+  // Primero se revoca en el servidor, mientras el token todavía está a mano.
+  // Si falla —sin red, servidor caído— el cierre local se hace igual.
+  await logout();
   clearSession();
   if (mensaje) showToast(mensaje, 'info');
   navigate('/login');

@@ -14,6 +14,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.navigation.compose.rememberNavController
 import com.minsalud.encuestas.data.local.prefs.SessionManager
+import com.minsalud.encuestas.domain.usecase.LogoutUseCase
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import com.minsalud.encuestas.presentation.navigation.AppNavGraph
 import com.minsalud.encuestas.presentation.navigation.Screen
 import com.minsalud.encuestas.presentation.theme.ColOfflineTheme
@@ -25,6 +29,9 @@ class MainActivity : ComponentActivity() {
 
     @Inject
     lateinit var sessionManager: SessionManager
+
+    @Inject
+    lateinit var logoutUseCase: LogoutUseCase
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -47,7 +54,11 @@ class MainActivity : ComponentActivity() {
                     AppNavGraph(
                         navController = navController,
                         startDestination = start,
-                        onLogout = { sessionManager.clear() },
+                        onLogout = {
+                            // Revoca el token en el servidor además de
+                            // limpiar la sesión local. En IO porque toca la red.
+                            CoroutineScope(Dispatchers.IO).launch { logoutUseCase() }
+                        },
                         isDark = isDark,
                         onToggleTheme = {
                             themeMode = if (isDark) 1 else 2

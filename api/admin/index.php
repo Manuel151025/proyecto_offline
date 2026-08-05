@@ -1,5 +1,16 @@
 <?php
+// La cookie de sesión no debe ser accesible desde JavaScript ni viajar en
+// claro, y SameSite=Strict evita que se envíe en peticiones de otros sitios.
+// Hay que fijarlo ANTES de session_start(), o no aplica.
+session_set_cookie_params([
+    'httponly' => true,
+    'samesite' => 'Strict',
+    'secure'   => !empty($_SERVER['HTTPS']) || ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https',
+]);
 session_start();
+
+require_once '../cors.php';
+aplicarCabecerasDeSeguridad();
 require_once '../db.php';
 
 /** Longitud mínima al crear o cambiar la contraseña de un encuestador. */
@@ -26,12 +37,24 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $error = 'Sesión expirada, intenta de nuevo.';
     } elseif ($action === 'login') {
         if (hash_equals($adminPassword, $_POST['password'] ?? '')) {
+            // Se cambia el identificador de sesión al elevar privilegios.
+            // Sin esto, quien consiguiera fijar el PHPSESSID de la víctima
+            // antes del login seguiría dentro de la sesión ya autenticada
+            // (fijación de sesión).
+            session_regenerate_id(true);
+            $_SESSION['csrf'] = bin2hex(random_bytes(16));
             $_SESSION['admin_ok'] = true;
         } else {
             $error = 'Contraseña incorrecta';
         }
     } elseif ($action === 'logout') {
-        unset($_SESSION['admin_ok']);
+        // Se destruye la sesión entera, no solo la marca de autenticado.
+        $_SESSION = [];
+        session_regenerate_id(true);
+        // El token CSRF se inicializa más arriba, antes de procesar el POST:
+        // si no se repone aquí, el formulario de login quedaría sin token y
+        // el siguiente envío sería rechazado.
+        $_SESSION['csrf'] = bin2hex(random_bytes(16));
     } elseif ($action === 'save' && !empty($_SESSION['admin_ok'])) {
         $id = trim($_POST['id'] ?? '');
         $nombre = trim($_POST['nombre'] ?? '');

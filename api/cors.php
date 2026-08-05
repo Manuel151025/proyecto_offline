@@ -13,10 +13,36 @@
  * La protección real de los endpoints de escritura está en auth_token.php.
  */
 
+/**
+ * Cabeceras de seguridad comunes a todo lo que sirve la API.
+ *
+ * Se aplican también al panel admin, que devuelve HTML y sin X-Frame-Options
+ * podía incrustarse en un iframe ajeno para engañar al administrador y que
+ * hiciera clic sin saberlo sobre los controles reales (clickjacking).
+ */
+function aplicarCabecerasDeSeguridad(): void
+{
+    // Impide que el navegador adivine el tipo de contenido e interprete como
+    // script algo que se sirvió como texto.
+    header('X-Content-Type-Options: nosniff');
+    // Nada de esta API debe mostrarse dentro de un marco.
+    header('X-Frame-Options: DENY');
+    header('Referrer-Policy: no-referrer');
+    // La API no necesita cámara, micrófono ni ubicación.
+    header('Permissions-Policy: geolocation=(), microphone=(), camera=()');
+
+    // HSTS solo bajo HTTPS: enviarlo por HTTP no tiene efecto y en desarrollo
+    // local forzaría al navegador a exigir TLS donde no lo hay.
+    if (!empty($_SERVER['HTTPS']) || ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https') {
+        header('Strict-Transport-Security: max-age=31536000; includeSubDomains');
+    }
+}
+
 function aplicarCors(string $metodos = 'GET, POST, OPTIONS'): void
 {
     header('Content-Type: application/json; charset=UTF-8');
     header('Vary: Origin');
+    aplicarCabecerasDeSeguridad();
 
     $permitidos = array_filter(array_map(
         'trim',
