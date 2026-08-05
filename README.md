@@ -66,10 +66,10 @@ graph TB
     MUNI --> DB
     ADMIN --> DB
 
-    style AD fill:#0E7A41,color:#fff
-    style AUTH fill:#C62828,color:#fff
-    style SYNC fill:#C62828,color:#fff
-    style DB fill:#1565C0,color:#fff
+    style AD fill:#1B7A4B,color:#fff
+    style AUTH fill:#B3261E,color:#fff
+    style SYNC fill:#B3261E,color:#fff
+    style DB fill:#12467E,color:#fff
 ```
 
 **Reglas que sostienen el diseño:**
@@ -118,6 +118,30 @@ sequenceDiagram
 ```
 
 El registro **nunca** queda solo en memoria: si la app muere entre el guardado y el envío, la cola sobrevive en disco y el `SyncWorker` la retoma.
+
+### Decisiones de escalabilidad
+
+| Decisión | Motivo |
+|---|---|
+| La sincronización viaja en **lotes de 100** | Antes Android enviaba una petición HTTP por registro. Volver del campo con 200 encuestas eran 200 viajes de ida y vuelta sobre una conexión intermitente. El servidor admite 500 por lote; 100 abarata el reintento y acota la memoria del JSON. |
+| Solo se marca `SENT` lo que el servidor confirma | La respuesta trae `processed_encuestas`. Dar por bueno el envío completo hacía que un registro ignorado quedara marcado como sincronizado sin estarlo. |
+| Las personas se **deduplican** dentro del lote | Crear y luego editar a la misma persona generaba dos copias idénticas en el payload. |
+| Índice `(deleted_at, updated_at)` **solo en Room** | Es lo que consultan las dos listas del `PersonaDao`. En MySQL no se añade: el servidor accede a `personas` únicamente por clave primaria, así que allí no aportaría nada. |
+| La lista de la PWA se pinta **de a 50** | Construir el HTML de miles de registros de golpe bloquea la interfaz en gama baja. Se amplía con `IntersectionObserver` al acercarse al final. |
+| Eventos de la lista **por delegación** | Dos listeners en total en vez de dos por tarjeta. |
+
+## Sistema de diseño
+
+Una sola paleta institucional para las dos plataformas, declarada en dos sitios que deben mantenerse en espejo:
+
+| Plataforma | Archivo |
+|---|---|
+| PWA | [`pwa/css/base.css`](pwa/css/base.css) — custom properties `--primary`, `--surface`, … |
+| Android | [`presentation/theme/Theme.kt`](app/src/main/java/com/minsalud/encuestas/presentation/theme/Theme.kt) — `BrandPrimary`, `StatusSuccess`, … |
+
+Los nombres describen el **rol, no el color**. La versión anterior los llamaba `BrandGreen`; cuando la marca pasó a azul, cada pantalla que los importaba quedó mintiendo. Si cambia la marca, se tocan esos dos archivos y nada más.
+
+Todas las combinaciones de texto sobre fondo se verificaron por encima del mínimo **AA (4.5:1)** de WCAG.
 
 ## Tecnologías Utilizadas (App Android)
 - **Kotlin & Coroutines/Flow**: Asincronía y reactividad.
@@ -195,11 +219,11 @@ Copiar `.env.example` a `.env` y completar:
 
 ## Pruebas
 ```bash
-./gradlew testDebugUnitTest       # 29 pruebas unitarias JVM
+./gradlew testDebugUnitTest       # 38 pruebas unitarias JVM
 node scripts/check-pwa-assets.mjs # integridad del caché offline de la PWA
 ```
 
-Las pruebas cubren autenticación (`AuthRepositoryImplTest`), reglas de negocio y persistencia (`GuardarRegistroCompletoUseCaseTest`, `EliminarPersonaUseCaseTest`), validaciones (`GuardarPersonaUseCaseTest`, `RegistrarEncuestaUseCaseTest`) y manejo de errores (`SincronizarPendientesUseCaseTest`).
+Las pruebas cubren autenticación (`AuthRepositoryImplTest`), sincronización por lotes (`SyncRepositoryImplTest`), reglas de negocio y persistencia (`GuardarRegistroCompletoUseCaseTest`, `EliminarPersonaUseCaseTest`), validaciones (`GuardarPersonaUseCaseTest`, `RegistrarEncuestaUseCaseTest`) y manejo de errores (`SincronizarPendientesUseCaseTest`).
 
 `check-pwa-assets.mjs` verifica que todo archivo listado en `pwa/sw.js` exista y que los recursos de `index.html` estén cacheados. Sin esa comprobación, dividir o renombrar un archivo rompe la app **sin conexión** — un fallo invisible al probar en línea.
 
@@ -270,7 +294,7 @@ docker exec -i encuestas_offline_db mysql -u root -p minsalud_encuestas < databa
 ## Estado Actual del Proyecto
 - **Android**: Scaffolding, Data, Domain, UseCases, Repositorios, ViewModels, UI Compose, WorkManager Sync completados.
 - **Backend/DB**: Completados Scripts DDL y Endpoints de resolución de conflictos.
-- **Calidad**: 29 pruebas unitarias, integración continua en GitHub Actions y autenticación por token en los endpoints de escritura.
+- **Calidad**: 38 pruebas unitarias, integración continua en GitHub Actions y autenticación por token en los endpoints de escritura.
 
 ## Licencia
 Distribuido bajo licencia MIT. Ver [LICENSE](LICENSE).
