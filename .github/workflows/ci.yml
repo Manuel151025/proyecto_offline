@@ -17,27 +17,27 @@ jobs:
     name: Android · pruebas y compilación
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       # AGP 8.2 requiere JDK 17; con JDK 21 falla JdkImageTransform.
       - name: Configurar JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
 
       - name: Configurar Gradle
-        uses: gradle/actions/setup-gradle@v3
+        uses: gradle/actions/setup-gradle@v4
 
       - name: Ejecutar pruebas unitarias
         run: |
           set -o pipefail
-          ./gradlew testDebugUnitTest --stacktrace 2>&1 | tee /tmp/gradle-test.log
+          ./gradlew testDebugUnitTest --stacktrace --console=plain 2>&1 | tee /tmp/gradle-test.log
 
       - name: Compilar APK de depuración
         run: |
           set -o pipefail
-          ./gradlew assembleDebug --stacktrace 2>&1 | tee /tmp/gradle-assemble.log
+          ./gradlew assembleDebug --stacktrace --console=plain 2>&1 | tee /tmp/gradle-assemble.log
 
       # Publica el error como anotación del check. El contenido del log solo es
       # accesible con autenticación, mientras que las anotaciones son públicas:
@@ -73,7 +73,7 @@ jobs:
 
       - name: Publicar reporte de pruebas
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: reporte-pruebas-android
           path: app/build/reports/tests/testDebugUnitTest/
@@ -83,7 +83,7 @@ jobs:
     name: API · análisis estático PHP
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Configurar PHP 8.2
         uses: shivammathur/setup-php@v2
@@ -130,10 +130,10 @@ jobs:
     name: PWA · integridad del modo offline
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Configurar Node 20
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v5
         with:
           node-version: '20'
 
