@@ -25,6 +25,24 @@ export async function login(numero_documento, password) {
   return { encuestador: data.encuestador, token: data.token, expiraEn: data.expira_en };
 }
 
+/**
+ * Revoca el token en el servidor. Se hace en el mejor esfuerzo: si no hay red
+ * o el servidor falla, el cierre de sesión local debe completarse igual — dejar
+ * al usuario dentro porque no hubo señal sería peor que no revocar.
+ */
+export async function logout() {
+  const token = getToken();
+  if (!token) return;
+  try {
+    await fetch(`${BASE_URL}/auth/logout.php`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${token}` }
+    });
+  } catch (_) {
+    // Sin conexión: el token caducará solo por vigencia.
+  }
+}
+
 export async function fetchMunicipios() {
   const res = await fetch(`${BASE_URL}/municipios/index.php`);
   if (!res.ok) throw new Error(`Error HTTP ${res.status}`);

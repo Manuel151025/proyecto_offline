@@ -66,6 +66,11 @@ object UseCaseModule {
     ): LoginUseCase = LoginUseCase(authRepository)
 
     @Provides
+    fun provideLogoutUseCase(
+        authRepository: AuthRepository
+    ): LogoutUseCase = LogoutUseCase(authRepository)
+
+    @Provides
     fun provideObtenerPendientesUseCase(
         syncRepository: SyncRepository
     ): ObtenerPendientesUseCase = ObtenerPendientesUseCase(syncRepository)
