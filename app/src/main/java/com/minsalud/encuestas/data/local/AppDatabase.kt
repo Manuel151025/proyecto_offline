@@ -20,7 +20,7 @@ import com.minsalud.encuestas.data.local.entity.PersonaEntity
         ColaSincronizacionEntity::class,
         MunicipioEntity::class
     ],
-    version = 2,
+    version = 3,
     exportSchema = true
 )
 @TypeConverters(RoomConverters::class)

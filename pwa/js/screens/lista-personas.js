@@ -2,6 +2,23 @@ import { getPersonas } from '../db.js';
 import { navigate } from '../router.js';
 import { formatDate } from '../utils.js';
 
+/**
+ * Lista de personas con renderizado incremental.
+ *
+ * Antes se construía el HTML de la lista COMPLETA de una vez y se registraban
+ * dos listeners por tarjeta. Con unos miles de registros eso son miles de nodos
+ * en el DOM y decenas de miles de listeners, en gama baja de campo.
+ *
+ * Ahora se pinta una página cada vez y se amplía al acercarse al final, y los
+ * eventos se manejan por delegación: dos listeners en total, sin importar
+ * cuántas tarjetas haya.
+ */
+
+const TAMANO_PAGINA = 50;
+
+/** Margen para pedir la siguiente página antes de tocar fondo. */
+const MARGEN_PRECARGA = '300px';
+
 export async function render(container) {
   container.innerHTML = `
     <div class="screen">
@@ -18,35 +35,63 @@ export async function render(container) {
 
   document.getElementById('btn-nueva').onclick = () => navigate('/nueva');
 
-  let allPersonas = [];
+  const contenedor = document.getElementById('persona-list');
+  let todas = [];
+  let visibles = [];   // resultado del filtro actual
+  let pintadas = 0;
+  let observador = null;
 
   try {
     const all = await getPersonas();
-    allPersonas = all.filter(p => !p.deleted_at);
+    todas = all.filter(p => !p.deleted_at);
   } catch (e) {
-    showError();
+    contenedor.innerHTML = `<div class="error-state">Error al cargar personas. Intenta de nuevo.</div>`;
     return;
   }
 
-  renderList(allPersonas);
+  // Delegación: un listener para toda la lista, no dos por tarjeta.
+  contenedor.addEventListener('click', e => {
+    const tarjeta = e.target.closest('.persona-card');
+    if (tarjeta) abrir(tarjeta);
+  });
+  contenedor.addEventListener('keydown', e => {
+    if (e.key !== 'Enter' && e.key !== ' ') return;
+    const tarjeta = e.target.closest('.persona-card');
+    if (tarjeta) { e.preventDefault(); abrir(tarjeta); }
+  });
 
+  // La búsqueda recorre todo el arreglo; con la lista larga conviene no
+  // rehacerlo en cada pulsación.
+  let temporizador;
   document.getElementById('search-input').addEventListener('input', e => {
     const q = e.target.value.trim().toLowerCase();
-    if (!q) { renderList(allPersonas); return; }
-    const filtered = allPersonas.filter(p =>
+    clearTimeout(temporizador);
+    temporizador = setTimeout(() => aplicarFiltro(q), 150);
+  });
+
+  mostrar(todas);
+
+  function abrir(tarjeta) {
+    navigate(`/editar/${tarjeta.dataset.tipo}/${tarjeta.dataset.numero}`);
+  }
+
+  function aplicarFiltro(q) {
+    if (!q) { mostrar(todas); return; }
+    mostrar(todas.filter(p =>
       `${p.nombres} ${p.apellidos}`.toLowerCase().includes(q) ||
       p.numero_documento.toLowerCase().includes(q) ||
       (p.tipo_documento + p.numero_documento).toLowerCase().includes(q)
-    );
-    renderList(filtered);
-  });
+    ));
+  }
 
-  function renderList(list) {
-    const el = document.getElementById('persona-list');
-    if (!el) return;
+  function mostrar(lista) {
+    visibles = lista;
+    pintadas = 0;
+    observador?.disconnect();
+    contenedor.innerHTML = '';
 
-    if (!list.length) {
-      el.innerHTML = `
+    if (!lista.length) {
+      contenedor.innerHTML = `
         <div class="empty-state">
           <div class="empty-icon">&#128100;</div>
           <p class="empty-title">Sin personas registradas</p>
@@ -56,40 +101,55 @@ export async function render(container) {
       return;
     }
 
-    el.innerHTML = list.map(p => {
-      const pending = p._pendingSync;
-      const badgeClass = pending ? 'badge-warning' : 'badge-success';
-      const badgeText = pending ? 'Pendiente' : 'Sincronizado';
-      const initials = ((p.nombres || '')[0] || '') + ((p.apellidos || '')[0] || '');
-      return `
-        <div class="card persona-card"
-             data-tipo="${escHtml(p.tipo_documento)}"
-             data-numero="${escHtml(p.numero_documento)}"
-             role="button" tabindex="0">
-          <div class="persona-avatar">${escHtml(initials.toUpperCase())}</div>
-          <div class="persona-info">
-            <div class="persona-name">${escHtml(p.nombres)} ${escHtml(p.apellidos)}</div>
-            <div class="persona-doc">${escHtml(p.tipo_documento)}: ${escHtml(p.numero_documento)}</div>
-            ${p.fecha_nacimiento ? `<div class="persona-meta">Nac: ${formatDate(p.fecha_nacimiento)}</div>` : ''}
-          </div>
-          <div class="persona-status">
-            <span class="badge ${badgeClass}">${badgeText}</span>
-          </div>
-        </div>
-      `;
-    }).join('');
-
-    el.querySelectorAll('.persona-card').forEach(card => {
-      const handler = () => navigate(`/editar/${card.dataset.tipo}/${card.dataset.numero}`);
-      card.addEventListener('click', handler);
-      card.addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') handler(); });
-    });
+    pintarPagina();
   }
 
-  function showError() {
-    const el = document.getElementById('persona-list');
-    if (el) el.innerHTML = `<div class="error-state">Error al cargar personas. Intenta de nuevo.</div>`;
+  function pintarPagina() {
+    const pagina = visibles.slice(pintadas, pintadas + TAMANO_PAGINA);
+    if (!pagina.length) return;
+
+    document.getElementById('centinela-lista')?.remove();
+    contenedor.insertAdjacentHTML('beforeend', pagina.map(tarjeta).join(''));
+    pintadas += pagina.length;
+
+    if (pintadas < visibles.length) colocarCentinela();
   }
+
+  /** Elemento invisible al final: al asomarse, se pide la siguiente página. */
+  function colocarCentinela() {
+    contenedor.insertAdjacentHTML('beforeend', '<div id="centinela-lista" aria-hidden="true"></div>');
+    const centinela = document.getElementById('centinela-lista');
+
+    observador?.disconnect();
+    observador = new IntersectionObserver(entradas => {
+      if (entradas.some(x => x.isIntersecting)) pintarPagina();
+    }, { root: contenedor, rootMargin: MARGEN_PRECARGA });
+
+    observador.observe(centinela);
+  }
+}
+
+function tarjeta(p) {
+  const pendiente = p._pendingSync;
+  const clase = pendiente ? 'badge-warning' : 'badge-success';
+  const texto = pendiente ? 'Pendiente' : 'Sincronizado';
+  const iniciales = ((p.nombres || '')[0] || '') + ((p.apellidos || '')[0] || '');
+  return `
+    <div class="card persona-card"
+         data-tipo="${escHtml(p.tipo_documento)}"
+         data-numero="${escHtml(p.numero_documento)}"
+         role="button" tabindex="0">
+      <div class="persona-avatar">${escHtml(iniciales.toUpperCase())}</div>
+      <div class="persona-info">
+        <div class="persona-name">${escHtml(p.nombres)} ${escHtml(p.apellidos)}</div>
+        <div class="persona-doc">${escHtml(p.tipo_documento)}: ${escHtml(p.numero_documento)}</div>
+        ${p.fecha_nacimiento ? `<div class="persona-meta">Nac: ${formatDate(p.fecha_nacimiento)}</div>` : ''}
+      </div>
+      <div class="persona-status">
+        <span class="badge ${clase}">${texto}</span>
+      </div>
+    </div>
+  `;
 }
 
 function escHtml(str) {
