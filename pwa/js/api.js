@@ -34,7 +34,12 @@ export async function fetchMunicipios() {
 export async function syncData(payload) {
   const token = getToken();
   if (!token) {
-    throw new Error('Sesión sin token válido. Inicia sesión con conexión para poder sincronizar.');
+    // Se marca para que quien llame pueda mandar al login en vez de dejar al
+    // usuario leyendo un mensaje que no le dice cómo salir del atasco.
+    throw Object.assign(
+      new Error('Tu sesión no permite sincronizar. Vuelve a iniciar sesión con conexión.'),
+      { sesionInvalida: true }
+    );
   }
 
   const res = await fetch(`${BASE_URL}/personas/sync.php`, {
@@ -48,7 +53,10 @@ export async function syncData(payload) {
 
   if (res.status === 401 || res.status === 403) {
     const data = await res.json().catch(() => ({}));
-    throw new Error(data.message || 'Tu sesión expiró. Inicia sesión de nuevo.');
+    throw Object.assign(
+      new Error(data.message || 'Tu sesión expiró. Inicia sesión de nuevo.'),
+      { sesionInvalida: true }
+    );
   }
   if (!res.ok) throw new Error(`Error HTTP ${res.status}`);
 

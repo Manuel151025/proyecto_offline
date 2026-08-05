@@ -1,6 +1,8 @@
 import { getSyncCounts, getAllSyncItems } from '../db.js';
 import { syncNow, isSyncing } from '../sync.js';
 import { showToast, formatDateTime } from '../utils.js';
+import { clearSession } from '../session.js';
+import { navigate } from '../router.js';
 
 export async function render(container) {
   container.innerHTML = `
@@ -49,6 +51,15 @@ export async function render(container) {
       const result = await syncNow();
       showToast(result.message || 'Sincronización completada', 'success');
     } catch (err) {
+      if (err.sesionInvalida) {
+        // Sin token no hay nada que reintentar: se lleva al login en vez de
+        // dejar al encuestador leyendo un error que no le dice cómo salir.
+        // La cola NO se toca; sigue en IndexedDB esperando.
+        clearSession();
+        showToast(err.message, 'info');
+        navigate('/login');
+        return;
+      }
       showToast('Error: ' + err.message, 'error');
     } finally {
       btn.disabled = false;
