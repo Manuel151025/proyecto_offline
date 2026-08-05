@@ -26,6 +26,23 @@ val MIGRATION_1_2 = object : Migration(1, 2) {
     }
 }
 
+/**
+ * Índice de listado. Las dos consultas del PersonaDao filtran por
+ * `deleted_at IS NULL` y ordenan por `updated_at DESC`; sin índice, SQLite
+ * recorre la tabla completa y ordena en memoria cada vez que emite el Flow.
+ *
+ * El nombre y las columnas deben coincidir exactamente con los declarados en
+ * PersonaEntity, o Room aborta al validar el esquema en el arranque.
+ */
+val MIGRATION_2_3 = object : Migration(2, 3) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            "CREATE INDEX IF NOT EXISTS idx_personas_listado " +
+                "ON personas (deleted_at, updated_at)"
+        )
+    }
+}
+
 @Module
 @InstallIn(SingletonComponent::class)
 object DatabaseModule {
@@ -38,7 +55,7 @@ object DatabaseModule {
             AppDatabase::class.java,
             "encuestas_db"
         )
-            .addMigrations(MIGRATION_1_2) // Migración versionada, sin pérdida de datos
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3) // Versionadas, sin pérdida de datos
             .build()
     }
 

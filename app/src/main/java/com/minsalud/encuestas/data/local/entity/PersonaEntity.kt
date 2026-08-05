@@ -2,10 +2,20 @@
 
 import androidx.room.ColumnInfo
 import androidx.room.Entity
+import androidx.room.Index
 
+/**
+ * El índice compuesto sirve a las dos consultas de listado del DAO, que filtran
+ * por `deleted_at IS NULL` y ordenan por `updated_at DESC`. Sin él, SQLite
+ * recorre la tabla entera y ordena en memoria en cada emisión del Flow.
+ *
+ * No se añade el equivalente en MySQL: el servidor solo accede a `personas` por
+ * clave primaria (ver la consulta de sync.php), así que allí no aportaría nada.
+ */
 @Entity(
     tableName = "personas",
-    primaryKeys = ["tipo_documento", "numero_documento"]
+    primaryKeys = ["tipo_documento", "numero_documento"],
+    indices = [Index(value = ["deleted_at", "updated_at"], name = "idx_personas_listado")]
 )
 data class PersonaEntity(
     @ColumnInfo(name = "tipo_documento") val tipoDocumento: TipoDocumentoEntity,

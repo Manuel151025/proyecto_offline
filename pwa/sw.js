@@ -1,11 +1,12 @@
 // Subir esta versión en cada cambio de JS/CSS: el fetch es cache-first, así que
 // sin bump los navegadores seguirían sirviendo los archivos viejos.
+// v10: lista con renderizado incremental y eventos por delegación.
 // v9: el HTML pasa a red-primero (servirlo obsoleto dejaba la app sin CSS).
 // v8: rediseño institucional del login y paleta unificada.
 // v7: .hidden pasa a !important (el spinner del login se veía siempre).
 // v6: styles.css se dividió en 7 hojas por responsabilidad.
 // v5: api.js y session.js ahora envían el token de autenticación en la sincronización.
-const CACHE = 'encuestas-v9';
+const CACHE = 'encuestas-v10';
 
 const ASSETS = [
   './index.html',
