@@ -3,9 +3,13 @@ require_once __DIR__ . '/../cors.php';
 aplicarCors('GET, OPTIONS');
 
 require_once __DIR__ . '/../db.php';
+$pdo = conectarBD();
 
 try {
     $stmt = $pdo->query('SELECT codigo, nombre, departamento FROM municipios');
+    if ($stmt === false) {
+        throw new RuntimeException('No se pudo preparar la consulta de municipios');
+    }
     echo json_encode($stmt->fetchAll());
 } catch (Exception $e) {
     // El detalle va al log del servidor, nunca al cliente: $e->getMessage()

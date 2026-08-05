@@ -1,0 +1,19 @@
+{
+    "name": "manuel151025/proyecto-offline-api",
+    "description": "API REST del sistema de encuestas offline-first del Ministerio de Salud",
+    "type": "project",
+    "license": "MIT",
+    "require": {
+        "php": ">=8.1"
+    },
+    "require-dev": {
+        "phpstan/phpstan": "^2.0"
+    },
+    "scripts": {
+        "analizar": "phpstan analyse",
+        "sintaxis": "find api -name '*.php' -exec php -l {} \\;"
+    },
+    "config": {
+        "sort-packages": true
+    }
+}

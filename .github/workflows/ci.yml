@@ -34,6 +34,16 @@ jobs:
           set -o pipefail
           ./gradlew testDebugUnitTest --stacktrace --console=plain 2>&1 | tee /tmp/gradle-test.log
 
+      # Falla ante ERRORES, no ante avisos: los 16 avisos actuales son
+      # "hay una versión más nueva", que es trabajo de Dependabot.
+      - name: Analizar con Android Lint
+        run: |
+          set -o pipefail
+          ./gradlew lintDebug --stacktrace --console=plain 2>&1 | tee /tmp/gradle-lint.log
+
+      - name: Generar informe de cobertura
+        run: ./gradlew informeCobertura --console=plain
+
       - name: Compilar APK de depuración
         run: |
           set -o pipefail
@@ -71,12 +81,15 @@ jobs:
               done
           done
 
-      - name: Publicar reporte de pruebas
+      - name: Publicar informes
         if: always()
         uses: actions/upload-artifact@v5
         with:
-          name: reporte-pruebas-android
-          path: app/build/reports/tests/testDebugUnitTest/
+          name: informes-android
+          path: |
+            app/build/reports/tests/testDebugUnitTest/
+            app/build/reports/jacoco/informeCobertura/html/
+            app/build/reports/lint-results-debug.html
           retention-days: 7
 
   php:
@@ -100,6 +113,15 @@ jobs:
             encontrados=$((encontrados + 1))
           done < <(find api -name '*.php' -type f)
           echo "✓ $encontrados archivos PHP validados"
+
+      - name: Instalar herramientas de análisis
+        run: composer install --no-interaction --no-progress --prefer-dist
+
+      # `php -l` solo comprueba que el archivo parsee. Esto es análisis
+      # estático de verdad: tipos, valores nulos, ramas inalcanzables.
+      # El nivel 8 no es arbitrario: es el más alto que el código pasa limpio.
+      - name: Analizar con PHPStan (nivel 8)
+        run: vendor/bin/phpstan analyse --no-progress --error-format=github
 
       # Solo llamadas reales a header(); los comentarios pueden mencionar el patrón.
       - name: Verificar que no quede CORS permisivo

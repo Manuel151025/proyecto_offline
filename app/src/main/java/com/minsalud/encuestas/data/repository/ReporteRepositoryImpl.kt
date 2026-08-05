@@ -30,7 +30,7 @@ class ReporteRepositoryImpl @Inject constructor(
         val file = File(dir, "reporte_$stamp.csv")
 
         file.bufferedWriter(Charsets.UTF_8).use { w ->
-            w.write("﻿") // BOM para que Excel abra los acentos correctamente
+            w.write("") // BOM para que Excel abra los acentos correctamente
             w.write(HEADER.joinToString(","))
             w.newLine()
             personas.forEach { p ->

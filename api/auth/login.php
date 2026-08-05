@@ -3,6 +3,7 @@ require_once __DIR__ . '/../cors.php';
 aplicarCors('POST, OPTIONS');
 
 require_once __DIR__ . '/../db.php';
+$pdo = conectarBD();
 require_once __DIR__ . '/../auth_token.php';
 require_once __DIR__ . '/../rate_limit.php';
 
@@ -10,7 +11,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     responderError(405, 'Método no permitido');
 }
 
-$data = json_decode(file_get_contents('php://input'), true);
+$data = json_decode(leerCuerpo(), true);
 if (!is_array($data)) {
     responderError(400, 'Payload inválido');
 }

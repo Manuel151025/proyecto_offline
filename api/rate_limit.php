@@ -37,7 +37,7 @@ function crearTablaIntentos(PDO $pdo): void
  * Ejecuta una operación y, si falla porque la tabla no existe todavía,
  * la crea y reintenta una sola vez. Evita hacer DDL en cada petición.
  */
-function conTablaIntentos(PDO $pdo, callable $operacion)
+function conTablaIntentos(PDO $pdo, callable $operacion): mixed
 {
     try {
         return $operacion();

@@ -1,0 +1,20 @@
+parameters:
+    # Nivel 8 de 10. No se eligió al azar: es el más alto que el código pasa
+    # con cero errores. El 9 exige tratar `mixed` de forma estricta y arrojaría
+    # 71 avisos sobre datos que llegan de JSON externo, donde `mixed` es
+    # justamente lo correcto hasta validarlos.
+    level: 8
+
+    paths:
+        - api
+        - scripts
+
+    # El endpoint de migración se borra tras usarse; si vuelve a existir de
+    # forma temporal, no debe frenar el CI.
+    excludePaths:
+        - api/setup/*
+
+    # Los endpoints son scripts, no librerías: leen superglobales y terminan
+    # con exit(). PHPStan no sigue el flujo a través de responderError(), que
+    # siempre corta, así que se le indica.
+    treatPhpDocTypesAsCertain: false

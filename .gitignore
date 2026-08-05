@@ -43,3 +43,6 @@ Desktop.ini
 step*.ps1
 update*.ps1
 scaffold.ps1
+
+# Dependencias de desarrollo de PHP (PHPStan). No se despliegan.
+/vendor/
