@@ -1,7 +1,6 @@
 package com.minsalud.encuestas.presentation.viewmodel
 
 import android.content.Context
-import android.util.Patterns
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -9,6 +8,7 @@ import com.minsalud.encuestas.core.Result
 import com.minsalud.encuestas.data.local.prefs.SessionManager
 import com.minsalud.encuestas.domain.model.*
 import com.minsalud.encuestas.domain.usecase.GuardarRegistroCompletoUseCase
+import com.minsalud.encuestas.domain.validation.Validaciones
 import com.minsalud.encuestas.domain.usecase.ObtenerMunicipiosUseCase
 import com.minsalud.encuestas.domain.usecase.ObtenerPersonaUseCase
 import com.minsalud.encuestas.domain.usecase.SeedMunicipiosUseCase
@@ -193,27 +193,25 @@ class FormularioEncuestaViewModel @Inject constructor(
     private fun validar(state: FormularioUiState): FormularioUiState {
         val docError = when {
             state.numeroDocumento.isBlank() -> "El documento es obligatorio"
-            state.numeroDocumento.length < 6 -> "Debe tener al menos 6 dígitos"
+            !Validaciones.esDocumentoValido(state.numeroDocumento) -> "Debe tener al menos 6 dígitos"
             else -> null
         }
         val nombresError = when {
             state.nombres.isBlank() -> "Los nombres son obligatorios"
-            state.nombres.any { it.isDigit() } -> "No debe contener números"
+            !Validaciones.esNombreValido(state.nombres) -> "No debe contener números"
             else -> null
         }
         val apellidosError = when {
             state.apellidos.isBlank() -> "Los apellidos son obligatorios"
-            state.apellidos.any { it.isDigit() } -> "No debe contener números"
+            !Validaciones.esNombreValido(state.apellidos) -> "No debe contener números"
             else -> null
         }
-        val emailError = if (state.email.isNotBlank() &&
-            !Patterns.EMAIL_ADDRESS.matcher(state.email).matches()
-        ) "Correo no válido" else null
-        val telefonoError = if (state.telefono.isNotBlank() && state.telefono.length < 7)
+        val emailError = if (state.email.isNotBlank() && !Validaciones.esEmailValido(state.email))
+            "Correo no válido" else null
+        val telefonoError = if (!Validaciones.esTelefonoValido(state.telefono))
             "Teléfono no válido" else null
-        val estratoError = state.estrato.toIntOrNull().let {
-            if (state.estrato.isNotBlank() && (it == null || it !in 1..6)) "Estrato debe ser 1–6" else null
-        }
+        val estratoError = if (!Validaciones.esEstratoValido(state.estrato))
+            "Estrato debe ser 1–6" else null
         return state.copy(
             docError = docError,
             nombresError = nombresError,

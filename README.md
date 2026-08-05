@@ -223,7 +223,9 @@ Copiar `.env.example` a `.env` y completar:
 node scripts/check-pwa-assets.mjs # integridad del caché offline de la PWA
 ```
 
-Las pruebas cubren autenticación (`AuthRepositoryImplTest`), sincronización por lotes (`SyncRepositoryImplTest`), reglas de negocio y persistencia (`GuardarRegistroCompletoUseCaseTest`, `EliminarPersonaUseCaseTest`), validaciones (`GuardarPersonaUseCaseTest`, `RegistrarEncuestaUseCaseTest`) y manejo de errores (`SincronizarPendientesUseCaseTest`).
+**Android** cubre autenticación (`AuthRepositoryImplTest`), sincronización por lotes (`SyncRepositoryImplTest`), reglas de negocio y persistencia (`GuardarRegistroCompletoUseCaseTest`, `EliminarPersonaUseCaseTest`), validaciones (`ValidacionesTest`, `GuardarPersonaUseCaseTest`), estado de la interfaz (`ListaPersonasViewModelTest`) y manejo de errores (`SincronizarPendientesUseCaseTest`).
+
+**PWA** usa el runner nativo de Node, sin dependencias que instalar. Cubre la conversión de fechas y la vigencia del token. Las pruebas de fecha se ejecutan en dos husos horarios (`America/Bogota` y `Asia/Tokyo`) porque el fallo que las motivó —la fecha de nacimiento corriéndose un día en cada edición— solo aparecía con desfase negativo respecto a UTC.
 
 `check-pwa-assets.mjs` verifica que todo archivo listado en `pwa/sw.js` exista y que los recursos de `index.html` estén cacheados. Sin esa comprobación, dividir o renombrar un archivo rompe la app **sin conexión** — un fallo invisible al probar en línea.
 
@@ -294,7 +296,7 @@ docker exec -i encuestas_offline_db mysql -u root -p minsalud_encuestas < databa
 ## Estado Actual del Proyecto
 - **Android**: Scaffolding, Data, Domain, UseCases, Repositorios, ViewModels, UI Compose, WorkManager Sync completados.
 - **Backend/DB**: Completados Scripts DDL y Endpoints de resolución de conflictos.
-- **Calidad**: 38 pruebas unitarias, integración continua en GitHub Actions y autenticación por token en los endpoints de escritura.
+- **Calidad**: 69 pruebas automatizadas (50 Android + 19 PWA), integración continua en GitHub Actions y autenticación por token en los endpoints de escritura.
 
 ## Licencia
 Distribuido bajo licencia MIT. Ver [LICENSE](LICENSE).

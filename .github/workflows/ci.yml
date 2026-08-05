@@ -129,6 +129,21 @@ jobs:
       - name: Verificar caché del service worker y manifest
         run: node scripts/check-pwa-assets.mjs
 
+      # El huso se fija a propósito: el fallo que motivó estas pruebas (la fecha
+      # de nacimiento corriéndose un día) solo se manifestaba con desfase
+      # negativo respecto a UTC, y Colombia es donde corre la app.
+      - name: Ejecutar pruebas de la PWA
+        env:
+          TZ: America/Bogota
+        run: node --test pwa/tests/*.test.mjs
+
+      # Se repiten con desfase positivo: una conversión de fecha correcta no
+      # puede depender del huso de la máquina.
+      - name: Repetir las pruebas con otro huso horario
+        env:
+          TZ: Asia/Tokyo
+        run: node --test pwa/tests/*.test.mjs
+
       # Los módulos ES no se pueden validar con `node --check` tal cual, hay que
       # presentarlos con extensión .mjs para que Node los trate como módulos.
       - name: Validar sintaxis de los módulos JavaScript

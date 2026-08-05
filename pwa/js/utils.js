@@ -19,29 +19,44 @@ export function nowMs() {
   return Date.now();
 }
 
+/**
+ * La fecha de nacimiento es una fecha de CALENDARIO, no un instante: el 15 de
+ * enero es el 15 de enero en cualquier huso. Se guarda como la medianoche UTC
+ * de ese día —que es lo que entrega el selector de fecha— y por tanto hay que
+ * leerla y mostrarla también en UTC.
+ *
+ * Mezclar los dos criterios restaba un día en Colombia (UTC-5) y el error se
+ * acumulaba: cada edición del registro corría la fecha una jornada más atrás.
+ */
 export function formatDate(ms) {
   if (!ms) return '—';
   return new Date(ms).toLocaleDateString('es-CO', {
-    year: 'numeric', month: 'short', day: 'numeric'
+    year: 'numeric', month: 'short', day: 'numeric', timeZone: 'UTC'
   });
 }
 
+/**
+ * Esta sí es un instante real (cuándo ocurrió una sincronización), así que se
+ * muestra en la hora local del dispositivo. No lleva timeZone a propósito.
+ */
 export function formatDateTime(ms) {
   if (!ms) return '—';
   return new Date(ms).toLocaleString('es-CO');
 }
 
+/** 'YYYY-MM-DD' -> medianoche UTC de ese día. */
 export function dateToMs(dateString) {
   if (!dateString) return null;
   return new Date(dateString).getTime();
 }
 
+/** Inversa exacta de dateToMs: lee en UTC para no correr el día. */
 export function msToDateInput(ms) {
   if (!ms) return '';
   const d = new Date(ms);
-  const yyyy = d.getFullYear();
-  const mm = String(d.getMonth() + 1).padStart(2, '0');
-  const dd = String(d.getDate()).padStart(2, '0');
+  const yyyy = d.getUTCFullYear();
+  const mm = String(d.getUTCMonth() + 1).padStart(2, '0');
+  const dd = String(d.getUTCDate()).padStart(2, '0');
   return `${yyyy}-${mm}-${dd}`;
 }
 
