@@ -30,6 +30,27 @@
 }
 .online-badge.offline { background: #EF9A9A; }
 
+.app-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.btn-salir {
+  background: rgba(255,255,255,0.14);
+  border: 1px solid rgba(255,255,255,0.25);
+  color: var(--on-primary);
+  font-family: inherit;
+  font-size: 0.78rem;
+  font-weight: 600;
+  padding: 5px 11px;
+  border-radius: 99px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.btn-salir:hover { background: rgba(255,255,255,0.26); }
+.btn-salir:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+
 /* ---- Main content ---- */
 #app-root {
   flex: 1;

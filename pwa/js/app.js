@@ -7,7 +7,7 @@ import { getMunicipios, saveMunicipios } from './db.js';
 import { fetchMunicipios } from './api.js';
 import { syncNow } from './sync.js';
 import { showToast } from './utils.js';
-import { hasActiveSession } from './session.js';
+import { hasActiveSession, clearSession, getToken } from './session.js';
 
 const appRoot = document.getElementById('app-root');
 
@@ -66,6 +66,29 @@ function setupBottomNav() {
   });
 }
 
+/**
+ * Cerrar sesión.
+ *
+ * Faltaba por completo: al exigirse el token para sincronizar, quien tuviera
+ * una sesión sin él veía "inicia sesión con conexión" sin ninguna forma de
+ * hacerlo. Solo se borra la sesión; las personas y la cola viven en IndexedDB
+ * y deben sobrevivir, porque pueden ser trabajo de campo sin enviar.
+ */
+function setupLogout() {
+  const btn = document.getElementById('btn-salir');
+  if (!btn) return;
+  btn.addEventListener('click', () => {
+    if (!confirm('¿Cerrar sesión? Los registros sin sincronizar se conservan en este dispositivo.')) return;
+    cerrarSesion();
+  });
+}
+
+export function cerrarSesion(mensaje) {
+  clearSession();
+  if (mensaje) showToast(mensaje, 'info');
+  navigate('/login');
+}
+
 function updateChrome() {
   const hash = window.location.hash.replace('#', '') || '/personas';
   const isLogin = hash === '/login';
@@ -76,6 +99,7 @@ function updateChrome() {
 async function init() {
   registerSW();
   setupBottomNav();
+  setupLogout();
   setupOnlineSync();
   window.addEventListener('hashchange', updateChrome);
   await loadMunicipios();
