@@ -66,6 +66,18 @@ function aplicarCors(string $metodos = 'GET, POST, OPTIONS'): void
     }
 }
 
+/**
+ * Cuerpo crudo de la petición.
+ *
+ * file_get_contents devuelve `string|false`, y pasar `false` a json_decode es
+ * un error de tipo en PHP 8. Aquí se normaliza a cadena vacía, que json_decode
+ * interpreta como payload inválido: justo lo que queremos que ocurra.
+ */
+function leerCuerpo(): string
+{
+    return file_get_contents('php://input') ?: '';
+}
+
 /** Respuesta JSON uniforme de error, sin filtrar detalles internos. */
 function responderError(int $codigo, string $mensaje): void
 {

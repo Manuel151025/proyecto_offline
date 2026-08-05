@@ -20,7 +20,14 @@ if (!is_file($origen)) {
     exit(1);
 }
 
-$sql = trim(file_get_contents($origen));
+// is_file() no garantiza que se pueda leer: puede fallar por permisos.
+$contenido = file_get_contents($origen);
+if ($contenido === false) {
+    fwrite(STDERR, "No se pudo leer $origen\n");
+    exit(1);
+}
+
+$sql = trim($contenido);
 
 if ($sql === '') {
     fwrite(STDERR, "El archivo de semilla está vacío\n");

@@ -12,6 +12,7 @@ session_start();
 require_once '../cors.php';
 aplicarCabecerasDeSeguridad();
 require_once '../db.php';
+$pdo = conectarBD();
 
 /** Longitud mínima al crear o cambiar la contraseña de un encuestador. */
 const MIN_LONGITUD_PASSWORD = 10;
@@ -106,10 +107,25 @@ if ($loggedIn && isset($_GET['edit'])) {
 }
 
 $encuestadores = $loggedIn
-    ? $pdo->query("SELECT id, nombre, numero_documento, activo FROM encuestadores ORDER BY id")->fetchAll()
+    ? consultarEncuestadores($pdo)
     : [];
 
-function h($v) { return htmlspecialchars((string)($v ?? ''), ENT_QUOTES, 'UTF-8'); }
+/**
+ * Lista de encuestadores.
+ *
+ * PDO::query devuelve `PDOStatement|false`; con ERRMODE_EXCEPTION nunca
+ * devuelve false, pero comprobarlo evita un fatal si alguien cambia ese ajuste.
+ *
+ * @return array<int, array<string, mixed>>
+ */
+function consultarEncuestadores(PDO $pdo): array
+{
+    $stmt = $pdo->query('SELECT id, nombre, numero_documento, activo FROM encuestadores ORDER BY id');
+    return $stmt === false ? [] : $stmt->fetchAll();
+}
+
+/** Escapa un valor para insertarlo en HTML. */
+function h(mixed $v): string { return htmlspecialchars((string)($v ?? ''), ENT_QUOTES, 'UTF-8'); }
 ?>
 <!DOCTYPE html>
 <html lang="es">

@@ -15,6 +15,7 @@
 const TOKEN_VIGENCIA_DIAS = 30;
 
 /** Genera un token nuevo para el encuestador y persiste su hash. */
+/** @return array{token: string, expira_en: int} El token en claro solo se devuelve aquí. */
 function emitirToken(PDO $pdo, int $idEncuestador): array
 {
     $token = bin2hex(random_bytes(32));
@@ -61,6 +62,7 @@ function leerHeaderAutorizacion(): string
  * Exige un token válido. Devuelve el encuestador autenticado o corta con 401.
  * Requiere que cors.php esté cargado (usa responderError).
  */
+/** @return array{id_encuestador: int, nombre: string} */
 function requerirAutenticacion(PDO $pdo): array
 {
     $token = leerHeaderAutorizacion();

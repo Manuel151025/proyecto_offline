@@ -51,3 +51,9 @@ design_handoff_login/
 # NO quitar esta exclusion: el docroot es /var/www/html, asi que cualquier .sql
 # que entre en la imagen queda descargable por HTTP.
 database/
+
+# Dependencias de desarrollo de PHP: PHPStan solo se usa en CI.
+vendor/
+composer.json
+composer.lock
+phpstan.neon

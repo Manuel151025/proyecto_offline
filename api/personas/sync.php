@@ -3,6 +3,7 @@ require_once __DIR__ . '/../cors.php';
 aplicarCors('POST, OPTIONS');
 
 require_once __DIR__ . '/../db.php';
+$pdo = conectarBD();
 require_once __DIR__ . '/../auth_token.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
@@ -16,6 +17,7 @@ $sesion = requerirAutenticacion($pdo);
 const MAX_LOTE = 500;
 
 /** Exige un texto no vacío y lo recorta a la longitud de la columna. */
+/** @param array<string, mixed> $fila */
 function textoRequerido(array $fila, string $clave, int $max): string
 {
     $valor = trim((string)($fila[$clave] ?? ''));
@@ -26,6 +28,7 @@ function textoRequerido(array $fila, string $clave, int $max): string
 }
 
 /** Texto opcional: null si viene vacío o ausente. */
+/** @param array<string, mixed> $fila */
 function textoOpcional(array $fila, string $clave, int $max): ?string
 {
     $valor = trim((string)($fila[$clave] ?? ''));
@@ -33,6 +36,7 @@ function textoOpcional(array $fila, string $clave, int $max): ?string
 }
 
 /** Entero obligatorio (timestamps en milisegundos). */
+/** @param array<string, mixed> $fila */
 function enteroRequerido(array $fila, string $clave): int
 {
     $valor = $fila[$clave] ?? null;
@@ -43,13 +47,14 @@ function enteroRequerido(array $fila, string $clave): int
 }
 
 /** Entero opcional: null si viene ausente o no numérico. */
+/** @param array<string, mixed> $fila */
 function enteroOpcional(array $fila, string $clave): ?int
 {
     $valor = $fila[$clave] ?? null;
     return is_numeric($valor) ? (int)$valor : null;
 }
 
-$data = json_decode(file_get_contents('php://input'), true);
+$data = json_decode(leerCuerpo(), true);
 
 if (!is_array($data) || !isset($data['personas']) || !isset($data['encuestas'])
     || !is_array($data['personas']) || !is_array($data['encuestas'])) {
