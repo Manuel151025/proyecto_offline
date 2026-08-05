@@ -19,6 +19,7 @@ import com.minsalud.encuestas.presentation.viewmodel.FormularioEncuestaViewModel
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
+import java.util.TimeZone
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -328,5 +329,13 @@ private fun <T> DropdownField(
     }
 }
 
+/**
+ * La fecha de nacimiento es una fecha de CALENDARIO, no un instante. El
+ * DatePicker de Material 3 devuelve la medianoche UTC del día elegido, así que
+ * hay que formatearla en UTC: con el huso local, en Colombia (UTC-5) se mostraba
+ * el día anterior al seleccionado.
+ */
 private fun formatFecha(ms: Long): String =
-    SimpleDateFormat("yyyy-MM-dd", Locale.getDefault()).format(Date(ms))
+    SimpleDateFormat("yyyy-MM-dd", Locale.getDefault())
+        .apply { timeZone = TimeZone.getTimeZone("UTC") }
+        .format(Date(ms))

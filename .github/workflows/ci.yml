@@ -49,12 +49,23 @@ jobs:
       - name: Publicar causa del fallo
         if: failure()
         run: |
+          # :app:packageDebug ha fallado de forma intermitente en el runner sin
+          # que la sección "What went wrong" diga por qué. El agotamiento de
+          # disco es la causa más habitual de ese fallo al escribir el APK, así
+          # que se registra el espacio libre junto al error.
+          echo "::error::[disco] $(df -h / | tail -1 | tr -s ' ')"
+          echo "::error::[memoria] $(free -m 2>/dev/null | grep Mem | tr -s ' ' || echo 'no disponible')"
+
           for archivo in /tmp/gradle-test.log /tmp/gradle-assemble.log; do
             [ -f "$archivo" ] || continue
             {
-              sed -n '/FAILURE: Build failed/,$p' "$archivo" | head -35
+              sed -n '/FAILURE: Build failed/,$p' "$archivo" | head -30
+              echo "--- excepción con traza ---"
+              # La causa real cuelga de "* Exception is:", no del bloque
+              # "What went wrong"; ayer se quedó fuera por el recorte.
+              sed -n '/\* Exception is:/,$p' "$archivo" | head -25
               echo "--- causas anidadas ---"
-              grep -F "Caused by" "$archivo" | head -10
+              grep -E "Caused by|No space left|OutOfMemory|Killed" "$archivo" | head -10
             } | nl -ba | while IFS= read -r linea; do
                 echo "::error::$linea"
               done
@@ -128,6 +139,21 @@ jobs:
 
       - name: Verificar caché del service worker y manifest
         run: node scripts/check-pwa-assets.mjs
+
+      # El huso se fija a propósito: el fallo que motivó estas pruebas (la fecha
+      # de nacimiento corriéndose un día) solo se manifestaba con desfase
+      # negativo respecto a UTC, y Colombia es donde corre la app.
+      - name: Ejecutar pruebas de la PWA
+        env:
+          TZ: America/Bogota
+        run: node --test pwa/tests/*.test.mjs
+
+      # Se repiten con desfase positivo: una conversión de fecha correcta no
+      # puede depender del huso de la máquina.
+      - name: Repetir las pruebas con otro huso horario
+        env:
+          TZ: Asia/Tokyo
+        run: node --test pwa/tests/*.test.mjs
 
       # Los módulos ES no se pueden validar con `node --check` tal cual, hay que
       # presentarlos con extensión .mjs para que Node los trate como módulos.
