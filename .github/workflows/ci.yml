@@ -17,7 +17,7 @@ jobs:
     name: Android · pruebas y compilación
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       # AGP 8.2 requiere JDK 17; con JDK 21 falla JdkImageTransform.
       - name: Configurar JDK 17
@@ -107,7 +107,7 @@ jobs:
     name: API · análisis estático PHP
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Configurar PHP 8.2
         uses: shivammathur/setup-php@v2
@@ -199,7 +199,7 @@ jobs:
     name: PWA · integridad del modo offline
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
 
       - name: Configurar Node 20
         uses: actions/setup-node@v5
