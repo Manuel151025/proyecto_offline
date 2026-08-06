@@ -159,6 +159,20 @@ jobs:
           fi
           echo "✓ Login con límite de intentos"
 
+      - name: Verificar que la descarga exija token y use el sello del servidor
+        run: |
+          if ! grep -q "requerirAutenticacion" api/personas/cambios.php; then
+            echo "::error::api/personas/cambios.php expone datos de todos: debe exigir token."
+            exit 1
+          fi
+          # Filtrar por updated_at rompería la descarga incremental: ese campo
+          # lo pone el dispositivo y puede ir hacia atrás.
+          if ! grep -q "server_updated_at > ?" api/personas/cambios.php; then
+            echo "::error::La descarga debe filtrar por server_updated_at, no por updated_at."
+            exit 1
+          fi
+          echo "✓ Descarga protegida y con marca de agua del servidor"
+
       - name: Verificar que el cierre de sesión revoque el token
         run: |
           if [ ! -f api/auth/logout.php ] || ! grep -q "DELETE FROM sesiones" api/auth/logout.php; then

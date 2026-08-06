@@ -119,6 +119,19 @@ sequenceDiagram
 
 El registro **nunca** queda solo en memoria: si la app muere entre el guardado y el envío, la cola sobrevive en disco y el `SyncWorker` la retoma.
 
+### Sincronización en los dos sentidos
+
+La sincronización **sube y baja**. Primero envía lo pendiente y después descarga lo que registraron otros dispositivos; en ese orden, porque subiendo antes el servidor ya conoce los cambios locales cuando se le pregunta, y se evita un conflicto que no hacía falta tener.
+
+| Pieza | Función |
+|---|---|
+| `updated_at` | Lo pone el **dispositivo**. Resuelve conflictos por Last-Write-Wins. |
+| `server_updated_at` | Lo pone el **servidor**. Es la marca de agua de la descarga incremental. |
+
+Son dos campos y no uno por un motivo concreto: si la descarga preguntara "dame lo cambiado desde X" usando `updated_at`, un teléfono con el reloj atrasado escribiría filas con fecha vieja que los demás dispositivos ya habrían superado. **Esos registros no se descargarían nunca y el dato se perdería en silencio.** El sello del servidor avanza siempre hacia adelante, sin depender del reloj de nadie.
+
+Al mezclar lo descargado, **los cambios locales sin enviar nunca se pisan**: todavía no llegaron al servidor, así que lo que vuelve es por fuerza anterior. Sobrescribirlos borraría una encuesta recién hecha.
+
 ### Decisiones de escalabilidad
 
 | Decisión | Motivo |

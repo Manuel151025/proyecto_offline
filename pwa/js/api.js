@@ -43,6 +43,41 @@ export async function logout() {
   }
 }
 
+/**
+ * Descarga las personas que cambiaron en el servidor desde `desde`.
+ *
+ * `desde` es la marca de agua del dispositivo: la mayor `server_updated_at`
+ * que ya tiene guardada. Pedir solo lo posterior evita traer la tabla entera
+ * en cada sincronización.
+ */
+export async function descargarCambios(desde = 0, limite = 200) {
+  const token = getToken();
+  if (!token) {
+    throw Object.assign(
+      new Error('Tu sesión no permite sincronizar. Vuelve a iniciar sesión con conexión.'),
+      { sesionInvalida: true }
+    );
+  }
+
+  const res = await fetch(
+    `${BASE_URL}/personas/cambios.php?desde=${encodeURIComponent(desde)}&limite=${limite}`,
+    { headers: { 'Authorization': `Bearer ${token}` } }
+  );
+
+  if (res.status === 401 || res.status === 403) {
+    const data = await res.json().catch(() => ({}));
+    throw Object.assign(
+      new Error(data.message || 'Tu sesión expiró. Inicia sesión de nuevo.'),
+      { sesionInvalida: true }
+    );
+  }
+  if (!res.ok) throw new Error(`Error HTTP ${res.status}`);
+
+  const data = await res.json();
+  if (!data.success) throw new Error(data.message || 'Error al descargar cambios');
+  return data;
+}
+
 export async function fetchMunicipios() {
   const res = await fetch(`${BASE_URL}/municipios/index.php`);
   if (!res.ok) throw new Error(`Error HTTP ${res.status}`);

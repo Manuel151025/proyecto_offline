@@ -5,6 +5,7 @@ aplicarCors('POST, OPTIONS');
 require_once __DIR__ . '/../db.php';
 $pdo = conectarBD();
 require_once __DIR__ . '/../auth_token.php';
+require_once __DIR__ . '/../esquema.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     responderError(405, 'Método no permitido');
@@ -110,6 +111,10 @@ foreach ($data['encuestas'] as $e) {
     ];
 }
 
+// Antes de la transacción: un ALTER TABLE hace commit implícito y partiría
+// el lote a la mitad si se ejecutara dentro.
+asegurarServerUpdatedAt($pdo);
+
 $processedEncuestas = [];
 $pdo->beginTransaction();
 
@@ -120,16 +125,22 @@ try {
         INSERT INTO personas (
             tipo_documento, numero_documento, nombres, apellidos, fecha_nacimiento,
             telefono, email, direccion, vereda, eps, ocupacion, estrato, municipio_codigo,
-            updated_at, device_id, deleted_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            updated_at, device_id, deleted_at, server_updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ");
     $stmtPersonaUpdate = $pdo->prepare("
         UPDATE personas SET
             nombres = ?, apellidos = ?, fecha_nacimiento = ?, telefono = ?, email = ?,
             direccion = ?, vereda = ?, eps = ?, ocupacion = ?, estrato = ?, municipio_codigo = ?,
-            updated_at = ?, device_id = ?, deleted_at = ?
+            updated_at = ?, device_id = ?, deleted_at = ?, server_updated_at = ?
         WHERE tipo_documento = ? AND numero_documento = ?
     ");
+
+    // Sello del servidor, el mismo para todo el lote. Es la marca de agua que
+    // usa la descarga incremental: al venir del reloj del servidor avanza de
+    // forma monótona, mientras que `updated_at` depende del reloj de cada
+    // dispositivo y podría ir hacia atrás.
+    $selloServidor = (int)round(microtime(true) * 1000);
 
     foreach ($personas as $p) {
         $stmtPersonaCheck->execute([$p['tipo_documento'], $p['numero_documento']]);
@@ -143,7 +154,8 @@ try {
                     $p['nombres'], $p['apellidos'], $p['fecha_nacimiento'], $p['telefono'],
                     $p['email'], $p['direccion'], $p['vereda'], $p['eps'], $p['ocupacion'],
                     $p['estrato'], $p['municipio_codigo'], $p['updated_at'], $p['device_id'],
-                    $p['deleted_at'], $p['tipo_documento'], $p['numero_documento']
+                    $p['deleted_at'], $selloServidor,
+                    $p['tipo_documento'], $p['numero_documento']
                 ]);
             }
             // Si el entrante es más viejo (updated_at menor o igual), lo ignoramos pacíficamente.
@@ -153,7 +165,8 @@ try {
                 $p['tipo_documento'], $p['numero_documento'], $p['nombres'], $p['apellidos'],
                 $p['fecha_nacimiento'], $p['telefono'], $p['email'], $p['direccion'],
                 $p['vereda'], $p['eps'], $p['ocupacion'], $p['estrato'],
-                $p['municipio_codigo'], $p['updated_at'], $p['device_id'], $p['deleted_at']
+                $p['municipio_codigo'], $p['updated_at'], $p['device_id'], $p['deleted_at'],
+                $selloServidor
             ]);
         }
     }
