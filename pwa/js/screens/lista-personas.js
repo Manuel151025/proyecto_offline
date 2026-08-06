@@ -1,4 +1,4 @@
-import { getPersonas } from '../db.js';
+import { getPersonas, resumenLocal } from '../db.js';
 import { navigate } from '../router.js';
 import { formatDate } from '../utils.js';
 
@@ -28,18 +28,26 @@ export async function render(container) {
           <input type="search" id="search-input" placeholder="Buscar por nombre o documento..." autocomplete="off" />
         </div>
       </div>
-      <div class="screen-content" id="persona-list"></div>
+      <div class="screen-content" id="area-scroll">
+        <div id="resumen-dia"></div>
+        <div id="persona-list"></div>
+      </div>
       <button class="fab" id="btn-nueva" title="Registrar nueva persona">&#43;</button>
     </div>
   `;
 
   document.getElementById('btn-nueva').onclick = () => navigate('/nueva');
 
+  // El área de scroll y la lista son elementos distintos a propósito: al
+  // filtrar se vacía la lista, y el resumen debe sobrevivir a eso.
+  const areaScroll = document.getElementById('area-scroll');
   const contenedor = document.getElementById('persona-list');
   let todas = [];
   let visibles = [];   // resultado del filtro actual
   let pintadas = 0;
   let observador = null;
+
+  pintarResumen();
 
   try {
     const all = await getPersonas();
@@ -73,6 +81,52 @@ export async function render(container) {
 
   function abrir(tarjeta) {
     navigate(`/editar/${tarjeta.dataset.tipo}/${tarjeta.dataset.numero}`);
+  }
+
+  /**
+   * Resumen del trabajo de este dispositivo.
+   *
+   * Va ARRIBA de la lista y no debajo: abajo solo se vería mientras haya pocos
+   * registros, y en cuanto la lista crezca quedaría enterrado justo cuando el
+   * resumen empieza a ser más útil.
+   */
+  async function pintarResumen() {
+    const caja = document.getElementById('resumen-dia');
+    if (!caja) return;
+
+    let r;
+    try {
+      r = await resumenLocal(7);
+    } catch (_) {
+      return; // Un fallo aquí no debe impedir ver la lista.
+    }
+
+    const maximo = Math.max(1, ...r.porDia.map(d => d.total));
+    const barras = r.porDia.map(d => `
+      <div class="mini-col" title="${escHtml(d.dia)}: ${d.total}">
+        <div class="mini-barra" style="height:${d.total ? Math.max(8, Math.round(100 * d.total / maximo)) : 2}%"></div>
+        <span class="mini-eti">${escHtml(d.dia)}</span>
+      </div>`).join('');
+
+    caja.innerHTML = `
+      <div class="resumen">
+        <div class="resumen-cifras">
+          <div class="resumen-dato">
+            <span class="resumen-n">${r.hoy}</span>
+            <span class="resumen-t">Hoy</span>
+          </div>
+          <div class="resumen-dato">
+            <span class="resumen-n">${r.total}</span>
+            <span class="resumen-t">En total</span>
+          </div>
+          <div class="resumen-dato ${r.pendientes ? 'pendiente' : ''}">
+            <span class="resumen-n">${r.pendientes}</span>
+            <span class="resumen-t">Sin enviar</span>
+          </div>
+        </div>
+        <div class="resumen-grafico" aria-label="Registros de los últimos 7 días">${barras}</div>
+      </div>
+    `;
   }
 
   function aplicarFiltro(q) {
@@ -123,7 +177,7 @@ export async function render(container) {
     observador?.disconnect();
     observador = new IntersectionObserver(entradas => {
       if (entradas.some(x => x.isIntersecting)) pintarPagina();
-    }, { root: contenedor, rootMargin: MARGEN_PRECARGA });
+    }, { root: areaScroll, rootMargin: MARGEN_PRECARGA });
 
     observador.observe(centinela);
   }
