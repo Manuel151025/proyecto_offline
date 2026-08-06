@@ -113,3 +113,77 @@
 .empty-title { font-size: 1rem; font-weight: 600; margin-bottom: 6px; color: var(--on-surface); }
 .empty-sub { font-size: 0.85rem; }
 
+
+/* ---- Resumen del dispositivo (pantalla de inicio) ----
+   Va arriba de la lista: abajo solo se vería con pocos registros y quedaría
+   enterrado justo cuando el resumen empieza a ser más útil. */
+.resumen {
+  background: var(--surface);
+  border: 1px solid var(--divider);
+  border-radius: var(--radius);
+  padding: 14px;
+  margin-bottom: 12px;
+}
+
+.resumen-cifras {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.resumen-dato {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 4px;
+  border-radius: var(--radius-sm);
+  background: var(--primary-tint);
+}
+.resumen-n {
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--primary);
+}
+.resumen-t {
+  font-size: 0.66rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  color: var(--on-surface-secondary);
+}
+
+/* Lo que falta por enviar se destaca: es lo único que exige una acción. */
+.resumen-dato.pendiente { background: var(--warning-bg); }
+.resumen-dato.pendiente .resumen-n { color: var(--warning); }
+
+/* Gráfico en CSS puro, sin librerías: la app debe funcionar sin conexión y
+   sin descargar nada. */
+.resumen-grafico {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  height: 56px;
+}
+.mini-col {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 3px;
+  height: 100%;
+}
+.mini-barra {
+  width: 100%;
+  background: var(--primary);
+  border-radius: 3px 3px 0 0;
+  min-height: 2px;
+}
+.mini-eti {
+  font-size: 0.58rem;
+  color: var(--on-surface-muted);
+  white-space: nowrap;
+}

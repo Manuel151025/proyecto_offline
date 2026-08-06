@@ -186,6 +186,46 @@ export async function getSyncCounts() {
   };
 }
 
+// --- Resumen para la pantalla de inicio ---
+
+/**
+ * Cifras del trabajo hecho en este dispositivo.
+ *
+ * Todo sale de IndexedDB: el encuestador puede verlo sin conexión, que es
+ * cuando más falta le hace saber cuánto lleva y cuánto le queda por enviar.
+ *
+ * @returns {Promise<{hoy:number, total:number, pendientes:number, porDia:Array<{dia:string,total:number}>}>}
+ */
+export async function resumenLocal(dias = 7) {
+  const [personas, cola] = await Promise.all([getPersonas(), getAllSyncItems()]);
+  const vivas = personas.filter(p => !p.deleted_at);
+
+  const inicioDelDia = new Date();
+  inicioDelDia.setHours(0, 0, 0, 0);
+  const desdeHoy = inicioDelDia.getTime();
+
+  // Serie de los últimos N días, incluidos los que no tuvieron actividad:
+  // un hueco en el gráfico también informa.
+  const porDia = [];
+  for (let i = dias - 1; i >= 0; i--) {
+    const d = new Date(inicioDelDia);
+    d.setDate(d.getDate() - i);
+    const ini = d.getTime();
+    const fin = ini + 86400000;
+    porDia.push({
+      dia: d.toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit' }),
+      total: vivas.filter(p => p.updated_at >= ini && p.updated_at < fin).length
+    });
+  }
+
+  return {
+    hoy: vivas.filter(p => p.updated_at >= desdeHoy).length,
+    total: vivas.length,
+    pendientes: cola.filter(i => i.status === 'PENDING' || i.status === 'ERROR').length,
+    porDia
+  };
+}
+
 // --- Credenciales (login offline) ---
 
 export async function getCredencial(documento) {

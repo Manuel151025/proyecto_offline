@@ -39,8 +39,25 @@ async function autoSync() {
   if (!navigator.onLine) return;
   try {
     const result = await syncNow();
-    if (result.synced > 0) showToast(`${result.synced} registro(s) sincronizados`, 'success');
+    if (result.synced > 0) {
+      showToast(`${result.synced} registro(s) sincronizados`, 'success');
+      refrescarPantallaActual();
+    }
   } catch (_) {}
+}
+
+/**
+ * Vuelve a pintar la pantalla visible tras sincronizar.
+ *
+ * La lista lee IndexedDB una sola vez al entrar. Cuando la sincronización
+ * marcaba los registros como enviados, nadie avisaba a la pantalla: había que
+ * salir y volver para ver el cambio, y parecía que la sincronización no había
+ * funcionado.
+ */
+function refrescarPantallaActual() {
+  const ruta = window.location.hash.replace('#', '') || '/personas';
+  if (ruta === '/personas') renderLista(getRoot());
+  else if (ruta === '/sync') renderSync(getRoot());
 }
 
 function setupOnlineSync() {
