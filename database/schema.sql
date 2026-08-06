@@ -235,10 +235,13 @@ CREATE TABLE IF NOT EXISTS personas (
     ocupacion VARCHAR(100) NULL,
     estrato INT NULL,
     municipio_codigo VARCHAR(10) NULL,
-    updated_at BIGINT NOT NULL,  -- CRÍTICO PARA EL ALGORITMO LWW
+    updated_at BIGINT NOT NULL,  -- CRÍTICO PARA EL ALGORITMO LWW (lo pone el dispositivo)
+    server_updated_at BIGINT NULL, -- Sello del SERVIDOR: marca de agua para la descarga incremental
     device_id VARCHAR(50) NOT NULL,
     deleted_at BIGINT NULL,
     PRIMARY KEY (tipo_documento, numero_documento),
+    -- Sirve a la descarga incremental: "dame lo cambiado desde esta marca".
+    INDEX idx_personas_server_updated (server_updated_at),
     FOREIGN KEY (municipio_codigo) REFERENCES municipios(codigo)
 );
 

@@ -186,6 +186,77 @@ export async function getSyncCounts() {
   };
 }
 
+// --- Descarga: mezclar lo que llega del servidor ---
+
+const CLAVE_MARCA = 'pwa_marca_sync';
+
+/** Marca de agua: hasta dónde llegó la última descarga. */
+export function getMarcaDescarga() {
+  return Number(localStorage.getItem(CLAVE_MARCA) || 0);
+}
+
+export function setMarcaDescarga(marca) {
+  localStorage.setItem(CLAVE_MARCA, String(marca));
+}
+
+/**
+ * Decide qué hacer con una persona que llega del servidor.
+ *
+ * Está aparte y sin tocar IndexedDB a propósito: es la regla que evita perder
+ * trabajo de campo, y así se puede comprobar sin navegador.
+ *
+ * - Si no existe en local, se guarda.
+ * - Si la copia local tiene cambios SIN ENVIAR, se conserva. Esos cambios aún
+ *   no llegaron al servidor, así que lo que vuelve es por definición anterior;
+ *   sobrescribirlos borraría una encuesta recién hecha en el dispositivo.
+ * - Si no, gana el `updated_at` más reciente: el mismo criterio Last-Write-Wins
+ *   que aplica el servidor al recibir, de modo que ambos lados resuelven igual.
+ *
+ * @returns {'nueva'|'actualizar'|'conservar'}
+ */
+export function decidirMezcla(local, remota) {
+  if (!local) return 'nueva';
+  if (local._pendingSync) return 'conservar';
+  return remota.updated_at > local.updated_at ? 'actualizar' : 'conservar';
+}
+
+/**
+ * Integra en la base local las personas que llegan del servidor.
+ *
+ * @returns {Promise<{nuevas:number, actualizadas:number, conservadas:number}>}
+ */
+export async function mezclarPersonasDescargadas(lista) {
+  if (!lista || lista.length === 0) return { nuevas: 0, actualizadas: 0, conservadas: 0 };
+
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const t = db.transaction('personas', 'readwrite');
+    const store = t.objectStore('personas');
+    let nuevas = 0, actualizadas = 0, conservadas = 0;
+
+    lista.forEach(remota => {
+      const req = store.get([remota.tipo_documento, remota.numero_documento]);
+      req.onsuccess = () => {
+        switch (decidirMezcla(req.result, remota)) {
+          case 'nueva':
+            store.put({ ...remota, _pendingSync: false });
+            nuevas++;
+            break;
+          case 'actualizar':
+            store.put({ ...remota, _pendingSync: false });
+            actualizadas++;
+            break;
+          default:
+            conservadas++;
+        }
+      };
+    });
+
+    t.oncomplete = () => resolve({ nuevas, actualizadas, conservadas });
+    t.onerror = e => reject(e.target.error);
+  });
+}
+
 // --- Resumen para la pantalla de inicio ---
 
 /**

@@ -39,8 +39,10 @@ async function autoSync() {
   if (!navigator.onLine) return;
   try {
     const result = await syncNow();
-    if (result.synced > 0) {
-      showToast(`${result.synced} registro(s) sincronizados`, 'success');
+    // También hay que repintar cuando solo se RECIBIÓ: la lista acaba de
+    // ganar personas de otros dispositivos y sin refresco no se verían.
+    if (result.synced > 0 || result.recibidas > 0) {
+      showToast(result.message, 'success');
       refrescarPantallaActual();
     }
   } catch (_) {}
