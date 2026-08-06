@@ -27,6 +27,7 @@ aplicarCors('GET, OPTIONS');
 
 require_once __DIR__ . '/../db.php';
 require_once __DIR__ . '/../auth_token.php';
+require_once __DIR__ . '/../esquema.php';
 $pdo = conectarBD();
 
 if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
@@ -44,6 +45,8 @@ $desde = max(0, $desde);
 
 $limite = filter_input(INPUT_GET, 'limite', FILTER_VALIDATE_INT) ?: 200;
 $limite = max(1, min(MAX_POR_PAGINA, $limite));
+
+asegurarServerUpdatedAt($pdo);
 
 try {
     // LIMIT no admite parámetro con EMULATE_PREPARES desactivado; al forzarlo

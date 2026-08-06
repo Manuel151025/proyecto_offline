@@ -5,6 +5,7 @@ aplicarCors('POST, OPTIONS');
 require_once __DIR__ . '/../db.php';
 $pdo = conectarBD();
 require_once __DIR__ . '/../auth_token.php';
+require_once __DIR__ . '/../esquema.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     responderError(405, 'Método no permitido');
@@ -109,6 +110,10 @@ foreach ($data['encuestas'] as $e) {
         'id_encuestador'   => $sesion['id_encuestador'],
     ];
 }
+
+// Antes de la transacción: un ALTER TABLE hace commit implícito y partiría
+// el lote a la mitad si se ejecutara dentro.
+asegurarServerUpdatedAt($pdo);
 
 $processedEncuestas = [];
 $pdo->beginTransaction();
