@@ -1,4 +1,4 @@
-import { getCredencial, saveCredencial } from '../db.js';
+import { getCredencial, saveCredencial, hayCredencialesGuardadas } from '../db.js';
 import { setSession } from '../session.js';
 import { navigate } from '../router.js';
 import { showToast } from '../utils.js';
@@ -155,7 +155,15 @@ export async function render(container) {
         await saveCredencial({ documento: doc, passwordHash, salt, encuestadorId, nombre, token, expiraEn, updated_at: Date.now() });
       } else {
         const cred = await getCredencial(doc);
-        if (!cred) throw new Error('Documento o contraseña incorrectos');
+        if (!cred) {
+          // Decir "contraseña incorrecta" aquí sería mentir: puede ser
+          // correcta. Lo que falta es que este dispositivo nunca guardó las
+          // credenciales, y eso solo ocurre al entrar con conexión.
+          throw new Error(
+            'Este dispositivo no tiene datos guardados para ese documento. ' +
+            'Conéctate a internet e inicia sesión una vez; después podrás entrar sin conexión.'
+          );
+        }
         const hash = await sha256Hex(cred.salt + pass);
         if (hash !== cred.passwordHash) throw new Error('Documento o contraseña incorrectos');
         encuestadorId = cred.encuestadorId;
@@ -205,7 +213,22 @@ export async function render(container) {
     connText.textContent = online ? 'En línea' : 'Sin conexión';
 
     const notice = document.getElementById('login-offline-notice');
-    if (notice) notice.classList.toggle('hidden', online);
+    if (notice) {
+      notice.classList.toggle('hidden', online);
+      // El aviso depende de si el dispositivo tiene algo guardado: decirle
+      // "puedes entrar con tus credenciales guardadas" a quien no tiene
+      // ninguna lo manda a intentar algo imposible.
+      if (!online) {
+        hayCredencialesGuardadas()
+          .then(hay => {
+            notice.textContent = hay
+              ? 'Sin conexión: puedes ingresar con las credenciales guardadas en este dispositivo.'
+              : 'Este dispositivo aún no tiene credenciales guardadas. Para entrar sin conexión necesitas iniciar sesión una vez con internet.';
+            notice.classList.toggle('login-offline-notice-bloqueo', !hay);
+          })
+          .catch(() => {});
+      }
+    }
 
     if (!loading && !done) {
       const label = document.getElementById('login-submit-label');

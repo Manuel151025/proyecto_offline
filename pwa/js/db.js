@@ -200,3 +200,19 @@ export async function getCredencial(documento) {
 export async function saveCredencial(cred) {
   return request('credenciales', 'readwrite', store => store.put(cred));
 }
+
+/**
+ * ¿Este dispositivo tiene alguna credencial guardada?
+ *
+ * Sirve para avisar por adelantado cuando no hay ninguna: sin ella el ingreso
+ * sin conexión es imposible, y dejar que el usuario lo intente solo produce un
+ * error que parece culpa suya.
+ */
+export async function hayCredencialesGuardadas() {
+  return openDB().then(db => new Promise((resolve, reject) => {
+    const t = db.transaction('credenciales', 'readonly');
+    const req = t.objectStore('credenciales').count();
+    req.onsuccess = () => resolve(req.result > 0);
+    req.onerror = e => reject(e.target.error);
+  }));
+}

@@ -354,3 +354,11 @@
   text-align: center;
   line-height: 1.45;
 }
+
+/* Aviso de bloqueo: no es informativo, es un impedimento real. El usuario no
+   puede entrar hasta conectarse una vez, así que se distingue del aviso normal. */
+.login-offline-notice-bloqueo {
+  color: var(--error);
+  background: var(--error-bg);
+  border-color: #F0D2D0;
+}
