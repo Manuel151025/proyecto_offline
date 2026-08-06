@@ -1,5 +1,6 @@
 // Subir esta versión en cada cambio de JS/CSS: el fetch es cache-first, así que
 // sin bump los navegadores seguirían sirviendo los archivos viejos.
+// v13: mensaje claro cuando el dispositivo no tiene credenciales guardadas.
 // v12: cerrar sesión revoca el token en el servidor.
 // v11: botón de cerrar sesión; un fallo de token lleva al login.
 // v10: lista con renderizado incremental y eventos por delegación.
@@ -8,7 +9,7 @@
 // v7: .hidden pasa a !important (el spinner del login se veía siempre).
 // v6: styles.css se dividió en 7 hojas por responsabilidad.
 // v5: api.js y session.js ahora envían el token de autenticación en la sincronización.
-const CACHE = 'encuestas-v12';
+const CACHE = 'encuestas-v13';
 
 const ASSETS = [
   './index.html',
