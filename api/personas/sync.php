@@ -55,6 +55,64 @@ function enteroOpcional(array $fila, string $clave): ?int
     return is_numeric($valor) ? (int)$valor : null;
 }
 
+/**
+ * Tipos de documento admitidos.
+ *
+ * Es la lista que ofrece el formulario de la PWA. Android reconoce solo cuatro
+ * (CC, TI, CE, NIT), así que un registro con RC, PP o PE no se puede
+ * representar allí todavía: hay que ampliar su enum antes de que Android
+ * descargue datos ajenos.
+ */
+const TIPOS_DOCUMENTO = ['CC', 'TI', 'RC', 'CE', 'PP', 'NIT', 'PE'];
+
+/** Longitud mínima del documento; la misma que ya exigen los clientes. */
+const MIN_LONGITUD_DOCUMENTO = 6;
+
+/**
+ * Valida el documento, que es la CLAVE PRIMARIA de personas.
+ *
+ * Los clientes ya comprueban esto, pero la validación del cliente no es
+ * validación: cualquiera con un token y curl puede saltársela. En producción
+ * apareció una persona con documento "hola", prueba de que se podía.
+ *
+ * No se exige que sean solo dígitos a propósito: los pasaportes y algunas
+ * cédulas de extranjería llevan letras, y rechazarlos dejaría fuera a personas
+ * reales. Se comprueba la longitud y que no haya caracteres imposibles en un
+ * identificador.
+ *
+ * @param array<string, mixed> $fila
+ */
+function documentoValidado(array $fila): string
+{
+    $tipo = strtoupper(trim((string)($fila['tipo_documento'] ?? '')));
+    if (!in_array($tipo, TIPOS_DOCUMENTO, true)) {
+        responderError(400, "Tipo de documento no admitido: '$tipo'");
+    }
+
+    $numero = trim((string)($fila['numero_documento'] ?? ''));
+    if (mb_strlen($numero) < MIN_LONGITUD_DOCUMENTO) {
+        responderError(400, 'El número de documento debe tener al menos ' . MIN_LONGITUD_DOCUMENTO . ' caracteres');
+    }
+    if (mb_strlen($numero) > 20) {
+        responderError(400, 'El número de documento no puede superar 20 caracteres');
+    }
+    if (!preg_match('/^[A-Za-z0-9\-]+$/', $numero)) {
+        responderError(400, 'El número de documento solo admite letras, dígitos y guiones');
+    }
+
+    return $numero;
+}
+
+/** @param array<string, mixed> $fila */
+function tipoDocumentoValidado(array $fila): string
+{
+    $tipo = strtoupper(trim((string)($fila['tipo_documento'] ?? '')));
+    if (!in_array($tipo, TIPOS_DOCUMENTO, true)) {
+        responderError(400, "Tipo de documento no admitido: '$tipo'");
+    }
+    return $tipo;
+}
+
 $data = json_decode(leerCuerpo(), true);
 
 if (!is_array($data) || !isset($data['personas']) || !isset($data['encuestas'])
@@ -74,8 +132,10 @@ foreach ($data['personas'] as $p) {
         responderError(400, 'Cada persona debe ser un objeto');
     }
     $personas[] = [
-        'tipo_documento'   => textoRequerido($p, 'tipo_documento', 10),
-        'numero_documento' => textoRequerido($p, 'numero_documento', 20),
+        // El documento es la clave primaria: se valida aquí y no se confía en
+        // que el cliente lo haya hecho.
+        'tipo_documento'   => tipoDocumentoValidado($p),
+        'numero_documento' => documentoValidado($p),
         'nombres'          => textoRequerido($p, 'nombres', 100),
         'apellidos'        => textoRequerido($p, 'apellidos', 100),
         'fecha_nacimiento' => enteroOpcional($p, 'fecha_nacimiento'),
@@ -100,8 +160,10 @@ foreach ($data['encuestas'] as $e) {
     }
     $encuestas[] = [
         'id'               => textoRequerido($e, 'id', 50),
-        'tipo_documento'   => textoRequerido($e, 'tipo_documento', 10),
-        'numero_documento' => textoRequerido($e, 'numero_documento', 20),
+        // Misma validación: la encuesta apunta a la persona por estas dos
+        // columnas, así que un valor inválido rompería la clave foránea.
+        'tipo_documento'   => tipoDocumentoValidado($e),
+        'numero_documento' => documentoValidado($e),
         'fecha_encuesta'   => enteroRequerido($e, 'fecha_encuesta'),
         'device_id'        => textoRequerido($e, 'device_id', 50),
         'accion'           => textoRequerido($e, 'accion', 20),

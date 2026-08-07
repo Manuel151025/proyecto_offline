@@ -173,6 +173,17 @@ jobs:
           fi
           echo "✓ Descarga protegida y con marca de agua del servidor"
 
+      - name: Verificar que el servidor valide el documento
+        run: |
+          # El documento es la clave primaria de personas. La validación del
+          # cliente no protege nada: con un token y curl se salta. En producción
+          # llegó a colarse una persona con documento "hola".
+          if ! grep -q "documentoValidado" api/personas/sync.php; then
+            echo "::error::sync.php debe validar el documento en el servidor, no fiarse del cliente."
+            exit 1
+          fi
+          echo "✓ Documento validado en el servidor"
+
       - name: Verificar que el cierre de sesión revoque el token
         run: |
           if [ ! -f api/auth/logout.php ] || ! grep -q "DELETE FROM sesiones" api/auth/logout.php; then
