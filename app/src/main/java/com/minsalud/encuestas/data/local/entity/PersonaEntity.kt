@@ -33,5 +33,14 @@ data class PersonaEntity(
     @ColumnInfo(name = "municipio_codigo") val municipioCodigo: String?,
     @ColumnInfo(name = "updated_at") val updatedAt: Long,
     @ColumnInfo(name = "device_id") val deviceId: String,
-    @ColumnInfo(name = "deleted_at") val deletedAt: Long?
+    @ColumnInfo(name = "deleted_at") val deletedAt: Long?,
+
+    /**
+     * Sello del SERVIDOR, no del dispositivo. Es la marca de agua de la
+     * descarga incremental: `updatedAt` lo pone el teléfono y puede ir hacia
+     * atrás si su reloj está mal, así que no sirve para preguntar "dame lo
+     * cambiado desde X". Null en los registros creados en local que todavía
+     * no han subido.
+     */
+    @ColumnInfo(name = "server_updated_at") val serverUpdatedAt: Long? = null
 )

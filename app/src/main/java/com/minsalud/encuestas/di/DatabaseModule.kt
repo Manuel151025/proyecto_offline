@@ -43,6 +43,20 @@ val MIGRATION_2_3 = object : Migration(2, 3) {
     }
 }
 
+/**
+ * Marca de agua de la descarga incremental.
+ *
+ * Se añade como nullable y sin valor por defecto a propósito: los registros
+ * que ya existen en el dispositivo se crearon en local y todavía no tienen
+ * sello del servidor. Null significa exactamente eso, y ponerles un cero los
+ * haría parecer sincronizados desde el principio del tiempo.
+ */
+val MIGRATION_3_4 = object : Migration(3, 4) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE personas ADD COLUMN server_updated_at INTEGER")
+    }
+}
+
 @Module
 @InstallIn(SingletonComponent::class)
 object DatabaseModule {
@@ -55,7 +69,7 @@ object DatabaseModule {
             AppDatabase::class.java,
             "encuestas_db"
         )
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3) // Versionadas, sin pérdida de datos
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4) // Sin pérdida de datos
             .build()
     }
 

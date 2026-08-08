@@ -9,7 +9,10 @@ import com.minsalud.encuestas.data.local.entity.EncuestaEntity
 import com.minsalud.encuestas.data.local.entity.EstadoSyncEntity
 import com.minsalud.encuestas.data.local.entity.PersonaEntity
 import com.minsalud.encuestas.data.local.entity.TipoDocumentoEntity
+import com.minsalud.encuestas.data.local.prefs.SessionManager
 import com.minsalud.encuestas.data.remote.api.ApiService
+import com.minsalud.encuestas.data.remote.dto.CambiosResponseDto
+import com.minsalud.encuestas.data.remote.dto.PersonaRemotaDto
 import com.minsalud.encuestas.data.remote.dto.SyncRequestDto
 import com.minsalud.encuestas.data.remote.dto.SyncResponseDto
 import com.minsalud.encuestas.domain.model.DomainError
@@ -41,6 +44,7 @@ class SyncRepositoryImplTest {
     private lateinit var personaDao: PersonaDao
     private lateinit var encuestaDao: EncuestaDao
     private lateinit var apiService: ApiService
+    private lateinit var sessionManager: SessionManager
     private lateinit var repository: SyncRepositoryImpl
 
     @Before
@@ -49,7 +53,15 @@ class SyncRepositoryImplTest {
         personaDao = mockk(relaxed = true)
         encuestaDao = mockk(relaxed = true)
         apiService = mockk()
-        repository = SyncRepositoryImpl(colaDao, personaDao, encuestaDao, apiService)
+        sessionManager = mockk(relaxed = true)
+
+        // Por defecto el servidor no tiene nada nuevo. Las pruebas de subida no
+        // deberían tener que saber que hay una descarga detrás.
+        coEvery { sessionManager.marcaDescarga() } returns 0L
+        coEvery { apiService.getCambios(any(), any()) } returns respuestaCambios(emptyList())
+        coEvery { colaDao.getPendingPersonaKeysList() } returns emptyList()
+
+        repository = SyncRepositoryImpl(colaDao, personaDao, encuestaDao, apiService, sessionManager)
     }
 
     // --- Utilidades de datos ---
@@ -97,6 +109,24 @@ class SyncRepositoryImplTest {
 
     private fun respuestaError(codigo: Int) = Response.error<SyncResponseDto>(
         codigo, """{"success":false}""".toResponseBody("application/json".toMediaTypeOrNull())
+    )
+
+    private fun remota(documento: String, updatedAt: Long, sello: Long, tipo: String = "CC") = PersonaRemotaDto(
+        tipoDocumento = tipo, numeroDocumento = documento,
+        nombres = "Remoto", apellidos = "Servidor",
+        fechaNacimiento = null, telefono = null, email = null, direccion = null,
+        vereda = null, eps = null, ocupacion = null, estrato = null,
+        municipioCodigo = "05001",
+        updatedAt = updatedAt, deviceId = "dev-otro", deletedAt = null,
+        serverUpdatedAt = sello
+    )
+
+    private fun respuestaCambios(
+        personas: List<PersonaRemotaDto>,
+        marca: Long = 0L,
+        hayMas: Boolean = false
+    ) = Response.success(
+        CambiosResponseDto(success = true, personas = personas, marca = marca, hayMas = hayMas)
     )
 
     // --- Pruebas ---
@@ -208,11 +238,138 @@ class SyncRepositoryImplTest {
     }
 
     @Test
-    fun `sin pendientes no toca la red`() = runTest {
+    fun `sin pendientes no envia nada, pero si baja cambios`() = runTest {
         coEvery { colaDao.getPendientes() } returns emptyList()
 
         repository.sincronizarPendientes()
 
         coVerify(exactly = 0) { apiService.syncData(any()) }
+        // Este es el fallo que motivó la descarga: un dispositivo sin nada que
+        // subir se quedaba sin ver nunca el trabajo de los demás.
+        coVerify(exactly = 1) { apiService.getCambios(any(), any()) }
+    }
+
+    // --- Descarga ---
+
+    @Test
+    fun `guarda las personas que llegan del servidor`() = runTest {
+        coEvery { colaDao.getPendientes() } returns emptyList()
+        coEvery { personaDao.getPersona(any(), any()) } returns null
+        coEvery { apiService.getCambios(any(), any()) } returns
+            respuestaCambios(listOf(remota("1098765432", 5_000L, 9_000L)), marca = 9_000L)
+
+        repository.sincronizarPendientes()
+
+        val guardada = slot<PersonaEntity>()
+        coVerify(exactly = 1) { personaDao.upsert(capture(guardada)) }
+        assertEquals("1098765432", guardada.captured.numeroDocumento)
+        assertEquals(9_000L, guardada.captured.serverUpdatedAt)
+    }
+
+    @Test
+    fun `la marca de agua avanza para no volver a pedir lo mismo`() = runTest {
+        coEvery { colaDao.getPendientes() } returns emptyList()
+        coEvery { personaDao.getPersona(any(), any()) } returns null
+        coEvery { apiService.getCambios(any(), any()) } returns
+            respuestaCambios(listOf(remota("1098765432", 5_000L, 9_000L)), marca = 9_000L)
+
+        repository.sincronizarPendientes()
+
+        coVerify(exactly = 1) { sessionManager.setMarcaDescarga(9_000L) }
+    }
+
+    @Test
+    fun `pide desde la marca guardada, no desde cero`() = runTest {
+        coEvery { colaDao.getPendientes() } returns emptyList()
+        coEvery { sessionManager.marcaDescarga() } returns 7_777L
+
+        repository.sincronizarPendientes()
+
+        coVerify(exactly = 1) { apiService.getCambios(7_777L, any()) }
+    }
+
+    /**
+     * El caso que puede destruir trabajo: una encuesta hecha en el campo y
+     * todavía en la cola no puede perderse porque el servidor devuelva una
+     * versión con fecha mayor puesta por otro teléfono mal ajustado.
+     */
+    @Test
+    fun `no pisa una persona con cambios locales sin enviar`() = runTest {
+        coEvery { colaDao.getPendientes() } returns emptyList()
+        coEvery { colaDao.getPendingPersonaKeysList() } returns listOf("CC|1098765432")
+        coEvery { personaDao.getPersona(any(), any()) } returns persona("1098765432", updatedAt = 1_000L)
+        coEvery { apiService.getCambios(any(), any()) } returns
+            respuestaCambios(listOf(remota("1098765432", 9_999_999L, 9_000L)), marca = 9_000L)
+
+        repository.sincronizarPendientes()
+
+        coVerify(exactly = 0) { personaDao.upsert(any()) }
+    }
+
+    @Test
+    fun `una version remota mas antigua no reemplaza a la local`() = runTest {
+        coEvery { colaDao.getPendientes() } returns emptyList()
+        coEvery { personaDao.getPersona(any(), any()) } returns persona("1098765432", updatedAt = 8_000L)
+        coEvery { apiService.getCambios(any(), any()) } returns
+            respuestaCambios(listOf(remota("1098765432", 2_000L, 9_000L)), marca = 9_000L)
+
+        repository.sincronizarPendientes()
+
+        coVerify(exactly = 0) { personaDao.upsert(any()) }
+    }
+
+    @Test
+    fun `sigue paginando mientras el servidor diga que hay mas`() = runTest {
+        coEvery { colaDao.getPendientes() } returns emptyList()
+        coEvery { personaDao.getPersona(any(), any()) } returns null
+        coEvery { apiService.getCambios(0L, any()) } returns
+            respuestaCambios(listOf(remota("111111", 1_000L, 100L)), marca = 100L, hayMas = true)
+        coEvery { apiService.getCambios(100L, any()) } returns
+            respuestaCambios(listOf(remota("222222", 2_000L, 200L)), marca = 200L, hayMas = false)
+
+        repository.sincronizarPendientes()
+
+        // Segunda página pedida desde la marca de la primera, y las dos personas guardadas.
+        coVerify(exactly = 1) { apiService.getCambios(100L, any()) }
+        coVerify(exactly = 2) { personaDao.upsert(any()) }
+        coVerify(exactly = 1) { sessionManager.setMarcaDescarga(200L) }
+    }
+
+    /**
+     * Un tipo de documento que Android no conoce no puede tumbar la página
+     * entera: perder una persona es malo, perder las 200 es peor.
+     */
+    @Test
+    fun `un tipo de documento desconocido se salta sin romper la pagina`() = runTest {
+        coEvery { colaDao.getPendientes() } returns emptyList()
+        coEvery { personaDao.getPersona(any(), any()) } returns null
+        coEvery { apiService.getCambios(any(), any()) } returns respuestaCambios(
+            listOf(
+                remota("111111", 1_000L, 100L, tipo = "MARCIANO"),
+                remota("222222", 2_000L, 200L)
+            ),
+            marca = 200L
+        )
+
+        repository.sincronizarPendientes()
+
+        val guardadas = mutableListOf<PersonaEntity>()
+        coVerify(exactly = 1) { personaDao.upsert(capture(guardadas)) }
+        assertEquals("222222", guardadas.single().numeroDocumento)
+    }
+
+    /**
+     * La descarga no debe tapar un fallo de subida: el WorkManager necesita el
+     * error para reprogramar y que la cola no se quede varada.
+     */
+    @Test
+    fun `un fallo de subida se propaga aunque la descarga funcione`() = runTest {
+        prepararCola(2)
+        coEvery { apiService.syncData(any()) } throws IOException("sin señal")
+
+        val error = runCatching { repository.sincronizarPendientes() }.exceptionOrNull()
+
+        assertTrue(error is DomainError.NetworkError)
+        coVerify(exactly = 1) { apiService.getCambios(any(), any()) }
     }
 }

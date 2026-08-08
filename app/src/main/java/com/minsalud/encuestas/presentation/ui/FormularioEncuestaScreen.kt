@@ -101,7 +101,9 @@ fun FormularioEncuestaScreen(
                     label = "Tipo de documento *",
                     options = TipoDocumento.entries.toList(),
                     selected = uiState.tipoDocumento,
-                    optionLabel = { it.name },
+                    // Con siete opciones, la sigla sola no basta: "PE" o "RC" no
+                    // dicen nada a quien está encuestando en campo.
+                    optionLabel = { "${it.name} — ${it.descripcion}" },
                     onSelected = { viewModel.onTipoDocumentoChanged(it) }
                 )
             }
