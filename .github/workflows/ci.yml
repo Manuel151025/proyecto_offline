@@ -218,12 +218,22 @@ jobs:
             echo "::error::Sin borrado en el panel no hay forma de retirar un registro que los clientes ya no pueden enviar."
             exit 1
           fi
-          # Debe sellar con la marca del servidor, o la descarga no lo reparte.
-          if ! grep -A 12 "function borrarPersona" api/admin/consultas.php | grep -q "server_updated_at"; then
-            echo "::error::borrarPersona debe actualizar server_updated_at, o el borrado no se descarga."
-            exit 1
-          fi
-          echo "✓ Borrado suave y propagable"
+          # Ambas deben sellar con la marca del servidor, o el cambio no se
+          # reparte: la descarga filtra por server_updated_at, y los clientes
+          # descartan por Last-Write-Wins lo que llegue con updated_at menor
+          # que su copia local.
+          for funcion in borrarPersona restaurarPersona; do
+            cuerpo=$(grep -A 14 "function $funcion" api/admin/consultas.php)
+            if ! echo "$cuerpo" | grep -q "server_updated_at"; then
+              echo "::error::$funcion debe actualizar server_updated_at, o el cambio no se descarga."
+              exit 1
+            fi
+            if ! echo "$cuerpo" | grep -q "updated_at = ?"; then
+              echo "::error::$funcion debe actualizar updated_at, o los clientes lo descartan por Last-Write-Wins."
+              exit 1
+            fi
+          done
+          echo "✓ Borrado suave, restaurable y propagable"
 
       - name: Verificar que el cierre de sesión revoque el token
         run: |

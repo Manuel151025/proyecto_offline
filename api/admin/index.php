@@ -70,15 +70,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $error = 'Falta el documento de la persona a borrar';
         } else {
             try {
-                if (borrarPersona($pdo, $tipo, $numero)) {
-                    header('Location: index.php?seccion=personas&borrada=1');
-                } else {
-                    header('Location: index.php?seccion=personas&borrada=0');
-                }
+                $ok = borrarPersona($pdo, $tipo, $numero) ? '1' : '0';
+                header('Location: index.php?seccion=personas&borrada=' . $ok);
                 exit;
             } catch (PDOException $e) {
                 error_log('[admin] borrar persona: ' . $e->getMessage());
                 $error = 'No se pudo borrar. Intenta de nuevo.';
+            }
+        }
+    } elseif ($action === 'restaurar_persona' && !empty($_SESSION['admin_ok'])) {
+        $tipo = trim($_POST['tipo_documento'] ?? '');
+        $numero = trim($_POST['numero_documento'] ?? '');
+
+        if ($tipo === '' || $numero === '') {
+            $error = 'Falta el documento de la persona a restaurar';
+        } else {
+            try {
+                $ok = restaurarPersona($pdo, $tipo, $numero) ? '1' : '0';
+                header('Location: index.php?seccion=personas&borradas=1&restaurada=' . $ok);
+                exit;
+            } catch (PDOException $e) {
+                error_log('[admin] restaurar persona: ' . $e->getMessage());
+                $error = 'No se pudo restaurar. Intenta de nuevo.';
             }
         }
     } elseif ($action === 'save' && !empty($_SESSION['admin_ok'])) {
@@ -179,6 +192,13 @@ $busqueda = trim((string)($_GET['q'] ?? ''));
 $pagina = max(1, (int)($_GET['p'] ?? 1));
 $porPagina = 25;
 
+// La papelera es una vista aparte de la misma sección, no una pestaña propia:
+// mirar lo borrado es una comprobación puntual, no un sitio donde se trabaja.
+$verBorradas = ($_GET['borradas'] ?? '') === '1';
+
+/** Cuántas hay en la papelera, para no ofrecerla vacía. */
+$totalBorradas = $loggedIn && $seccion === 'personas' ? contarPersonas($pdo, '', true) : 0;
+
 if ($loggedIn) {
     if ($seccion === 'resumen') {
         $resumen        = resumenGeneral($pdo);
@@ -186,8 +206,8 @@ if ($loggedIn) {
         $porDia         = encuestasPorDia($pdo);
         $porEncuestador = encuestasPorEncuestador($pdo);
     } elseif ($seccion === 'personas') {
-        $totalPersonas = contarPersonas($pdo, $busqueda);
-        $personas      = consultarPersonas($pdo, $busqueda, $porPagina, ($pagina - 1) * $porPagina);
+        $totalPersonas = contarPersonas($pdo, $busqueda, $verBorradas);
+        $personas      = consultarPersonas($pdo, $busqueda, $porPagina, ($pagina - 1) * $porPagina, $verBorradas);
     }
 }
 
@@ -371,9 +391,18 @@ function etiquetaDia(string $dia): string
       <?php if ($_GET['borrada'] === '1'): ?>
         Persona borrada. Los celulares la retirarán en su próxima sincronización;
         los que tengan cambios sin enviar, cuando los suban.
+        Puedes deshacerlo desde <a href="?seccion=personas&amp;borradas=1">Ver borradas</a>.
       <?php else: ?>
         Esa persona ya no estaba en la base de datos.
       <?php endif; ?>
+    </div>
+  <?php endif; ?>
+
+  <?php if (isset($_GET['restaurada'])): ?>
+    <div class="aviso <?= $_GET['restaurada'] === '1' ? 'ok' : '' ?>">
+      <?= $_GET['restaurada'] === '1'
+          ? 'Persona restaurada. Volverá a aparecer en los celulares en su próxima sincronización.'
+          : 'Esa persona no estaba borrada.' ?>
     </div>
   <?php endif; ?>
 
@@ -448,20 +477,45 @@ function etiquetaDia(string $dia): string
   <?php elseif ($seccion === 'personas'): ?>
 
     <div class="panel">
-      <h2>Personas registradas</h2>
+      <h2><?= $verBorradas ? 'Personas borradas' : 'Personas registradas' ?></h2>
+
+      <?php if ($verBorradas): ?>
+        <p class="sub" style="margin-bottom:14px">
+          Siguen en la base de datos, marcadas como borradas. Los celulares las
+          ocultan igual. Restaurarlas las devuelve a todos los dispositivos en
+          su próxima sincronización.
+        </p>
+      <?php endif; ?>
+
       <form class="buscador" method="get">
         <input type="hidden" name="seccion" value="personas">
+        <?php if ($verBorradas): ?><input type="hidden" name="borradas" value="1"><?php endif; ?>
         <input type="search" name="q" value="<?= h($busqueda) ?>" placeholder="Buscar por nombre, apellido o documento…">
         <button class="btn" type="submit">Buscar</button>
         <?php if ($busqueda !== ''): ?>
-          <a class="btn sec" href="?seccion=personas">Limpiar</a>
+          <a class="btn sec" href="?seccion=personas<?= $verBorradas ? '&borradas=1' : '' ?>">Limpiar</a>
         <?php endif; ?>
-        <a class="btn sec" href="?exportar=personas">Exportar CSV</a>
+        <?php if ($verBorradas): ?>
+          <a class="btn sec" href="?seccion=personas">← Volver a las activas</a>
+        <?php else: ?>
+          <a class="btn sec" href="?exportar=personas">Exportar CSV</a>
+          <?php // Solo se ofrece si hay algo dentro: una papelera vacía es un
+                // clic que no lleva a ninguna parte. ?>
+          <?php if ($totalBorradas > 0): ?>
+            <a class="btn sec" href="?seccion=personas&borradas=1">Ver borradas (<?= (int)$totalBorradas ?>)</a>
+          <?php endif; ?>
+        <?php endif; ?>
       </form>
 
       <?php if ($personas === []): ?>
         <div class="vacio">
-          <?= $busqueda !== '' ? 'Ninguna persona coincide con la búsqueda.' : 'Todavía no se ha sincronizado ninguna persona.' ?>
+          <?php if ($busqueda !== ''): ?>
+            Ninguna persona coincide con la búsqueda.
+          <?php elseif ($verBorradas): ?>
+            No hay personas borradas.
+          <?php else: ?>
+            Todavía no se ha sincronizado ninguna persona.
+          <?php endif; ?>
         </div>
       <?php else: ?>
         <div style="overflow-x:auto">
@@ -469,7 +523,8 @@ function etiquetaDia(string $dia): string
           <thead>
             <tr>
               <th>Documento</th><th>Nombre</th><th>Municipio</th>
-              <th>Vereda</th><th>EPS</th><th>Estrato</th><th>Actualizado</th>
+              <th>Vereda</th><th>EPS</th><th>Estrato</th>
+              <th><?= $verBorradas ? 'Borrada' : 'Actualizado' ?></th>
               <th></th>
             </tr>
           </thead>
@@ -482,17 +537,27 @@ function etiquetaDia(string $dia): string
                 <td><?= h($p['vereda'] ?: '—') ?></td>
                 <td><?= h($p['eps'] ?: '—') ?></td>
                 <td><?= h($p['estrato'] ?: '—') ?></td>
-                <td style="color:var(--texto-2);white-space:nowrap"><?= h(fecha($p['updated_at'])) ?></td>
+                <td style="color:var(--texto-2);white-space:nowrap">
+                  <?= h(fecha($verBorradas ? $p['deleted_at'] : $p['updated_at'])) ?>
+                </td>
                 <td style="text-align:right">
-                  <?php // El confirm() no es seguridad, solo evita el clic accidental:
-                        // quien tenga la sesión puede enviar el POST igualmente. ?>
+                  <?php
+                    // El confirm() no es seguridad, solo evita el clic accidental:
+                    // quien tenga la sesión puede enviar el POST igualmente.
+                    $nombreCompleto = trim($p['nombres'] . ' ' . $p['apellidos']);
+                    $aviso = $verBorradas
+                        ? "¿Restaurar a $nombreCompleto? Volverá a aparecer en todos los celulares en su próxima sincronización."
+                        : "¿Borrar a $nombreCompleto? Desaparecerá también de los celulares en su próxima sincronización.";
+                  ?>
                   <form method="post" style="margin:0"
-                        onsubmit="return confirm('¿Borrar a <?= h($p['nombres']) ?> <?= h($p['apellidos']) ?>? Desaparecerá también de los celulares en su próxima sincronización.')">
+                        onsubmit="return confirm('<?= h(str_replace("'", "\u{2019}", $aviso)) ?>')">
                     <input type="hidden" name="csrf" value="<?= h($_SESSION['csrf']) ?>">
-                    <input type="hidden" name="action" value="borrar_persona">
+                    <input type="hidden" name="action" value="<?= $verBorradas ? 'restaurar_persona' : 'borrar_persona' ?>">
                     <input type="hidden" name="tipo_documento" value="<?= h($p['tipo_documento']) ?>">
                     <input type="hidden" name="numero_documento" value="<?= h($p['numero_documento']) ?>">
-                    <button type="submit" class="btn peligro">Borrar</button>
+                    <button type="submit" class="btn <?= $verBorradas ? 'sec' : 'peligro' ?>">
+                      <?= $verBorradas ? 'Restaurar' : 'Borrar' ?>
+                    </button>
                   </form>
                 </td>
               </tr>
@@ -506,7 +571,12 @@ function etiquetaDia(string $dia): string
             <?= (int)$totalPersonas ?> persona(s) · página <?= (int)$pagina ?> de <?= (int)$totalPaginas ?>
           </span>
           <span style="display:flex;gap:8px">
-            <?php $qs = $busqueda !== '' ? '&q=' . urlencode($busqueda) : ''; ?>
+            <?php
+              // La papelera también pagina: sin arrastrar el parámetro, la
+              // página 2 saltaría de vuelta a las personas activas.
+              $qs = $busqueda !== '' ? '&q=' . urlencode($busqueda) : '';
+              $qs .= $verBorradas ? '&borradas=1' : '';
+            ?>
             <?php if ($pagina > 1): ?>
               <a class="btn sec" href="?seccion=personas&p=<?= $pagina - 1 ?><?= $qs ?>">Anterior</a>
             <?php endif; ?>
