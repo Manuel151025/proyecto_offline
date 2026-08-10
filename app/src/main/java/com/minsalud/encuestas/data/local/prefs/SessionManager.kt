@@ -49,6 +49,21 @@ class SessionManager @Inject constructor(
             .apply()
     }
 
+    /**
+     * Marca de agua de la descarga incremental: el mayor `server_updated_at`
+     * ya recibido. Se pide al servidor lo cambiado DESPUÉS de este valor.
+     *
+     * Se borra al cerrar sesión junto con el resto (ver `clear`), de modo que
+     * el siguiente inicio descarga todo otra vez. Es deliberado: es barato y
+     * la mezcla es idempotente, mientras que conservar una marca de otra
+     * sesión podría ocultar registros que nunca llegarían.
+     */
+    fun marcaDescarga(): Long = prefs.getLong(KEY_MARCA_DESCARGA, 0L)
+
+    fun setMarcaDescarga(marca: Long) {
+        prefs.edit().putLong(KEY_MARCA_DESCARGA, marca).apply()
+    }
+
     fun clear() {
         // No borramos la preferencia de tema al cerrar sesión.
         val theme = themeMode()
@@ -69,5 +84,6 @@ class SessionManager @Inject constructor(
         const val KEY_THEME = "theme_mode"
         const val KEY_TOKEN = "api_token"
         const val KEY_TOKEN_EXP = "api_token_expira_en"
+        const val KEY_MARCA_DESCARGA = "marca_descarga"
     }
 }

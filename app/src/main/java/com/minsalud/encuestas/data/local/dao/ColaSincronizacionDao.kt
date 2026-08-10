@@ -20,6 +20,21 @@ interface ColaSincronizacionDao {
     )
     fun getPendingPersonaKeys(): Flow<List<String>>
 
+    /**
+     * Misma consulta, en una sola lectura. La descarga la necesita como valor
+     * puntual: no puede quedarse observando un Flow mientras decide qué
+     * sobrescribir.
+     */
+    @Query(
+        """
+        SELECT DISTINCT e.tipo_documento || '|' || e.numero_documento
+        FROM encuestas e
+        INNER JOIN cola_sincronizacion c ON c.id_encuesta = e.id
+        WHERE c.estado != 'SENT'
+        """
+    )
+    suspend fun getPendingPersonaKeysList(): List<String>
+
     // Reintentables: PENDING y también ERROR (para que un fallo transitorio no
     // deje el registro varado para siempre).
     @Query("SELECT * FROM cola_sincronizacion WHERE estado != 'SENT' ORDER BY id_cola ASC")

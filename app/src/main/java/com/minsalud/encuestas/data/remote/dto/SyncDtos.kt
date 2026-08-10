@@ -55,3 +55,37 @@ data class MunicipioDto(
         )
     }
 }
+
+/**
+ * Respuesta de la descarga incremental (api/personas/cambios.php).
+ *
+ * `marca` es la nueva marca de agua: la mayor `server_updated_at` entregada.
+ * `hayMas` indica que la página venía llena y probablemente quedan más.
+ */
+data class CambiosResponseDto(
+    @SerializedName("success") val success: Boolean,
+    @SerializedName("personas") val personas: List<PersonaRemotaDto>,
+    @SerializedName("marca") val marca: Long,
+    @SerializedName("hay_mas") val hayMas: Boolean
+)
+
+/** Persona tal como la devuelve el servidor, con su sello incluido. */
+data class PersonaRemotaDto(
+    @SerializedName("tipo_documento") val tipoDocumento: String,
+    @SerializedName("numero_documento") val numeroDocumento: String,
+    @SerializedName("nombres") val nombres: String,
+    @SerializedName("apellidos") val apellidos: String,
+    @SerializedName("fecha_nacimiento") val fechaNacimiento: Long?,
+    @SerializedName("telefono") val telefono: String?,
+    @SerializedName("email") val email: String?,
+    @SerializedName("direccion") val direccion: String?,
+    @SerializedName("vereda") val vereda: String?,
+    @SerializedName("eps") val eps: String?,
+    @SerializedName("ocupacion") val ocupacion: String?,
+    @SerializedName("estrato") val estrato: Int?,
+    @SerializedName("municipio_codigo") val municipioCodigo: String?,
+    @SerializedName("updated_at") val updatedAt: Long,
+    @SerializedName("device_id") val deviceId: String,
+    @SerializedName("deleted_at") val deletedAt: Long?,
+    @SerializedName("server_updated_at") val serverUpdatedAt: Long
+)
