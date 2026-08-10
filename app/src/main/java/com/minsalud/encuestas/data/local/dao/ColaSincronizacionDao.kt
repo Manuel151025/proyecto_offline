@@ -36,9 +36,17 @@ interface ColaSincronizacionDao {
     suspend fun getPendingPersonaKeysList(): List<String>
 
     // Reintentables: PENDING y también ERROR (para que un fallo transitorio no
-    // deje el registro varado para siempre).
-    @Query("SELECT * FROM cola_sincronizacion WHERE estado != 'SENT' ORDER BY id_cola ASC")
+    // deje el registro varado para siempre). RECHAZADO queda fuera: el servidor
+    // ya dijo que ese registro es inválido, así que reenviarlo solo consume
+    // datos móviles y arrastra al resto del lote en cada intento.
+    @Query(
+        "SELECT * FROM cola_sincronizacion " +
+            "WHERE estado NOT IN ('SENT', 'RECHAZADO') ORDER BY id_cola ASC"
+    )
     suspend fun getPendientes(): List<ColaSincronizacionEntity>
+
+    @Query("UPDATE cola_sincronizacion SET estado = 'RECHAZADO', ultimo_error = :motivo WHERE id_cola = :idCola")
+    suspend fun marcarRechazado(idCola: Int, motivo: String)
 
     @Query("UPDATE cola_sincronizacion SET estado = 'SENT', ultimo_error = NULL WHERE id_cola = :idCola")
     suspend fun marcarEnviado(idCola: Int)

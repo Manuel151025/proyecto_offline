@@ -1,5 +1,6 @@
 // Subir esta versión en cada cambio de JS/CSS: el fetch es cache-first, así que
 // sin bump los navegadores seguirían sirviendo los archivos viejos.
+// v16: un registro rechazado por el servidor deja de reintentarse (bloqueaba la cola).
 // v15: la sincronización ahora también DESCARGA lo de otros dispositivos.
 // v14: resumen del dispositivo en inicio y refresco tras sincronizar.
 // v13: mensaje claro cuando el dispositivo no tiene credenciales guardadas.
@@ -11,7 +12,7 @@
 // v7: .hidden pasa a !important (el spinner del login se veía siempre).
 // v6: styles.css se dividió en 7 hojas por responsabilidad.
 // v5: api.js y session.js ahora envían el token de autenticación en la sincronización.
-const CACHE = 'encuestas-v15';
+const CACHE = 'encuestas-v16';
 
 const ASSETS = [
   './index.html',

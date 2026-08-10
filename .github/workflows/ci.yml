@@ -184,6 +184,27 @@ jobs:
           fi
           echo "✓ Documento validado en el servidor"
 
+      - name: Verificar que un registro inválido no tumbe el lote entero
+        run: |
+          # Las validaciones por fila deben lanzar DatoInvalido, no llamar a
+          # responderError, que hace exit. Si vuelven a abortar el envío, un
+          # solo registro irreparable deja la cola de un encuestador bloqueada:
+          # se reintenta el mismo lote en cada sincronización y falla igual.
+          if ! grep -q "class DatoInvalido" api/personas/sync.php; then
+            echo "::error::sync.php debe descartar la fila inválida, no abortar el lote completo."
+            exit 1
+          fi
+          if ! grep -q '"rechazadas"' api/personas/sync.php; then
+            echo "::error::sync.php debe informar qué registros rechazó, o el cliente los reenvía siempre."
+            exit 1
+          fi
+          # Y el cliente debe tener un estado terminal para no reintentarlos.
+          if ! grep -q "RECHAZADO" app/src/main/java/com/minsalud/encuestas/data/local/dao/ColaSincronizacionDao.kt; then
+            echo "::error::La cola de Android debe excluir los rechazados de los reintentos."
+            exit 1
+          fi
+          echo "✓ Un registro inválido no bloquea la cola"
+
       - name: Verificar que el cierre de sesión revoque el token
         run: |
           if [ ! -f api/auth/logout.php ] || ! grep -q "DELETE FROM sesiones" api/auth/logout.php; then

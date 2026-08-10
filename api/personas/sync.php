@@ -17,13 +17,29 @@ $sesion = requerirAutenticacion($pdo);
 
 const MAX_LOTE = 500;
 
+/**
+ * Un registro concreto del lote no es válido.
+ *
+ * Antes, cada validación llamaba a responderError, que hace exit: una sola
+ * fila mala devolvía 400 y tumbaba el envío entero, hasta 500 registros. Peor
+ * aún, el cliente reintentaba ese mismo lote indefinidamente, así que un
+ * registro irreparable dejaba la cola de un encuestador bloqueada para
+ * siempre. Ahora se lanza esto, se descarta la fila y el resto del lote sigue.
+ *
+ * Un payload MAL FORMADO (sin los arreglos esperados) sigue siendo 400: eso es
+ * un fallo del cliente, no un dato de campo defectuoso.
+ */
+class DatoInvalido extends RuntimeException
+{
+}
+
 /** Exige un texto no vacío y lo recorta a la longitud de la columna. */
 /** @param array<string, mixed> $fila */
 function textoRequerido(array $fila, string $clave, int $max): string
 {
     $valor = trim((string)($fila[$clave] ?? ''));
     if ($valor === '') {
-        responderError(400, "Campo obligatorio faltante o vacío: $clave");
+        throw new DatoInvalido("Campo obligatorio faltante o vacío: $clave");
     }
     return mb_substr($valor, 0, $max);
 }
@@ -42,7 +58,7 @@ function enteroRequerido(array $fila, string $clave): int
 {
     $valor = $fila[$clave] ?? null;
     if (!is_numeric($valor)) {
-        responderError(400, "Campo numérico obligatorio inválido: $clave");
+        throw new DatoInvalido("Campo numérico obligatorio inválido: $clave");
     }
     return (int)$valor;
 }
@@ -58,10 +74,9 @@ function enteroOpcional(array $fila, string $clave): ?int
 /**
  * Tipos de documento admitidos.
  *
- * Es la lista que ofrece el formulario de la PWA. Android reconoce solo cuatro
- * (CC, TI, CE, NIT), así que un registro con RC, PP o PE no se puede
- * representar allí todavía: hay que ampliar su enum antes de que Android
- * descargue datos ajenos.
+ * Es la lista que ofrece el formulario de la PWA y, desde que Android descarga
+ * datos ajenos, también la de su enum TipoDocumento. Las tres deben coincidir:
+ * un tipo que un cliente no reconozca hace que se salte ese registro.
  */
 const TIPOS_DOCUMENTO = ['CC', 'TI', 'RC', 'CE', 'PP', 'NIT', 'PE'];
 
@@ -86,18 +101,18 @@ function documentoValidado(array $fila): string
 {
     $tipo = strtoupper(trim((string)($fila['tipo_documento'] ?? '')));
     if (!in_array($tipo, TIPOS_DOCUMENTO, true)) {
-        responderError(400, "Tipo de documento no admitido: '$tipo'");
+        throw new DatoInvalido("Tipo de documento no admitido: '$tipo'");
     }
 
     $numero = trim((string)($fila['numero_documento'] ?? ''));
     if (mb_strlen($numero) < MIN_LONGITUD_DOCUMENTO) {
-        responderError(400, 'El número de documento debe tener al menos ' . MIN_LONGITUD_DOCUMENTO . ' caracteres');
+        throw new DatoInvalido('El número de documento debe tener al menos ' . MIN_LONGITUD_DOCUMENTO . ' caracteres');
     }
     if (mb_strlen($numero) > 20) {
-        responderError(400, 'El número de documento no puede superar 20 caracteres');
+        throw new DatoInvalido('El número de documento no puede superar 20 caracteres');
     }
     if (!preg_match('/^[A-Za-z0-9\-]+$/', $numero)) {
-        responderError(400, 'El número de documento solo admite letras, dígitos y guiones');
+        throw new DatoInvalido('El número de documento solo admite letras, dígitos y guiones');
     }
 
     return $numero;
@@ -108,7 +123,7 @@ function tipoDocumentoValidado(array $fila): string
 {
     $tipo = strtoupper(trim((string)($fila['tipo_documento'] ?? '')));
     if (!in_array($tipo, TIPOS_DOCUMENTO, true)) {
-        responderError(400, "Tipo de documento no admitido: '$tipo'");
+        throw new DatoInvalido("Tipo de documento no admitido: '$tipo'");
     }
     return $tipo;
 }
@@ -124,6 +139,27 @@ if (count($data['personas']) > MAX_LOTE || count($data['encuestas']) > MAX_LOTE)
     responderError(413, 'Lote demasiado grande: máximo ' . MAX_LOTE . ' registros por envío');
 }
 
+/**
+ * Clave de la persona TAL COMO VINO, sin validar.
+ *
+ * Sirve para relacionar una persona descartada con las encuestas que la
+ * referencian. No se puede usar la clave normalizada, porque justamente puede
+ * ser el dato que falló.
+ *
+ * @param array<string, mixed> $fila
+ */
+function claveCruda(array $fila): string
+{
+    return strtoupper(trim((string)($fila['tipo_documento'] ?? '')))
+        . '|' . trim((string)($fila['numero_documento'] ?? ''));
+}
+
+/** Encuestas rechazadas: id => motivo. Se devuelven al cliente. */
+$rechazadas = [];
+
+/** Personas descartadas: clave cruda => motivo. */
+$personasRechazadas = [];
+
 // Normalizamos y validamos ANTES de abrir la transacción, para que un payload
 // malformado no deje la conexión a mitad de camino.
 $personas = [];
@@ -131,26 +167,30 @@ foreach ($data['personas'] as $p) {
     if (!is_array($p)) {
         responderError(400, 'Cada persona debe ser un objeto');
     }
-    $personas[] = [
-        // El documento es la clave primaria: se valida aquí y no se confía en
-        // que el cliente lo haya hecho.
-        'tipo_documento'   => tipoDocumentoValidado($p),
-        'numero_documento' => documentoValidado($p),
-        'nombres'          => textoRequerido($p, 'nombres', 100),
-        'apellidos'        => textoRequerido($p, 'apellidos', 100),
-        'fecha_nacimiento' => enteroOpcional($p, 'fecha_nacimiento'),
-        'telefono'         => textoOpcional($p, 'telefono', 20),
-        'email'            => textoOpcional($p, 'email', 100),
-        'direccion'        => textoOpcional($p, 'direccion', 150),
-        'vereda'           => textoOpcional($p, 'vereda', 100),
-        'eps'              => textoOpcional($p, 'eps', 50),
-        'ocupacion'        => textoOpcional($p, 'ocupacion', 100),
-        'estrato'          => enteroOpcional($p, 'estrato'),
-        'municipio_codigo' => textoOpcional($p, 'municipio_codigo', 10),
-        'updated_at'       => enteroRequerido($p, 'updated_at'),
-        'device_id'        => textoRequerido($p, 'device_id', 50),
-        'deleted_at'       => enteroOpcional($p, 'deleted_at'),
-    ];
+    try {
+        $personas[] = [
+            // El documento es la clave primaria: se valida aquí y no se confía
+            // en que el cliente lo haya hecho.
+            'tipo_documento'   => tipoDocumentoValidado($p),
+            'numero_documento' => documentoValidado($p),
+            'nombres'          => textoRequerido($p, 'nombres', 100),
+            'apellidos'        => textoRequerido($p, 'apellidos', 100),
+            'fecha_nacimiento' => enteroOpcional($p, 'fecha_nacimiento'),
+            'telefono'         => textoOpcional($p, 'telefono', 20),
+            'email'            => textoOpcional($p, 'email', 100),
+            'direccion'        => textoOpcional($p, 'direccion', 150),
+            'vereda'           => textoOpcional($p, 'vereda', 100),
+            'eps'              => textoOpcional($p, 'eps', 50),
+            'ocupacion'        => textoOpcional($p, 'ocupacion', 100),
+            'estrato'          => enteroOpcional($p, 'estrato'),
+            'municipio_codigo' => textoOpcional($p, 'municipio_codigo', 10),
+            'updated_at'       => enteroRequerido($p, 'updated_at'),
+            'device_id'        => textoRequerido($p, 'device_id', 50),
+            'deleted_at'       => enteroOpcional($p, 'deleted_at'),
+        ];
+    } catch (DatoInvalido $ex) {
+        $personasRechazadas[claveCruda($p)] = $ex->getMessage();
+    }
 }
 
 $encuestas = [];
@@ -158,19 +198,40 @@ foreach ($data['encuestas'] as $e) {
     if (!is_array($e)) {
         responderError(400, 'Cada encuesta debe ser un objeto');
     }
-    $encuestas[] = [
-        'id'               => textoRequerido($e, 'id', 50),
-        // Misma validación: la encuesta apunta a la persona por estas dos
-        // columnas, así que un valor inválido rompería la clave foránea.
-        'tipo_documento'   => tipoDocumentoValidado($e),
-        'numero_documento' => documentoValidado($e),
-        'fecha_encuesta'   => enteroRequerido($e, 'fecha_encuesta'),
-        'device_id'        => textoRequerido($e, 'device_id', 50),
-        'accion'           => textoRequerido($e, 'accion', 20),
-        // id_encuestador NO se toma del payload: se usa el del token, para que
-        // un cliente no pueda atribuir encuestas a otro encuestador.
-        'id_encuestador'   => $sesion['id_encuestador'],
-    ];
+
+    // El id se lee aparte y sin validar el resto: es la única forma de decirle
+    // al cliente CUÁL de sus elementos se rechazó. Sin id no hay nada que
+    // informar, así que ese sí es un fallo de cliente.
+    $idEncuesta = trim((string)($e['id'] ?? ''));
+    if ($idEncuesta === '') {
+        responderError(400, 'Cada encuesta debe traer un id');
+    }
+
+    // Si su persona se descartó, la encuesta no puede entrar: la clave foránea
+    // apunta a una fila que no existirá.
+    $clave = claveCruda($e);
+    if (isset($personasRechazadas[$clave])) {
+        $rechazadas[$idEncuesta] = 'Persona inválida: ' . $personasRechazadas[$clave];
+        continue;
+    }
+
+    try {
+        $encuestas[] = [
+            'id'               => mb_substr($idEncuesta, 0, 50),
+            // Misma validación: la encuesta apunta a la persona por estas dos
+            // columnas, así que un valor inválido rompería la clave foránea.
+            'tipo_documento'   => tipoDocumentoValidado($e),
+            'numero_documento' => documentoValidado($e),
+            'fecha_encuesta'   => enteroRequerido($e, 'fecha_encuesta'),
+            'device_id'        => textoRequerido($e, 'device_id', 50),
+            'accion'           => textoRequerido($e, 'accion', 20),
+            // id_encuestador NO se toma del payload: se usa el del token, para
+            // que un cliente no pueda atribuir encuestas a otro encuestador.
+            'id_encuestador'   => $sesion['id_encuestador'],
+        ];
+    } catch (DatoInvalido $ex) {
+        $rechazadas[$idEncuesta] = $ex->getMessage();
+    }
 }
 
 // Antes de la transacción: un ALTER TABLE hace commit implícito y partiría
@@ -253,10 +314,21 @@ try {
 
     $pdo->commit();
 
+    // Las rechazadas se informan una a una para que el cliente las marque como
+    // terminales y deje de reintentarlas. Si solo se devolviera el conteo, el
+    // cliente no sabría cuáles descartar y las reenviaría en cada sincronización.
+    $listaRechazadas = [];
+    foreach ($rechazadas as $id => $motivo) {
+        $listaRechazadas[] = ['id' => (string)$id, 'motivo' => $motivo];
+    }
+
     echo json_encode([
         "success" => true,
-        "message" => "Sincronización completada. Conflictos resueltos vía LWW.",
-        "processed_encuestas" => $processedEncuestas
+        "message" => $listaRechazadas === []
+            ? "Sincronización completada. Conflictos resueltos vía LWW."
+            : "Sincronización completada con " . count($listaRechazadas) . " registro(s) rechazado(s).",
+        "processed_encuestas" => $processedEncuestas,
+        "rechazadas" => $listaRechazadas
     ]);
 
 } catch (Exception $e) {

@@ -39,7 +39,22 @@ data class EncuestaSyncDto(
 data class SyncResponseDto(
     @SerializedName("success") val success: Boolean,
     @SerializedName("message") val message: String?,
-    @SerializedName("processed_encuestas") val processedEncuestas: List<String>
+    @SerializedName("processed_encuestas") val processedEncuestas: List<String>,
+
+    /**
+     * Registros que el servidor descartó por inválidos, con su motivo. El
+     * cliente debe marcarlos como terminales en vez de reintentarlos: volver a
+     * enviarlos daría siempre el mismo resultado.
+     *
+     * Nulo si el servidor todavía no envía el campo, y por eso tiene valor por
+     * defecto: durante un despliegue conviven las dos versiones.
+     */
+    @SerializedName("rechazadas") val rechazadas: List<RechazoDto>? = null
+)
+
+data class RechazoDto(
+    @SerializedName("id") val id: String,
+    @SerializedName("motivo") val motivo: String
 )
 
 data class MunicipioDto(
