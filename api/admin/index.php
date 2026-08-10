@@ -14,6 +14,7 @@ aplicarCabecerasDeSeguridad();
 require_once '../db.php';
 require_once __DIR__ . '/consultas.php';
 require_once __DIR__ . '/../esquema.php';
+require_once __DIR__ . '/../rate_limit.php';
 $pdo = conectarBD();
 
 /** Longitud mínima al crear o cambiar la contraseña de un encuestador. */
@@ -39,7 +40,15 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!$csrfOk) {
         $error = 'Sesión expirada, intenta de nuevo.';
     } elseif ($action === 'login') {
-        if (hash_equals($adminPassword, $_POST['password'] ?? '')) {
+        // Sin esto el panel se podía probar a contraseñas indefinidamente: la
+        // URL es pública, no pide usuario, y quien entre puede borrar personas.
+        // El contador es global porque el panel tiene un único administrador.
+        $bloqueoRestante = segundosDeBloqueo($pdo, CLAVE_PANEL_ADMIN);
+
+        if ($bloqueoRestante > 0) {
+            $minutos = (int)ceil($bloqueoRestante / 60);
+            $error = "Demasiados intentos fallidos. Espera $minutos minuto(s).";
+        } elseif (hash_equals($adminPassword, $_POST['password'] ?? '')) {
             // Se cambia el identificador de sesión al elevar privilegios.
             // Sin esto, quien consiguiera fijar el PHPSESSID de la víctima
             // antes del login seguiría dentro de la sesión ya autenticada
@@ -47,7 +56,12 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             session_regenerate_id(true);
             $_SESSION['csrf'] = bin2hex(random_bytes(16));
             $_SESSION['admin_ok'] = true;
+            // Entrar bien borra el historial: al administrador legítimo no le
+            // debe quedar deuda por unos tecleos mal puestos de ayer.
+            limpiarIntentos($pdo, CLAVE_PANEL_ADMIN);
         } else {
+            registrarIntentoFallido($pdo, CLAVE_PANEL_ADMIN);
+            error_log('[admin] intento de acceso fallido al panel');
             $error = 'Contraseña incorrecta';
         }
     } elseif ($action === 'logout') {

@@ -23,6 +23,18 @@ if ($documento === '' || $password === '') {
     responderError(400, 'Documento y contraseña son requeridos');
 }
 
+// El documento es la CLAVE del contador anti fuerza bruta, así que aquí no se
+// puede aceptar cualquier cadena. Sin esta comprobación, un cliente podía
+// enviar como "documento" la clave interna que usa el panel de administración
+// y dejarlo bloqueado sin llegar a tocarlo.
+//
+// El formato es el mismo que exige sync.php: letras, dígitos y guiones. Se
+// admiten letras porque los pasaportes y algunas cédulas de extranjería las
+// llevan, y rechazarlas dejaría fuera a personas reales.
+if (mb_strlen($documento) > 20 || !preg_match('/^[A-Za-z0-9\-]+$/', $documento)) {
+    responderError(400, 'Formato de documento inválido');
+}
+
 try {
     // Se comprueba antes de tocar la contraseña, y para cualquier documento
     // exista o no, para que el bloqueo no delate qué cuentas son reales.
