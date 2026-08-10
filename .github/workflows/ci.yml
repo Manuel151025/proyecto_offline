@@ -159,6 +159,27 @@ jobs:
           fi
           echo "✓ Login con límite de intentos"
 
+      - name: Verificar que el panel admin limite los intentos
+        run: |
+          # La URL del panel es pública, no pide usuario y quien entre puede
+          # borrar personas. Sin límite se le puede probar contraseñas sin fin.
+          if ! grep -q "segundosDeBloqueo" api/admin/index.php; then
+            echo "::error::El panel admin debe comprobar el bloqueo por intentos fallidos."
+            exit 1
+          fi
+          if ! grep -q "registrarIntentoFallido" api/admin/index.php; then
+            echo "::error::El panel admin debe registrar los intentos fallidos, o el contador nunca sube."
+            exit 1
+          fi
+          # El contador del panel se guarda bajo una clave con '#', imposible de
+          # producir con la validación de documento de login.php. Si esa
+          # validación desaparece, un cliente puede bloquear el panel desde fuera.
+          if ! grep -q 'preg_match(.*A-Za-z0-9' api/auth/login.php; then
+            echo "::error::login.php debe validar el formato del documento, o se puede bloquear el panel admin desde fuera."
+            exit 1
+          fi
+          echo "✓ Panel admin con límite de intentos"
+
       - name: Verificar que la descarga exija token y use el sello del servidor
         run: |
           if ! grep -q "requerirAutenticacion" api/personas/cambios.php; then
