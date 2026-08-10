@@ -46,16 +46,18 @@ function resumenGeneral(PDO $pdo): array
 }
 
 /** Total de personas que coinciden con la búsqueda, para paginar. */
-function contarPersonas(PDO $pdo, string $busqueda = ''): int
+function contarPersonas(PDO $pdo, string $busqueda = '', bool $borradas = false): int
 {
+    $filtro = $borradas ? 'deleted_at IS NOT NULL' : 'deleted_at IS NULL';
+
     if ($busqueda === '') {
-        $stmt = $pdo->query('SELECT COUNT(*) FROM personas WHERE deleted_at IS NULL');
+        $stmt = $pdo->query("SELECT COUNT(*) FROM personas WHERE $filtro");
         return $stmt === false ? 0 : (int)$stmt->fetchColumn();
     }
     $stmt = $pdo->prepare(
-        'SELECT COUNT(*) FROM personas
-         WHERE deleted_at IS NULL
-           AND (nombres LIKE ? OR apellidos LIKE ? OR numero_documento LIKE ?)'
+        "SELECT COUNT(*) FROM personas
+         WHERE $filtro
+           AND (nombres LIKE ? OR apellidos LIKE ? OR numero_documento LIKE ?)"
     );
     $like = '%' . $busqueda . '%';
     $stmt->execute([$like, $like, $like]);
@@ -67,15 +69,20 @@ function contarPersonas(PDO $pdo, string $busqueda = ''): int
  *
  * @return array<int, array<string, mixed>>
  */
-function consultarPersonas(PDO $pdo, string $busqueda = '', int $limite = 25, int $desde = 0): array
-{
+function consultarPersonas(
+    PDO $pdo,
+    string $busqueda = '',
+    int $limite = 25,
+    int $desde = 0,
+    bool $borradas = false
+): array {
     // LIMIT y OFFSET no admiten parámetros en todas las versiones de MySQL con
     // EMULATE_PREPARES desactivado, así que se fuerzan a entero y se
     // interpolan. Al ser (int) no hay riesgo de inyección.
     $limite = max(1, min(200, $limite));
     $desde  = max(0, $desde);
 
-    $where = 'p.deleted_at IS NULL';
+    $where = $borradas ? 'p.deleted_at IS NOT NULL' : 'p.deleted_at IS NULL';
     $params = [];
     if ($busqueda !== '') {
         $where .= ' AND (p.nombres LIKE ? OR p.apellidos LIKE ? OR p.numero_documento LIKE ?)';
@@ -86,6 +93,7 @@ function consultarPersonas(PDO $pdo, string $busqueda = '', int $limite = 25, in
     $stmt = $pdo->prepare(
         "SELECT p.tipo_documento, p.numero_documento, p.nombres, p.apellidos,
                 p.telefono, p.eps, p.estrato, p.vereda, p.updated_at, p.device_id,
+                p.deleted_at,
                 m.nombre AS municipio, m.departamento
          FROM personas p
          LEFT JOIN municipios m ON m.codigo = p.municipio_codigo
@@ -235,6 +243,35 @@ function borrarPersona(PDO $pdo, string $tipoDocumento, string $numeroDocumento)
           WHERE tipo_documento = ? AND numero_documento = ?'
     );
     $stmt->execute([$ahora, $ahora, $ahora, 'panel-admin', $tipoDocumento, $numeroDocumento]);
+
+    return $stmt->rowCount() > 0;
+}
+
+/**
+ * Deshace un borrado suave.
+ *
+ * Sella igual que borrarPersona y por lo mismo: sin `server_updated_at` nuevo
+ * la descarga no la reparte, y sin `updated_at` nuevo los clientes la
+ * descartarían por Last-Write-Wins al tener una copia local más reciente (la
+ * que ellos mismos marcaron como borrada al sincronizar el borrado).
+ *
+ * No restaura las encuestas asociadas porque nunca se borraron: `encuestas` es
+ * el registro de trazabilidad y no se toca en ningún caso.
+ *
+ * @return bool false si esa persona no existe o no estaba borrada.
+ */
+function restaurarPersona(PDO $pdo, string $tipoDocumento, string $numeroDocumento): bool
+{
+    asegurarServerUpdatedAt($pdo);
+
+    $ahora = (int)round(microtime(true) * 1000);
+
+    $stmt = $pdo->prepare(
+        'UPDATE personas
+            SET deleted_at = NULL, updated_at = ?, server_updated_at = ?, device_id = ?
+          WHERE tipo_documento = ? AND numero_documento = ? AND deleted_at IS NOT NULL'
+    );
+    $stmt->execute([$ahora, $ahora, 'panel-admin', $tipoDocumento, $numeroDocumento]);
 
     return $stmt->rowCount() > 0;
 }
