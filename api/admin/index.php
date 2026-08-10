@@ -13,6 +13,7 @@ require_once '../cors.php';
 aplicarCabecerasDeSeguridad();
 require_once '../db.php';
 require_once __DIR__ . '/consultas.php';
+require_once __DIR__ . '/../esquema.php';
 $pdo = conectarBD();
 
 /** Longitud mínima al crear o cambiar la contraseña de un encuestador. */
@@ -57,6 +58,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         // si no se repone aquí, el formulario de login quedaría sin token y
         // el siguiente envío sería rechazado.
         $_SESSION['csrf'] = bin2hex(random_bytes(16));
+    } elseif ($action === 'borrar_persona' && !empty($_SESSION['admin_ok'])) {
+        // Existe para poder retirar registros que ningún cliente puede tocar:
+        // los que se crearon antes de que el servidor validara el documento y
+        // que ahora la propia validación impide reenviar. Sin esto no hay
+        // forma de quitarlos del sistema.
+        $tipo = trim($_POST['tipo_documento'] ?? '');
+        $numero = trim($_POST['numero_documento'] ?? '');
+
+        if ($tipo === '' || $numero === '') {
+            $error = 'Falta el documento de la persona a borrar';
+        } else {
+            try {
+                if (borrarPersona($pdo, $tipo, $numero)) {
+                    header('Location: index.php?seccion=personas&borrada=1');
+                } else {
+                    header('Location: index.php?seccion=personas&borrada=0');
+                }
+                exit;
+            } catch (PDOException $e) {
+                error_log('[admin] borrar persona: ' . $e->getMessage());
+                $error = 'No se pudo borrar. Intenta de nuevo.';
+            }
+        }
     } elseif ($action === 'save' && !empty($_SESSION['admin_ok'])) {
         $id = trim($_POST['id'] ?? '');
         $nombre = trim($_POST['nombre'] ?? '');
@@ -274,9 +298,15 @@ function etiquetaDia(string $dia): string
   .btn:hover { background: var(--primary-dark); }
   .btn.sec { background: var(--surface); color: var(--primary); border: 1px solid var(--borde); }
   .btn.sec:hover { background: var(--primary-tint); }
+  /* Discreto en reposo y rojo solo al apuntarlo: es una acción destructiva que
+     aparece en cada fila, y en rojo permanente la tabla entera pediría alarma. */
+  .btn.peligro { background: transparent; color: var(--texto-2); border: 1px solid var(--borde);
+                 padding: 6px 11px; }
+  .btn.peligro:hover { background: var(--error-bg); color: var(--error); border-color: #F0D2D0; }
 
   .aviso { padding: 10px 12px; border-radius: 8px; font-size: .85rem; margin-bottom: 14px;
            background: var(--error-bg); color: var(--error); border: 1px solid #F0D2D0; }
+  .aviso.ok { background: var(--ok-bg); color: var(--ok); border-color: #BFE3CF; }
   .buscador { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
   .buscador input { flex: 1; min-width: 200px; }
   .paginacion { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 14px; flex-wrap: wrap; }
@@ -335,6 +365,17 @@ function etiquetaDia(string $dia): string
   </nav>
 
   <?php if ($error): ?><div class="aviso"><?= h($error) ?></div><?php endif; ?>
+
+  <?php if (isset($_GET['borrada'])): ?>
+    <div class="aviso <?= $_GET['borrada'] === '1' ? 'ok' : '' ?>">
+      <?php if ($_GET['borrada'] === '1'): ?>
+        Persona borrada. Los celulares la retirarán en su próxima sincronización;
+        los que tengan cambios sin enviar, cuando los suban.
+      <?php else: ?>
+        Esa persona ya no estaba en la base de datos.
+      <?php endif; ?>
+    </div>
+  <?php endif; ?>
 
   <?php if ($seccion === 'resumen'): ?>
 
@@ -429,6 +470,7 @@ function etiquetaDia(string $dia): string
             <tr>
               <th>Documento</th><th>Nombre</th><th>Municipio</th>
               <th>Vereda</th><th>EPS</th><th>Estrato</th><th>Actualizado</th>
+              <th></th>
             </tr>
           </thead>
           <tbody>
@@ -441,6 +483,18 @@ function etiquetaDia(string $dia): string
                 <td><?= h($p['eps'] ?: '—') ?></td>
                 <td><?= h($p['estrato'] ?: '—') ?></td>
                 <td style="color:var(--texto-2);white-space:nowrap"><?= h(fecha($p['updated_at'])) ?></td>
+                <td style="text-align:right">
+                  <?php // El confirm() no es seguridad, solo evita el clic accidental:
+                        // quien tenga la sesión puede enviar el POST igualmente. ?>
+                  <form method="post" style="margin:0"
+                        onsubmit="return confirm('¿Borrar a <?= h($p['nombres']) ?> <?= h($p['apellidos']) ?>? Desaparecerá también de los celulares en su próxima sincronización.')">
+                    <input type="hidden" name="csrf" value="<?= h($_SESSION['csrf']) ?>">
+                    <input type="hidden" name="action" value="borrar_persona">
+                    <input type="hidden" name="tipo_documento" value="<?= h($p['tipo_documento']) ?>">
+                    <input type="hidden" name="numero_documento" value="<?= h($p['numero_documento']) ?>">
+                    <button type="submit" class="btn peligro">Borrar</button>
+                  </form>
+                </td>
               </tr>
             <?php endforeach; ?>
           </tbody>
