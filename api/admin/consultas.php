@@ -203,3 +203,38 @@ function personasParaExportar(PDO $pdo): array
     );
     return $stmt === false ? [] : $stmt->fetchAll();
 }
+
+/**
+ * Borra una persona de forma SUAVE, marcándola en vez de eliminarla.
+ *
+ * Tiene que ser suave. La descarga incremental entrega las filas cuyo
+ * `server_updated_at` supera la marca del cliente, incluidas las borradas,
+ * justamente para que los dispositivos se enteren del borrado. Un DELETE real
+ * quitaría la fila y no quedaría nada que enviar: cada teléfono que ya la
+ * hubiera descargado se la quedaría para siempre, sin forma de corregirlo.
+ *
+ * `updated_at` se pone al reloj del servidor y no se conserva el anterior,
+ * porque los clientes resuelven por Last-Write-Wins: con una marca menor que
+ * la copia local, el borrado se descartaría al llegar.
+ *
+ * Un dispositivo con cambios locales sin enviar conserva su versión hasta que
+ * la suba (así lo decide la regla de mezcla). Es deliberado: el borrado del
+ * administrador no debe destruir trabajo de campo que aún no se ha visto.
+ *
+ * @return bool false si esa persona no existe.
+ */
+function borrarPersona(PDO $pdo, string $tipoDocumento, string $numeroDocumento): bool
+{
+    asegurarServerUpdatedAt($pdo);
+
+    $ahora = (int)round(microtime(true) * 1000);
+
+    $stmt = $pdo->prepare(
+        'UPDATE personas
+            SET deleted_at = ?, updated_at = ?, server_updated_at = ?, device_id = ?
+          WHERE tipo_documento = ? AND numero_documento = ?'
+    );
+    $stmt->execute([$ahora, $ahora, $ahora, 'panel-admin', $tipoDocumento, $numeroDocumento]);
+
+    return $stmt->rowCount() > 0;
+}

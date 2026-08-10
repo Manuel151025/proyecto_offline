@@ -205,6 +205,26 @@ jobs:
           fi
           echo "✓ Un registro inválido no bloquea la cola"
 
+      - name: Verificar que el borrado de personas sea suave
+        run: |
+          # Un DELETE real quitaría la fila, y entonces cambios.php no tendría
+          # nada que enviar: los celulares que ya la descargaron se la quedarían
+          # para siempre, sin forma de corregirlo desde el servidor.
+          if grep -qE "DELETE\s+FROM\s+personas" api/admin/consultas.php api/admin/index.php; then
+            echo "::error::El borrado de personas debe ser suave (deleted_at), o los dispositivos nunca se enteran."
+            exit 1
+          fi
+          if ! grep -q "function borrarPersona" api/admin/consultas.php; then
+            echo "::error::Sin borrado en el panel no hay forma de retirar un registro que los clientes ya no pueden enviar."
+            exit 1
+          fi
+          # Debe sellar con la marca del servidor, o la descarga no lo reparte.
+          if ! grep -A 12 "function borrarPersona" api/admin/consultas.php | grep -q "server_updated_at"; then
+            echo "::error::borrarPersona debe actualizar server_updated_at, o el borrado no se descarga."
+            exit 1
+          fi
+          echo "✓ Borrado suave y propagable"
+
       - name: Verificar que el cierre de sesión revoque el token
         run: |
           if [ ! -f api/auth/logout.php ] || ! grep -q "DELETE FROM sesiones" api/auth/logout.php; then
