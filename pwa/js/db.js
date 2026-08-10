@@ -167,6 +167,38 @@ export async function updateSyncItems(ids, status) {
   });
 }
 
+/**
+ * Marca como RECHAZADO lo que el servidor descartó por inválido.
+ *
+ * Es un estado TERMINAL: getRetriableSync no lo recoge. Un registro que el
+ * servidor rechaza es irreparable desde aquí, y reintentarlo en cada
+ * sincronización lo único que consigue es arrastrar al resto del lote.
+ * Se guarda el motivo para poder explicarlo en vez de dejarlo desaparecer.
+ *
+ * @param {Array<{id: string, motivo: string}>} rechazos
+ */
+export async function marcarRechazados(rechazos) {
+  if (!rechazos.length) return;
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const t = db.transaction('sync_queue', 'readwrite');
+    const store = t.objectStore('sync_queue');
+    rechazos.forEach(({ id, motivo }) => {
+      const req = store.get(id);
+      req.onsuccess = () => {
+        const item = req.result;
+        if (item) {
+          item.status = 'RECHAZADO';
+          item.error = motivo;
+          store.put(item);
+        }
+      };
+    });
+    t.oncomplete = resolve;
+    t.onerror = e => reject(e.target.error);
+  });
+}
+
 export async function getAllSyncItems() {
   return openDB().then(db => new Promise((resolve, reject) => {
     const t = db.transaction('sync_queue', 'readonly');
@@ -182,6 +214,9 @@ export async function getSyncCounts() {
     pending: all.filter(i => i.status === 'PENDING').length,
     sent: all.filter(i => i.status === 'SENT').length,
     error: all.filter(i => i.status === 'ERROR').length,
+    // Terminales: no se reintentan. Se cuentan aparte para no hacerlos pasar
+    // por pendientes eternos en la pantalla de inicio.
+    rechazadas: all.filter(i => i.status === 'RECHAZADO').length,
     total: all.length
   };
 }

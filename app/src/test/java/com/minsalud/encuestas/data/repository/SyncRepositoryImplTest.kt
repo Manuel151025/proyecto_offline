@@ -13,6 +13,7 @@ import com.minsalud.encuestas.data.local.prefs.SessionManager
 import com.minsalud.encuestas.data.remote.api.ApiService
 import com.minsalud.encuestas.data.remote.dto.CambiosResponseDto
 import com.minsalud.encuestas.data.remote.dto.PersonaRemotaDto
+import com.minsalud.encuestas.data.remote.dto.RechazoDto
 import com.minsalud.encuestas.data.remote.dto.SyncRequestDto
 import com.minsalud.encuestas.data.remote.dto.SyncResponseDto
 import com.minsalud.encuestas.domain.model.DomainError
@@ -247,6 +248,85 @@ class SyncRepositoryImplTest {
         // Este es el fallo que motivó la descarga: un dispositivo sin nada que
         // subir se quedaba sin ver nunca el trabajo de los demás.
         coVerify(exactly = 1) { apiService.getCambios(any(), any()) }
+    }
+
+    // --- Registros rechazados por el servidor ---
+
+    /**
+     * El fallo que motivó esto: el servidor abortaba el lote entero por una
+     * fila inválida y el cliente lo reenviaba en cada sincronización, así que
+     * un registro irreparable bloqueaba la cola para siempre arrastrando
+     * consigo hasta 100 encuestas buenas.
+     */
+    @Test
+    fun `un registro rechazado no arrastra al resto del lote`() = runTest {
+        prepararCola(3)
+        coEvery { apiService.syncData(any()) } returns Response.success(
+            SyncResponseDto(
+                success = true,
+                message = null,
+                processedEncuestas = listOf("enc-1", "enc-3"),
+                rechazadas = listOf(RechazoDto("enc-2", "El número de documento debe tener al menos 6 caracteres"))
+            )
+        )
+
+        repository.sincronizarPendientes()
+
+        coVerify(exactly = 1) { colaDao.marcarEnviado(1) }
+        coVerify(exactly = 1) { colaDao.marcarEnviado(3) }
+        coVerify(exactly = 1) { colaDao.marcarRechazado(2, any()) }
+    }
+
+    @Test
+    fun `un rechazo es terminal y no se reintenta`() = runTest {
+        prepararCola(1)
+        coEvery { apiService.syncData(any()) } returns Response.success(
+            SyncResponseDto(
+                success = true, message = null, processedEncuestas = emptyList(),
+                rechazadas = listOf(RechazoDto("enc-1", "documento inválido"))
+            )
+        )
+
+        repository.sincronizarPendientes()
+
+        // Ni reintento ni error recuperable: marcarRechazado lo saca de
+        // getPendientes, que es lo que corta el bucle.
+        coVerify(exactly = 0) { colaDao.incrementarIntento(any(), any()) }
+        coVerify(exactly = 0) { colaDao.marcarError(any(), any()) }
+        coVerify(exactly = 1) { colaDao.marcarRechazado(1, "documento inválido") }
+    }
+
+    @Test
+    fun `un lote sin rechazos se comporta como antes`() = runTest {
+        prepararCola(2)
+        coEvery { apiService.syncData(any()) } returns respuestaOk(listOf("enc-1", "enc-2"))
+
+        repository.sincronizarPendientes()
+
+        coVerify(exactly = 0) { colaDao.marcarRechazado(any(), any()) }
+        coVerify(exactly = 2) { colaDao.marcarEnviado(any()) }
+    }
+
+    /**
+     * Durante un despliegue conviven servidor viejo y nuevo. Sin el campo no
+     * se puede deducir que algo fue rechazado: se acepta lo confirmado, que es
+     * el comportamiento anterior.
+     */
+    @Test
+    fun `un servidor sin el campo rechazadas no rompe nada`() = runTest {
+        prepararCola(2)
+        coEvery { apiService.syncData(any()) } returns Response.success(
+            SyncResponseDto(
+                success = true, message = null,
+                processedEncuestas = listOf("enc-1", "enc-2"),
+                rechazadas = null
+            )
+        )
+
+        repository.sincronizarPendientes()
+
+        coVerify(exactly = 2) { colaDao.marcarEnviado(any()) }
+        coVerify(exactly = 0) { colaDao.marcarRechazado(any(), any()) }
     }
 
     // --- Descarga ---

@@ -173,12 +173,22 @@ class SyncRepositoryImpl @Inject constructor(
                     // Antes se daba por bueno todo el envío; si el servidor
                     // ignoraba un registro, la app lo creía sincronizado.
                     val confirmadas = response.body()?.processedEncuestas.orEmpty().toSet()
+
+                    // Rechazadas: el servidor las examinó y las descartó. Se
+                    // marcan como terminales, porque reenviarlas daría siempre
+                    // el mismo resultado y bloquearían la cola indefinidamente.
+                    val rechazadas = response.body()?.rechazadas.orEmpty()
+                        .associate { it.id to it.motivo }
+
                     for (p in lote) {
-                        if (p.encuesta.id in confirmadas) {
-                            colaDao.marcarEnviado(p.cola.idCola)
-                        } else {
-                            colaDao.incrementarIntento(p.cola.idCola, "El servidor no confirmó la encuesta")
-                            hayFalloDeRed = true
+                        val motivo = rechazadas[p.encuesta.id]
+                        when {
+                            motivo != null -> colaDao.marcarRechazado(p.cola.idCola, motivo)
+                            p.encuesta.id in confirmadas -> colaDao.marcarEnviado(p.cola.idCola)
+                            else -> {
+                                colaDao.incrementarIntento(p.cola.idCola, "El servidor no confirmó la encuesta")
+                                hayFalloDeRed = true
+                            }
                         }
                     }
                 } else {

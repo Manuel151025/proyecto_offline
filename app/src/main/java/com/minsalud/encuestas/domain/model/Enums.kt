@@ -18,4 +18,5 @@ enum class TipoDocumento(val descripcion: String) {
     PE("Permiso especial de permanencia")
 }
 enum class AccionEncuesta { CREACION, ACTUALIZACION }
-enum class EstadoSync { PENDING, SENT, ERROR }
+/** Debe reflejar EstadoSyncEntity. RECHAZADO es terminal. */
+enum class EstadoSync { PENDING, SENT, ERROR, RECHAZADO }
