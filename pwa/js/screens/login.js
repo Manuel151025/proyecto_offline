@@ -82,6 +82,17 @@ export async function render(container) {
       <strong>Cuenta de prueba</strong><br>
       Documento <code>1000000001</code> &middot; Contrase&ntilde;a <code>Demo2026Salud</code>
     </div>
+    <div class="login-admin-box">
+      <a href="../api/admin/index.php" class="login-admin-btn">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+        </svg>
+        <span>Acceso a Panel Administrador</span>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M5 12h14M12 5l7 7-7 7"/>
+        </svg>
+      </a>
+    </div>
   `;
 
   const docInput = document.getElementById('login-doc');

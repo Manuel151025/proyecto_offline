@@ -315,6 +315,37 @@
   padding: 1px 5px;
 }
 
+/* ---- Enlace Panel Admin ---- */
+.login-admin-box {
+  margin-top: 14px;
+  text-align: center;
+}
+
+.login-admin-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  padding: 10px 14px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--primary);
+  background: var(--surface-alt);
+  border: 1px solid var(--divider);
+  border-radius: var(--radius-sm);
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+
+.login-admin-btn:hover {
+  background: var(--primary-tint, #EEF3F9);
+  border-color: var(--primary);
+  color: var(--primary-dark, #0C325C);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(18, 70, 126, 0.08);
+}
+
 /* ---- Pie ---- */
 .login-foot {
   font-size: 0.72rem;

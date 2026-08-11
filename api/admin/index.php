@@ -328,101 +328,304 @@ function etiquetaDia(string $dia): string
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex">
 <title>Admin · ColOffline</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-  /* Misma paleta institucional que la PWA (pwa/css/base.css) y que el tema
-     de Android: el panel es parte del mismo producto. */
   :root {
-    --primary: #12467E; --primary-dark: #0C325C; --primary-tint: #EEF3F9;
-    --surface: #fff; --surface-alt: #F7F9FC; --bg: #F2F5F9;
-    --texto: #16202C; --texto-2: #5B6878; --texto-3: #8695A8;
-    --divisor: #DCE3EC; --borde: #C3CDDA;
-    --ok: #1B7A4B; --ok-bg: #E8F5EE; --error: #B3261E; --error-bg: #FCEEEE;
-    --radio: 10px;
+    --primary: #12467E;
+    --primary-gradient: linear-gradient(135deg, #12467E 0%, #0D325C 100%);
+    --primary-dark: #0C325C;
+    --primary-tint: #EEF4FA;
+    --primary-glow: rgba(18, 70, 126, 0.15);
+    --surface: #FFFFFF;
+    --surface-alt: #F8FAFC;
+    --bg: #F1F5F9;
+    --texto: #0F172A;
+    --texto-2: #475569;
+    --texto-3: #94A3B8;
+    --divisor: #E2E8F0;
+    --borde: #CBD5E1;
+    --ok: #15803D;
+    --ok-bg: #F0FDF4;
+    --ok-border: #BBF7D0;
+    --error: #B91C1C;
+    --error-bg: #FEF2F2;
+    --error-border: #FECACA;
+    --radio: 12px;
+    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+    --shadow-md: 0 10px 15px -3px rgba(15, 23, 42, 0.08), 0 4px 6px -4px rgba(15, 23, 42, 0.04);
   }
   * { box-sizing: border-box; }
-  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-         background: var(--bg); color: var(--texto); margin: 0; -webkit-font-smoothing: antialiased; }
-  .barra { height: 4px; background: var(--primary); }
-  .wrap { max-width: 1080px; margin: 0 auto; padding: 24px 20px 48px; }
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--texto);
+    margin: 0;
+    -webkit-font-smoothing: antialiased;
+    line-height: 1.5;
+  }
+  .barra { height: 4px; background: var(--primary-gradient); }
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 28px 20px 56px; }
 
-  header.top { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 20px; flex-wrap: wrap; }
-  .marca { display: flex; align-items: center; gap: 10px; }
-  .logo { width: 36px; height: 36px; border-radius: 8px; background: var(--primary);
-          display: flex; align-items: center; justify-content: center; color: #fff; font-weight: 700; }
-  h1 { font-size: 1.15rem; margin: 0; }
-  .sub { font-size: .78rem; color: var(--texto-2); margin: 2px 0 0; }
+  header.top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+    background: var(--surface);
+    padding: 16px 20px;
+    border-radius: var(--radio);
+    border: 1px solid var(--divisor);
+    box-shadow: var(--shadow-sm);
+  }
+  .marca { display: flex; align-items: center; gap: 12px; }
+  .logo {
+    width: 42px;
+    height: 42px;
+    border-radius: 10px;
+    background: var(--primary-gradient);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #fff;
+    box-shadow: 0 4px 10px rgba(18, 70, 126, 0.25);
+  }
+  h1 { font-size: 1.25rem; font-weight: 700; margin: 0; color: var(--texto); letter-spacing: -0.02em; }
+  .sub { font-size: .8rem; color: var(--texto-2); margin: 2px 0 0; }
+  .sub strong { color: var(--primary); font-weight: 600; }
 
-  nav.tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--divisor); margin-bottom: 22px; flex-wrap: wrap; }
-  nav.tabs a { padding: 9px 14px; font-size: .88rem; font-weight: 600; color: var(--texto-2);
-               text-decoration: none; border-bottom: 2px solid transparent; }
-  nav.tabs a:hover { color: var(--primary); }
-  nav.tabs a.on { color: var(--primary); border-bottom-color: var(--primary); }
+  nav.tabs {
+    display: flex;
+    gap: 6px;
+    background: var(--surface);
+    padding: 6px;
+    border-radius: 12px;
+    border: 1px solid var(--divisor);
+    margin-bottom: 24px;
+    box-shadow: var(--shadow-sm);
+  }
+  nav.tabs a {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 18px;
+    font-size: .88rem;
+    font-weight: 500;
+    color: var(--texto-2);
+    text-decoration: none;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+  }
+  nav.tabs a:hover { color: var(--primary); background: var(--primary-tint); }
+  nav.tabs a.on {
+    color: #fff;
+    background: var(--primary-gradient);
+    font-weight: 600;
+    box-shadow: 0 2px 8px rgba(18, 70, 126, 0.25);
+  }
 
-  .tarjetas { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; margin-bottom: 24px; }
-  .kpi { background: var(--surface); border: 1px solid var(--divisor); border-radius: var(--radio); padding: 16px; }
-  .kpi .n { font-size: 1.9rem; font-weight: 700; line-height: 1; color: var(--primary); }
-  .kpi .t { font-size: .72rem; font-weight: 600; text-transform: uppercase; letter-spacing: .5px; color: var(--texto-2); margin-top: 6px; }
+  .tarjetas {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  .kpi {
+    background: var(--surface);
+    border: 1px solid var(--divisor);
+    border-radius: var(--radio);
+    padding: 20px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    box-shadow: var(--shadow-sm);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+  }
+  .kpi:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+  }
+  .kpi-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+  .icon-personas { background: #EEF4FA; color: #12467E; }
+  .icon-encuestas { background: #F0FDF4; color: #15803D; }
+  .icon-encuestadores { background: #FEF3C7; color: #B45309; }
+  .icon-dispositivos { background: #F3E8FF; color: #6B21A8; }
+  .kpi .n { font-size: 1.85rem; font-weight: 700; line-height: 1.1; color: var(--texto); letter-spacing: -0.03em; }
+  .kpi .t { font-size: .75rem; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--texto-2); margin-top: 4px; }
 
-  .panel { background: var(--surface); border: 1px solid var(--divisor); border-radius: var(--radio); padding: 18px; margin-bottom: 20px; }
-  .panel h2 { font-size: .95rem; margin: 0 0 14px; }
-  .dos { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px; }
+  .panel {
+    background: var(--surface);
+    border: 1px solid var(--divisor);
+    border-radius: var(--radio);
+    padding: 24px;
+    margin-bottom: 24px;
+    box-shadow: var(--shadow-sm);
+  }
+  .panel h2 {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--texto);
+    margin: 0 0 16px;
+    letter-spacing: -0.01em;
+  }
+  .dos { display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 24px; }
 
-  /* Gráfico de barras en CSS puro: sin librerías externas, que además la
-     política de seguridad del sitio bloquearía. */
-  .grafico { display: flex; align-items: flex-end; gap: 4px; height: 150px; padding-top: 8px; }
-  .barra-col { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 4px; height: 100%; }
-  .barra-val { width: 100%; background: var(--primary); border-radius: 3px 3px 0 0; min-height: 2px; transition: background .15s; }
-  .barra-col:hover .barra-val { background: var(--primary-dark); }
-  .barra-eti { font-size: .6rem; color: var(--texto-3); white-space: nowrap; }
-  .barra-num { font-size: .65rem; font-weight: 600; color: var(--texto-2); }
+  .grafico { display: flex; align-items: flex-end; gap: 8px; height: 160px; padding-top: 12px; }
+  .barra-col { flex: 1; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; gap: 6px; height: 100%; }
+  .barra-val {
+    width: 100%;
+    background: var(--primary-gradient);
+    border-radius: 6px 6px 0 0;
+    min-height: 4px;
+    transition: transform 0.2s ease, opacity 0.2s ease;
+  }
+  .barra-col:hover .barra-val { opacity: 0.85; transform: scaleY(1.03); }
+  .barra-eti { font-size: .68rem; font-weight: 500; color: var(--texto-3); white-space: nowrap; }
+  .barra-num { font-size: .72rem; font-weight: 700; color: var(--primary); }
 
-  .lista-barras { display: flex; flex-direction: column; gap: 10px; }
-  .fila-barra { display: grid; grid-template-columns: 1fr auto; gap: 4px; }
-  .fila-barra .n { font-size: .82rem; }
-  .fila-barra .v { font-size: .82rem; font-weight: 700; color: var(--primary); }
-  .pista { grid-column: 1 / -1; height: 6px; background: var(--primary-tint); border-radius: 99px; overflow: hidden; }
-  .relleno { height: 100%; background: var(--primary); border-radius: 99px; }
+  .lista-barras { display: flex; flex-direction: column; gap: 14px; }
+  .fila-barra { display: grid; grid-template-columns: 1fr auto; gap: 6px; align-items: center; }
+  .fila-barra .n { font-size: .85rem; font-weight: 500; }
+  .fila-barra .v { font-size: .85rem; font-weight: 700; color: var(--primary); }
+  .pista { grid-column: 1 / -1; height: 8px; background: #F1F5F9; border-radius: 99px; overflow: hidden; margin-top: 2px; }
+  .relleno { height: 100%; background: var(--primary-gradient); border-radius: 99px; }
 
-  table { width: 100%; border-collapse: collapse; font-size: .85rem; }
-  th { text-align: left; font-size: .7rem; text-transform: uppercase; letter-spacing: .5px;
-       color: var(--texto-2); border-bottom: 1px solid var(--divisor); padding: 8px 10px; white-space: nowrap; }
-  td { padding: 10px; border-bottom: 1px solid var(--divisor); }
+  table { width: 100%; border-collapse: separate; border-spacing: 0; font-size: .88rem; }
+  th {
+    text-align: left;
+    font-size: .72rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    color: var(--texto-2);
+    background: var(--surface-alt);
+    border-bottom: 1px solid var(--divisor);
+    padding: 10px 14px;
+    white-space: nowrap;
+  }
+  th:first-child { border-top-left-radius: 8px; }
+  th:last-child { border-top-right-radius: 8px; }
+  td { padding: 12px 14px; border-bottom: 1px solid var(--divisor); vertical-align: middle; }
   tr:last-child td { border-bottom: none; }
-  tbody tr:hover { background: var(--surface-alt); }
-  .vacio { text-align: center; color: var(--texto-2); padding: 32px 16px; font-size: .88rem; }
+  tbody tr { transition: background 0.15s ease; }
+  tbody tr:hover { background: var(--primary-tint); }
+  .vacio { text-align: center; color: var(--texto-2); padding: 40px 16px; font-size: .9rem; }
 
-  .badge { font-size: .68rem; font-weight: 700; padding: 3px 8px; border-radius: 99px; text-transform: uppercase; }
-  .badge.si { background: var(--ok-bg); color: var(--ok); }
-  .badge.no { background: var(--error-bg); color: var(--error); }
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: .72rem;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 99px;
+    text-transform: uppercase;
+    letter-spacing: .03em;
+  }
+  .badge.si { background: var(--ok-bg); color: var(--ok); border: 1px solid var(--ok-border); }
+  .badge.no { background: var(--error-bg); color: var(--error); border: 1px solid var(--error-border); }
 
   input[type=text], input[type=password], input[type=search], select {
-    width: 100%; padding: 9px 11px; font-size: .9rem; font-family: inherit; color: var(--texto);
-    border: 1px solid var(--borde); border-radius: 8px; outline: none; background: var(--surface); }
-  input:focus, select:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(18,70,126,.16); }
-  label.campo { display: block; font-size: .75rem; font-weight: 600; color: var(--texto-2); margin: 0 0 5px; }
-  .fila-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; margin-bottom: 12px; }
+    width: 100%;
+    padding: 10px 14px;
+    font-size: .9rem;
+    font-family: inherit;
+    color: var(--texto);
+    border: 1px solid var(--borde);
+    border-radius: 8px;
+    outline: none;
+    background: var(--surface);
+    transition: all 0.2s ease;
+  }
+  input:focus, select:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px var(--primary-glow);
+  }
+  label.campo { display: block; font-size: .78rem; font-weight: 600; color: var(--texto-2); margin: 0 0 6px; }
+  .fila-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 16px; }
 
-  .btn { display: inline-flex; align-items: center; gap: 6px; padding: 9px 15px; border: none; border-radius: 8px;
-         background: var(--primary); color: #fff; font-size: .85rem; font-weight: 600; font-family: inherit;
-         cursor: pointer; text-decoration: none; }
-  .btn:hover { background: var(--primary-dark); }
-  .btn.sec { background: var(--surface); color: var(--primary); border: 1px solid var(--borde); }
-  .btn.sec:hover { background: var(--primary-tint); }
-  /* Discreto en reposo y rojo solo al apuntarlo: es una acción destructiva que
-     aparece en cada fila, y en rojo permanente la tabla entera pediría alarma. */
-  .btn.peligro { background: transparent; color: var(--texto-2); border: 1px solid var(--borde);
-                 padding: 6px 11px; }
-  .btn.peligro:hover { background: var(--error-bg); color: var(--error); border-color: #F0D2D0; }
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 10px 18px;
+    border: none;
+    border-radius: 8px;
+    background: var(--primary-gradient);
+    color: #fff;
+    font-size: .88rem;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    text-decoration: none;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 4px rgba(18, 70, 126, 0.15);
+  }
+  .btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 10px rgba(18, 70, 126, 0.25);
+  }
+  .btn.sec {
+    background: var(--surface);
+    color: var(--primary);
+    border: 1px solid var(--borde);
+    box-shadow: var(--shadow-sm);
+  }
+  .btn.sec:hover {
+    background: var(--primary-tint);
+    border-color: var(--primary);
+  }
+  .btn.peligro {
+    background: transparent;
+    color: var(--texto-2);
+    border: 1px solid var(--borde);
+    padding: 6px 12px;
+    font-size: .82rem;
+  }
+  .btn.peligro:hover {
+    background: var(--error-bg);
+    color: var(--error);
+    border-color: var(--error-border);
+  }
 
-  .aviso { padding: 10px 12px; border-radius: 8px; font-size: .85rem; margin-bottom: 14px;
-           background: var(--error-bg); color: var(--error); border: 1px solid #F0D2D0; }
-  .aviso.ok { background: var(--ok-bg); color: var(--ok); border-color: #BFE3CF; }
-  .buscador { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
-  .buscador input { flex: 1; min-width: 200px; }
-  .paginacion { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 14px; flex-wrap: wrap; }
-  .paginacion .info { font-size: .8rem; color: var(--texto-2); }
+  .aviso {
+    padding: 14px 16px;
+    border-radius: 10px;
+    font-size: .88rem;
+    line-height: 1.5;
+    margin-bottom: 20px;
+    background: var(--error-bg);
+    color: var(--error);
+    border: 1px solid var(--error-border);
+  }
+  .aviso.ok { background: var(--ok-bg); color: var(--ok); border-color: var(--ok-border); }
+  .buscador { display: flex; gap: 10px; margin-bottom: 18px; flex-wrap: wrap; }
+  .buscador input { flex: 1; min-width: 220px; }
+  .paginacion { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 18px; flex-wrap: wrap; }
+  .paginacion .info { font-size: .82rem; color: var(--texto-2); }
 
-  .login-caja { max-width: 380px; margin: 60px auto; }
+  .login-caja {
+    max-width: 400px;
+    margin: 60px auto;
+  }
+  .login-caja .panel {
+    box-shadow: var(--shadow-md);
+    border-radius: 16px;
+    padding: 32px 28px;
+  }
 </style>
 </head>
 <body>
@@ -432,8 +635,12 @@ function etiquetaDia(string $dia): string
 <?php if (!$loggedIn): ?>
 
   <div class="login-caja">
-    <div class="marca" style="justify-content:center;margin-bottom:18px">
-      <div class="logo">+</div>
+    <div class="marca" style="justify-content:center;margin-bottom:20px">
+      <div class="logo">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+        </svg>
+      </div>
       <div>
         <h1>Admin · ColOffline</h1>
         <p class="sub">Ministerio de Salud</p>
@@ -465,13 +672,13 @@ function etiquetaDia(string $dia): string
         <?php if (!$modoArranque): ?>
           <label class="campo" for="doc">Número de documento</label>
           <input type="text" id="doc" name="numero_documento" autocomplete="username" autofocus>
-          <div style="height:12px"></div>
+          <div style="height:14px"></div>
         <?php endif; ?>
 
         <label class="campo" for="pw">Contraseña<?= $modoArranque ? ' de administrador' : '' ?></label>
         <input type="password" id="pw" name="password" autocomplete="current-password"
                <?= $modoArranque ? 'autofocus' : '' ?>>
-        <button class="btn" type="submit" style="width:100%;justify-content:center;margin-top:12px">Ingresar</button>
+        <button class="btn" type="submit" style="width:100%;justify-content:center;margin-top:16px">Ingresar</button>
       </form>
     </div>
   </div>
@@ -480,13 +687,16 @@ function etiquetaDia(string $dia): string
 
   <header class="top">
     <div class="marca">
-      <div class="logo">+</div>
+      <div class="logo">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+        </svg>
+      </div>
       <div>
         <h1>Admin · ColOffline</h1>
         <p class="sub">
           Ministerio de Salud ·
-          <?php // Quién está dentro. Antes no se sabía: la contraseña era
-                // compartida y ninguna acción tenía autor. ?>
+          <?php // Quién está dentro. ?>
           <strong><?= h($_SESSION['admin_nombre'] ?? 'Administrador') ?></strong>
         </p>
       </div>
@@ -494,14 +704,26 @@ function etiquetaDia(string $dia): string
     <form method="post">
       <input type="hidden" name="csrf" value="<?= h($_SESSION['csrf']) ?>">
       <input type="hidden" name="action" value="logout">
-      <button class="btn sec" type="submit">Salir</button>
+      <button class="btn sec" type="submit">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        <span>Salir</span>
+      </button>
     </form>
   </header>
 
   <nav class="tabs">
-    <a href="?seccion=resumen" class="<?= $seccion === 'resumen' ? 'on' : '' ?>">Resumen</a>
-    <a href="?seccion=personas" class="<?= $seccion === 'personas' ? 'on' : '' ?>">Personas</a>
-    <a href="?seccion=encuestadores" class="<?= $seccion === 'encuestadores' ? 'on' : '' ?>">Cuentas</a>
+    <a href="?seccion=resumen" class="<?= $seccion === 'resumen' ? 'on' : '' ?>">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+      <span>Resumen</span>
+    </a>
+    <a href="?seccion=personas" class="<?= $seccion === 'personas' ? 'on' : '' ?>">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+      <span>Personas</span>
+    </a>
+    <a href="?seccion=encuestadores" class="<?= $seccion === 'encuestadores' ? 'on' : '' ?>">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><polyline points="17 11 19 13 23 9"/></svg>
+      <span>Cuentas</span>
+    </a>
   </nav>
 
   <?php if ($error): ?><div class="aviso"><?= h($error) ?></div><?php endif; ?>
@@ -529,10 +751,42 @@ function etiquetaDia(string $dia): string
   <?php if ($seccion === 'resumen'): ?>
 
     <div class="tarjetas">
-      <div class="kpi"><div class="n"><?= (int)($resumen['personas'] ?? 0) ?></div><div class="t">Personas</div></div>
-      <div class="kpi"><div class="n"><?= (int)($resumen['encuestas'] ?? 0) ?></div><div class="t">Encuestas</div></div>
-      <div class="kpi"><div class="n"><?= (int)($resumen['encuestadores'] ?? 0) ?></div><div class="t">Encuestadores</div></div>
-      <div class="kpi"><div class="n"><?= (int)($resumen['dispositivos'] ?? 0) ?></div><div class="t">Dispositivos</div></div>
+      <div class="kpi">
+        <div class="kpi-icon icon-personas">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+        </div>
+        <div>
+          <div class="n"><?= (int)($resumen['personas'] ?? 0) ?></div>
+          <div class="t">Personas</div>
+        </div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-icon icon-encuestas">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+        </div>
+        <div>
+          <div class="n"><?= (int)($resumen['encuestas'] ?? 0) ?></div>
+          <div class="t">Encuestas</div>
+        </div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-icon icon-encuestadores">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        </div>
+        <div>
+          <div class="n"><?= (int)($resumen['encuestadores'] ?? 0) ?></div>
+          <div class="t">Encuestadores</div>
+        </div>
+      </div>
+      <div class="kpi">
+        <div class="kpi-icon icon-dispositivos">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+        </div>
+        <div>
+          <div class="n"><?= (int)($resumen['dispositivos'] ?? 0) ?></div>
+          <div class="t">Dispositivos</div>
+        </div>
+      </div>
     </div>
 
     <div class="panel">
