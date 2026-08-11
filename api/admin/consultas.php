@@ -17,7 +17,9 @@
 /** @return array<int, array<string, mixed>> */
 function consultarEncuestadores(PDO $pdo): array
 {
-    $stmt = $pdo->query('SELECT id, nombre, numero_documento, activo FROM encuestadores ORDER BY id');
+    asegurarRolEncuestador($pdo);
+
+    $stmt = $pdo->query('SELECT id, nombre, numero_documento, activo, rol FROM encuestadores ORDER BY id');
     return $stmt === false ? [] : $stmt->fetchAll();
 }
 
@@ -231,7 +233,7 @@ function personasParaExportar(PDO $pdo): array
  *
  * @return bool false si esa persona no existe.
  */
-function borrarPersona(PDO $pdo, string $tipoDocumento, string $numeroDocumento): bool
+function borrarPersona(PDO $pdo, string $tipoDocumento, string $numeroDocumento, string $autor = 'panel-admin'): bool
 {
     asegurarServerUpdatedAt($pdo);
 
@@ -242,7 +244,7 @@ function borrarPersona(PDO $pdo, string $tipoDocumento, string $numeroDocumento)
             SET deleted_at = ?, updated_at = ?, server_updated_at = ?, device_id = ?
           WHERE tipo_documento = ? AND numero_documento = ?'
     );
-    $stmt->execute([$ahora, $ahora, $ahora, 'panel-admin', $tipoDocumento, $numeroDocumento]);
+    $stmt->execute([$ahora, $ahora, $ahora, mb_substr($autor, 0, 50), $tipoDocumento, $numeroDocumento]);
 
     return $stmt->rowCount() > 0;
 }
@@ -260,7 +262,7 @@ function borrarPersona(PDO $pdo, string $tipoDocumento, string $numeroDocumento)
  *
  * @return bool false si esa persona no existe o no estaba borrada.
  */
-function restaurarPersona(PDO $pdo, string $tipoDocumento, string $numeroDocumento): bool
+function restaurarPersona(PDO $pdo, string $tipoDocumento, string $numeroDocumento, string $autor = 'panel-admin'): bool
 {
     asegurarServerUpdatedAt($pdo);
 
@@ -271,7 +273,70 @@ function restaurarPersona(PDO $pdo, string $tipoDocumento, string $numeroDocumen
             SET deleted_at = NULL, updated_at = ?, server_updated_at = ?, device_id = ?
           WHERE tipo_documento = ? AND numero_documento = ? AND deleted_at IS NOT NULL'
     );
-    $stmt->execute([$ahora, $ahora, 'panel-admin', $tipoDocumento, $numeroDocumento]);
+    $stmt->execute([$ahora, $ahora, mb_substr($autor, 0, 50), $tipoDocumento, $numeroDocumento]);
 
     return $stmt->rowCount() > 0;
+}
+
+/**
+ * Cuántas cuentas de administrador ACTIVAS hay.
+ *
+ * Es lo que decide si ADMIN_PASSWORD sigue sirviendo. Mientras no exista
+ * ningún administrador, la contraseña compartida es la única forma de entrar
+ * y crear el primero; en cuanto hay uno, deja de aceptarse. Así el secreto
+ * compartido se apaga solo, sin dejar nunca el panel inaccesible.
+ *
+ * Se cuentan solo las activas: dejar una cuenta desactivada como único
+ * administrador equivaldría a no tener ninguno.
+ */
+function contarAdminsActivos(PDO $pdo): int
+{
+    asegurarRolEncuestador($pdo);
+
+    $stmt = $pdo->query("SELECT COUNT(*) FROM encuestadores WHERE rol = 'admin' AND activo = 1");
+    return $stmt === false ? 0 : (int)$stmt->fetchColumn();
+}
+
+/**
+ * Busca una cuenta de administrador activa por documento.
+ *
+ * Devuelve la fila sin comprobar la contraseña: quien llame debe verificarla
+ * con password_verify. Se separa así para que el mensaje de error pueda ser
+ * el mismo tanto si la cuenta no existe como si la contraseña es incorrecta,
+ * y no se pueda averiguar qué documentos son administradores.
+ *
+ * @return array<string, mixed>|null
+ */
+function buscarAdminPorDocumento(PDO $pdo, string $documento): ?array
+{
+    asegurarRolEncuestador($pdo);
+
+    $stmt = $pdo->prepare(
+        "SELECT id, nombre, password_hash
+           FROM encuestadores
+          WHERE numero_documento = ? AND rol = 'admin' AND activo = 1"
+    );
+    $stmt->execute([$documento]);
+
+    return $stmt->fetch() ?: null;
+}
+
+/**
+ * ¿Esta cuenta es el último administrador activo que queda?
+ *
+ * Sirve para impedir que alguien se deje fuera del panel quitándose el rol o
+ * desactivándose. Recuperarse de eso exigiría entrar a la base de datos por
+ * SSH, que es justo lo que este sistema de cuentas venía a evitar.
+ */
+function esUltimoAdminActivo(PDO $pdo, int $id): bool
+{
+    asegurarRolEncuestador($pdo);
+
+    $stmt = $pdo->prepare(
+        "SELECT COUNT(*) FROM encuestadores
+          WHERE rol = 'admin' AND activo = 1 AND id <> ?"
+    );
+    $stmt->execute([$id]);
+
+    return (int)$stmt->fetchColumn() === 0;
 }

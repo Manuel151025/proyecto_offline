@@ -212,7 +212,10 @@ CREATE TABLE IF NOT EXISTS encuestadores (
     nombre VARCHAR(100) NOT NULL,
     numero_documento VARCHAR(20) NULL UNIQUE,
     password_hash VARCHAR(255) NULL,
-    activo TINYINT(1) DEFAULT 1
+    activo TINYINT(1) DEFAULT 1,
+    -- Los encuestadores hacen trabajo de campo; los admin entran al panel.
+    -- Por defecto encuestador: crear una cuenta no debe dar acceso al panel.
+    rol ENUM('encuestador', 'admin') NOT NULL DEFAULT 'encuestador'
 );
 
 -- Cuenta de prueba (docente). Documento: 1000000001 · Contraseña: Demo2026Salud

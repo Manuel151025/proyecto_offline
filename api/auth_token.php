@@ -12,6 +12,8 @@
  *  - Es revocable: basta borrar la fila (o marcar el encuestador como inactivo).
  */
 
+require_once __DIR__ . '/esquema.php';
+
 const TOKEN_VIGENCIA_DIAS = 30;
 
 /** Genera un token nuevo para el encuestador y persiste su hash. */
@@ -62,7 +64,7 @@ function leerHeaderAutorizacion(): string
  * Exige un token válido. Devuelve el encuestador autenticado o corta con 401.
  * Requiere que cors.php esté cargado (usa responderError).
  */
-/** @return array{id_encuestador: int, nombre: string} */
+/** @return array{id_encuestador: int, nombre: string, rol: string} */
 function requerirAutenticacion(PDO $pdo): array
 {
     $token = leerHeaderAutorizacion();
@@ -71,8 +73,15 @@ function requerirAutenticacion(PDO $pdo): array
         responderError(401, 'Falta el token de autenticación');
     }
 
+    // La consulta lee e.rol. Se garantiza aquí y no en cada endpoint: quien
+    // necesita la columna es esta función, y confiar en que todos los que
+    // llaman se acuerden es justo la clase de dependencia implícita que ya
+    // dio problemas con el $pdo global de db.php. La comprobación se hace una
+    // vez por petición gracias al estático de asegurarRolEncuestador.
+    asegurarRolEncuestador($pdo);
+
     $stmt = $pdo->prepare(
-        'SELECT s.id, s.id_encuestador, s.expira_en, e.nombre, e.activo
+        'SELECT s.id, s.id_encuestador, s.expira_en, e.nombre, e.activo, e.rol
          FROM sesiones s
          JOIN encuestadores e ON e.id = s.id_encuestador
          WHERE s.token_hash = ?'
@@ -99,5 +108,7 @@ function requerirAutenticacion(PDO $pdo): array
     return [
         'id_encuestador' => (int)$sesion['id_encuestador'],
         'nombre' => $sesion['nombre'],
+        // Los endpoints que lo necesiten pueden exigir rol sin otra consulta.
+        'rol' => (string)($sesion['rol'] ?? 'encuestador'),
     ];
 }

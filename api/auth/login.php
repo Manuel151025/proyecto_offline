@@ -6,6 +6,7 @@ require_once __DIR__ . '/../db.php';
 $pdo = conectarBD();
 require_once __DIR__ . '/../auth_token.php';
 require_once __DIR__ . '/../rate_limit.php';
+require_once __DIR__ . '/../esquema.php';
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     responderError(405, 'Método no permitido');
@@ -36,11 +37,15 @@ if (mb_strlen($documento) > 20 || !preg_match('/^[A-Za-z0-9\-]+$/', $documento))
 }
 
 try {
+    // La consulta de abajo lee `rol`; sin esto fallaría contra una base que
+    // todavía no tenga la columna, que es el estado antes del despliegue.
+    asegurarRolEncuestador($pdo);
+
     // Se comprueba antes de tocar la contraseña, y para cualquier documento
     // exista o no, para que el bloqueo no delate qué cuentas son reales.
     exigirLimiteIntentos($pdo, $documento);
 
-    $stmt = $pdo->prepare('SELECT id, nombre, password_hash, activo FROM encuestadores WHERE numero_documento = ?');
+    $stmt = $pdo->prepare('SELECT id, nombre, password_hash, activo, rol FROM encuestadores WHERE numero_documento = ?');
     $stmt->execute([$documento]);
     $encuestador = $stmt->fetch();
 
@@ -64,6 +69,8 @@ try {
             'id' => (int)$encuestador['id'],
             'nombre' => $encuestador['nombre'],
             'numero_documento' => $documento,
+            // El cliente puede adaptar lo que muestra sin consultar otra vez.
+            'rol' => (string)($encuestador['rol'] ?? 'encuestador'),
         ],
     ]);
 } catch (Exception $e) {

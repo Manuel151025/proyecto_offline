@@ -20,10 +20,27 @@ $pdo = conectarBD();
 /** Longitud mínima al crear o cambiar la contraseña de un encuestador. */
 const MIN_LONGITUD_PASSWORD = 10;
 
+/**
+ * MODO ARRANQUE: no existe todavía ninguna cuenta de administrador.
+ *
+ * Solo mientras dura, se acepta la contraseña compartida de ADMIN_PASSWORD,
+ * y sirve únicamente para entrar y crear el primer administrador con nombre.
+ * En cuanto existe uno activo, deja de aceptarse y la variable se puede
+ * borrar del entorno.
+ *
+ * Se apaga sola, que es lo que hace segura la transición: no hay que acordarse
+ * de retirar nada para que el secreto compartido deje de valer.
+ */
+$modoArranque = contarAdminsActivos($pdo) === 0;
 $adminPassword = getenv('ADMIN_PASSWORD');
-if (!$adminPassword) {
+
+if ($modoArranque && !$adminPassword) {
+    // Sin administradores y sin contraseña de arranque no hay forma de entrar.
+    // Se dice explícitamente porque el remedio no es evidente desde fuera.
     http_response_code(500);
-    echo 'ADMIN_PASSWORD no está configurada en el entorno del servidor.';
+    echo 'No hay ninguna cuenta de administrador y ADMIN_PASSWORD no está '
+       . 'configurada. Define ADMIN_PASSWORD en el entorno para poder entrar y '
+       . 'crear la primera cuenta.';
     exit;
 }
 
@@ -40,29 +57,58 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (!$csrfOk) {
         $error = 'Sesión expirada, intenta de nuevo.';
     } elseif ($action === 'login') {
-        // Sin esto el panel se podía probar a contraseñas indefinidamente: la
-        // URL es pública, no pide usuario, y quien entre puede borrar personas.
-        // El contador es global porque el panel tiene un único administrador.
-        $bloqueoRestante = segundosDeBloqueo($pdo, CLAVE_PANEL_ADMIN);
+        $password = (string)($_POST['password'] ?? '');
+        $documento = trim($_POST['numero_documento'] ?? '');
 
-        if ($bloqueoRestante > 0) {
-            $minutos = (int)ceil($bloqueoRestante / 60);
+        // La clave del contador anti fuerza bruta es el documento cuando se
+        // entra con cuenta, y la clave interna del panel en modo arranque,
+        // donde no hay documento que usar.
+        $claveIntentos = $modoArranque ? CLAVE_PANEL_ADMIN : $documento;
+
+        if (!$modoArranque && $documento === '') {
+            $error = 'Escribe tu número de documento';
+        } elseif ($claveIntentos !== '' && ($bloqueo = segundosDeBloqueo($pdo, $claveIntentos)) > 0) {
+            $minutos = (int)ceil($bloqueo / 60);
             $error = "Demasiados intentos fallidos. Espera $minutos minuto(s).";
-        } elseif (hash_equals($adminPassword, $_POST['password'] ?? '')) {
-            // Se cambia el identificador de sesión al elevar privilegios.
-            // Sin esto, quien consiguiera fijar el PHPSESSID de la víctima
-            // antes del login seguiría dentro de la sesión ya autenticada
-            // (fijación de sesión).
-            session_regenerate_id(true);
-            $_SESSION['csrf'] = bin2hex(random_bytes(16));
-            $_SESSION['admin_ok'] = true;
-            // Entrar bien borra el historial: al administrador legítimo no le
-            // debe quedar deuda por unos tecleos mal puestos de ayer.
-            limpiarIntentos($pdo, CLAVE_PANEL_ADMIN);
         } else {
-            registrarIntentoFallido($pdo, CLAVE_PANEL_ADMIN);
-            error_log('[admin] intento de acceso fallido al panel');
-            $error = 'Contraseña incorrecta';
+            // En modo arranque vale la contraseña compartida; con cuentas
+            // creadas, solo documento + contraseña de un administrador activo.
+            $cuenta = null;
+            $entra = false;
+
+            if ($modoArranque) {
+                $entra = hash_equals($adminPassword, $password);
+            } else {
+                $cuenta = buscarAdminPorDocumento($pdo, $documento);
+                // password_verify se ejecuta contra un hash falso cuando la
+                // cuenta no existe, para que responder tarde lo mismo en los
+                // dos casos y no se pueda deducir qué documentos son admin.
+                $hash = $cuenta['password_hash'] ?? '$2y$10$invalidinvalidinvalidinvalidinvalidinvalidinvalidinvalidinv';
+                $entra = password_verify($password, (string)$hash) && $cuenta !== null;
+            }
+
+            if ($entra) {
+                // Se cambia el identificador de sesión al elevar privilegios.
+                // Sin esto, quien consiguiera fijar el PHPSESSID de la víctima
+                // antes del login seguiría dentro de la sesión ya autenticada
+                // (fijación de sesión).
+                session_regenerate_id(true);
+                $_SESSION['csrf'] = bin2hex(random_bytes(16));
+                $_SESSION['admin_ok'] = true;
+                $_SESSION['admin_id'] = $cuenta['id'] ?? null;
+                $_SESSION['admin_nombre'] = $cuenta['nombre'] ?? 'Administrador inicial';
+                // Entrar bien borra el historial: al administrador legítimo no
+                // le debe quedar deuda por unos tecleos mal puestos de ayer.
+                limpiarIntentos($pdo, $claveIntentos);
+            } else {
+                if ($claveIntentos !== '') {
+                    registrarIntentoFallido($pdo, $claveIntentos);
+                }
+                error_log('[admin] intento de acceso fallido al panel');
+                // Mensaje único: no revela si el documento corresponde a un
+                // administrador o si lo que falló fue la contraseña.
+                $error = $modoArranque ? 'Contraseña incorrecta' : 'Credenciales incorrectas';
+            }
         }
     } elseif ($action === 'logout') {
         // Se destruye la sesión entera, no solo la marca de autenticado.
@@ -84,7 +130,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $error = 'Falta el documento de la persona a borrar';
         } else {
             try {
-                $ok = borrarPersona($pdo, $tipo, $numero) ? '1' : '0';
+                // Queda registrado QUIÉN borró, no solo que fue "el panel".
+                // Era imposible antes, cuando la contraseña era compartida.
+                $autor = 'admin:' . ($_SESSION['admin_nombre'] ?? '?');
+                $ok = borrarPersona($pdo, $tipo, $numero, $autor) ? '1' : '0';
                 header('Location: index.php?seccion=personas&borrada=' . $ok);
                 exit;
             } catch (PDOException $e) {
@@ -100,7 +149,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             $error = 'Falta el documento de la persona a restaurar';
         } else {
             try {
-                $ok = restaurarPersona($pdo, $tipo, $numero) ? '1' : '0';
+                $autor = 'admin:' . ($_SESSION['admin_nombre'] ?? '?');
+                $ok = restaurarPersona($pdo, $tipo, $numero, $autor) ? '1' : '0';
                 header('Location: index.php?seccion=personas&borradas=1&restaurada=' . $ok);
                 exit;
             } catch (PDOException $e) {
@@ -114,6 +164,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $documento = trim($_POST['numero_documento'] ?? '');
         $password = (string)($_POST['password'] ?? '');
         $activo = isset($_POST['activo']) ? 1 : 0;
+        $rol = ($_POST['rol'] ?? '') === 'admin' ? 'admin' : 'encuestador';
+
+        // Deja de ser administrador activo tras este guardado, sea porque se
+        // le cambia el rol o porque se le desactiva.
+        $dejaDeSerAdmin = $id !== '' && ($rol !== 'admin' || $activo === 0);
 
         if ($nombre === '' || $documento === '') {
             $error = 'Nombre y número de documento son obligatorios';
@@ -123,20 +178,41 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             // Solo se valida al fijar o cambiar la contraseña: las cuentas
             // existentes no quedan bloqueadas por una regla nueva.
             $error = 'La contraseña debe tener al menos ' . MIN_LONGITUD_PASSWORD . ' caracteres';
+        } elseif ($dejaDeSerAdmin && esUltimoAdminActivo($pdo, (int)$id)) {
+            // Sin esto se puede uno dejar fuera del panel con dos clics, y
+            // recuperarlo exigiría entrar a la base de datos por SSH.
+            $error = 'No puedes quitar el rol de administrador ni desactivar la única cuenta '
+                   . 'de administrador que queda. Crea otra antes.';
         } else {
             try {
+                asegurarRolEncuestador($pdo);
+
                 if ($id !== '') {
                     if ($password !== '') {
-                        $stmt = $pdo->prepare("UPDATE encuestadores SET nombre = ?, numero_documento = ?, password_hash = ?, activo = ? WHERE id = ?");
-                        $stmt->execute([$nombre, $documento, password_hash($password, PASSWORD_BCRYPT), $activo, $id]);
+                        $stmt = $pdo->prepare("UPDATE encuestadores SET nombre = ?, numero_documento = ?, password_hash = ?, activo = ?, rol = ? WHERE id = ?");
+                        $stmt->execute([$nombre, $documento, password_hash($password, PASSWORD_BCRYPT), $activo, $rol, $id]);
                     } else {
-                        $stmt = $pdo->prepare("UPDATE encuestadores SET nombre = ?, numero_documento = ?, activo = ? WHERE id = ?");
-                        $stmt->execute([$nombre, $documento, $activo, $id]);
+                        $stmt = $pdo->prepare("UPDATE encuestadores SET nombre = ?, numero_documento = ?, activo = ?, rol = ? WHERE id = ?");
+                        $stmt->execute([$nombre, $documento, $activo, $rol, $id]);
                     }
                 } else {
-                    $stmt = $pdo->prepare("INSERT INTO encuestadores (nombre, numero_documento, password_hash, activo) VALUES (?, ?, ?, ?)");
-                    $stmt->execute([$nombre, $documento, password_hash($password, PASSWORD_BCRYPT), $activo]);
+                    $stmt = $pdo->prepare("INSERT INTO encuestadores (nombre, numero_documento, password_hash, activo, rol) VALUES (?, ?, ?, ?, ?)");
+                    $stmt->execute([$nombre, $documento, password_hash($password, PASSWORD_BCRYPT), $activo, $rol]);
                 }
+
+                // Si se acaba de crear el primer administrador estando en modo
+                // arranque, la sesión sigue siendo la de la contraseña
+                // compartida. Se cierra para obligar a entrar con la cuenta
+                // nueva: si no, ADMIN_PASSWORD seguiría dando acceso durante
+                // toda esta sesión pese a haber dejado de ser válida.
+                if ($modoArranque && $rol === 'admin' && $activo === 1) {
+                    $_SESSION = [];
+                    session_regenerate_id(true);
+                    $_SESSION['csrf'] = bin2hex(random_bytes(16));
+                    header('Location: index.php?primer_admin=1');
+                    exit;
+                }
+
                 header('Location: index.php?seccion=encuestadores');
                 exit;
             } catch (PDOException $e) {
@@ -188,7 +264,7 @@ if (!in_array($seccion, ['resumen', 'personas', 'encuestadores'], true)) {
 
 $editRow = null;
 if ($loggedIn && isset($_GET['edit'])) {
-    $stmt = $pdo->prepare('SELECT id, nombre, numero_documento, activo FROM encuestadores WHERE id = ?');
+    $stmt = $pdo->prepare('SELECT id, nombre, numero_documento, activo, rol FROM encuestadores WHERE id = ?');
     $stmt->execute([$_GET['edit']]);
     $editRow = $stmt->fetch() ?: null;
     $seccion = 'encuestadores';
@@ -319,10 +395,10 @@ function etiquetaDia(string $dia): string
   .badge.si { background: var(--ok-bg); color: var(--ok); }
   .badge.no { background: var(--error-bg); color: var(--error); }
 
-  input[type=text], input[type=password], input[type=search] {
+  input[type=text], input[type=password], input[type=search], select {
     width: 100%; padding: 9px 11px; font-size: .9rem; font-family: inherit; color: var(--texto);
     border: 1px solid var(--borde); border-radius: 8px; outline: none; background: var(--surface); }
-  input:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(18,70,126,.16); }
+  input:focus, select:focus { border-color: var(--primary); box-shadow: 0 0 0 3px rgba(18,70,126,.16); }
   label.campo { display: block; font-size: .75rem; font-weight: 600; color: var(--texto-2); margin: 0 0 5px; }
   .fila-form { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; margin-bottom: 12px; }
 
@@ -365,11 +441,36 @@ function etiquetaDia(string $dia): string
     </div>
     <div class="panel">
       <?php if ($error): ?><div class="aviso"><?= h($error) ?></div><?php endif; ?>
+
+      <?php if (isset($_GET['primer_admin'])): ?>
+        <div class="aviso ok">
+          Cuenta de administrador creada. Entra con su documento y contraseña.
+          La contraseña compartida ya no sirve, y puedes borrar
+          <strong>ADMIN_PASSWORD</strong> del entorno.
+        </div>
+      <?php endif; ?>
+
+      <?php if ($modoArranque): ?>
+        <div class="aviso">
+          No hay ninguna cuenta de administrador. Entra con la contraseña
+          compartida y crea la primera desde <strong>Encuestadores</strong>.
+          Después dejará de aceptarse.
+        </div>
+      <?php endif; ?>
+
       <form method="post">
         <input type="hidden" name="csrf" value="<?= h($_SESSION['csrf']) ?>">
         <input type="hidden" name="action" value="login">
-        <label class="campo" for="pw">Contraseña de administrador</label>
-        <input type="password" id="pw" name="password" autocomplete="current-password" autofocus>
+
+        <?php if (!$modoArranque): ?>
+          <label class="campo" for="doc">Número de documento</label>
+          <input type="text" id="doc" name="numero_documento" autocomplete="username" autofocus>
+          <div style="height:12px"></div>
+        <?php endif; ?>
+
+        <label class="campo" for="pw">Contraseña<?= $modoArranque ? ' de administrador' : '' ?></label>
+        <input type="password" id="pw" name="password" autocomplete="current-password"
+               <?= $modoArranque ? 'autofocus' : '' ?>>
         <button class="btn" type="submit" style="width:100%;justify-content:center;margin-top:12px">Ingresar</button>
       </form>
     </div>
@@ -382,7 +483,12 @@ function etiquetaDia(string $dia): string
       <div class="logo">+</div>
       <div>
         <h1>Admin · ColOffline</h1>
-        <p class="sub">Ministerio de Salud · Encuestas demográficas</p>
+        <p class="sub">
+          Ministerio de Salud ·
+          <?php // Quién está dentro. Antes no se sabía: la contraseña era
+                // compartida y ninguna acción tenía autor. ?>
+          <strong><?= h($_SESSION['admin_nombre'] ?? 'Administrador') ?></strong>
+        </p>
       </div>
     </div>
     <form method="post">
@@ -395,7 +501,7 @@ function etiquetaDia(string $dia): string
   <nav class="tabs">
     <a href="?seccion=resumen" class="<?= $seccion === 'resumen' ? 'on' : '' ?>">Resumen</a>
     <a href="?seccion=personas" class="<?= $seccion === 'personas' ? 'on' : '' ?>">Personas</a>
-    <a href="?seccion=encuestadores" class="<?= $seccion === 'encuestadores' ? 'on' : '' ?>">Encuestadores</a>
+    <a href="?seccion=encuestadores" class="<?= $seccion === 'encuestadores' ? 'on' : '' ?>">Cuentas</a>
   </nav>
 
   <?php if ($error): ?><div class="aviso"><?= h($error) ?></div><?php endif; ?>
@@ -605,7 +711,16 @@ function etiquetaDia(string $dia): string
   <?php else: ?>
 
     <div class="panel">
-      <h2><?= $editRow ? 'Editar encuestador' : 'Nuevo encuestador' ?></h2>
+      <h2><?= $editRow ? 'Editar cuenta' : 'Nueva cuenta' ?></h2>
+
+      <?php if ($modoArranque): ?>
+        <div class="aviso">
+          Estás dentro con la contraseña compartida. Crea aquí una cuenta con rol
+          <strong>Administrador</strong>: al guardarla, la contraseña compartida
+          dejará de aceptarse y entrarás con documento y contraseña.
+        </div>
+      <?php endif; ?>
+
       <form method="post">
         <input type="hidden" name="csrf" value="<?= h($_SESSION['csrf']) ?>">
         <input type="hidden" name="action" value="save">
@@ -625,12 +740,20 @@ function etiquetaDia(string $dia): string
             </label>
             <input type="password" id="pass" name="password" autocomplete="new-password">
           </div>
+          <div>
+            <label class="campo" for="rol">Rol</label>
+            <?php $rolActual = $editRow['rol'] ?? 'encuestador'; ?>
+            <select id="rol" name="rol">
+              <option value="encuestador" <?= $rolActual === 'encuestador' ? 'selected' : '' ?>>Encuestador</option>
+              <option value="admin" <?= $rolActual === 'admin' ? 'selected' : '' ?>>Administrador</option>
+            </select>
+          </div>
         </div>
         <label style="display:flex;align-items:center;gap:8px;font-size:.85rem;margin-bottom:14px">
           <input type="checkbox" name="activo" <?= (!$editRow || $editRow['activo']) ? 'checked' : '' ?>>
           Cuenta activa
         </label>
-        <button class="btn" type="submit"><?= $editRow ? 'Guardar cambios' : 'Crear encuestador' ?></button>
+        <button class="btn" type="submit"><?= $editRow ? 'Guardar cambios' : 'Crear cuenta' ?></button>
         <?php if ($editRow): ?>
           <a class="btn sec" href="?seccion=encuestadores">Cancelar</a>
         <?php endif; ?>
@@ -639,18 +762,22 @@ function etiquetaDia(string $dia): string
     </div>
 
     <div class="panel">
-      <h2>Encuestadores</h2>
+      <h2>Cuentas</h2>
       <?php if ($encuestadores === []): ?>
-        <div class="vacio">No hay encuestadores registrados.</div>
+        <div class="vacio">No hay cuentas registradas.</div>
       <?php else: ?>
         <table>
-          <thead><tr><th>ID</th><th>Nombre</th><th>Documento</th><th>Estado</th><th></th></tr></thead>
+          <thead><tr><th>ID</th><th>Nombre</th><th>Documento</th><th>Rol</th><th>Estado</th><th></th></tr></thead>
           <tbody>
             <?php foreach ($encuestadores as $e): ?>
               <tr>
                 <td><?= h($e['id']) ?></td>
                 <td><?= h($e['nombre']) ?></td>
                 <td><?= h($e['numero_documento'] ?: '—') ?></td>
+                <td>
+                  <?php $esAdmin = ($e['rol'] ?? 'encuestador') === 'admin'; ?>
+                  <span class="badge <?= $esAdmin ? 'si' : '' ?>"><?= $esAdmin ? 'Administrador' : 'Encuestador' ?></span>
+                </td>
                 <td><span class="badge <?= $e['activo'] ? 'si' : 'no' ?>"><?= $e['activo'] ? 'Activo' : 'Inactivo' ?></span></td>
                 <td style="text-align:right"><a class="btn sec" href="?edit=<?= h($e['id']) ?>">Editar</a></td>
               </tr>

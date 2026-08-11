@@ -180,6 +180,26 @@ jobs:
           fi
           echo "✓ Panel admin con límite de intentos"
 
+      - name: Verificar que el panel admin use cuentas con nombre
+        run: |
+          # La contraseña compartida no deja rastro de QUIÉN hizo qué. El panel
+          # debe validar contra la tabla de cuentas con rol admin.
+          if ! grep -q "buscarAdminPorDocumento" api/admin/index.php; then
+            echo "::error::El panel admin debe autenticar contra cuentas con rol, no solo con ADMIN_PASSWORD."
+            exit 1
+          fi
+          # ADMIN_PASSWORD solo puede valer mientras no exista ningún admin.
+          if ! grep -q "modoArranque" api/admin/index.php; then
+            echo "::error::ADMIN_PASSWORD debe aceptarse solo en modo arranque, o el secreto compartido nunca muere."
+            exit 1
+          fi
+          # Y no debe poder uno dejarse fuera del panel.
+          if ! grep -q "esUltimoAdminActivo" api/admin/index.php; then
+            echo "::error::Hay que impedir quitar el rol o desactivar al último administrador activo."
+            exit 1
+          fi
+          echo "✓ Panel admin con cuentas por rol"
+
       - name: Verificar que la descarga exija token y use el sello del servidor
         run: |
           if ! grep -q "requerirAutenticacion" api/personas/cambios.php; then
