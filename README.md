@@ -1,10 +1,34 @@
 # Sistema de Encuestas - Offline First 📡
 
+Sistema de recolección de datos demográficos para el Ministerio de Salud, diseñado para funcionar en zonas rurales **sin conectividad**. Compuesto por una **app Android nativa**, una **PWA**, una **API REST en PHP** y un **panel de administración web**.
+
+🔗 **Producción:** https://encuestas.manuelcardenas.online/pwa/
+
+## 📚 Documentación
+
+| Documento | Contenido |
+|---|---|
+| [**Arquitectura**](docs/ARQUITECTURA.md) | Diagramas de componentes, despliegue, modelo de datos y flujos · 8 decisiones de arquitectura documentadas |
+| [**Historias de usuario**](docs/HISTORIAS-DE-USUARIO.md) | 34 historias con criterios de aceptación y trazabilidad a código y pruebas |
+| [**API**](docs/API.md) | Referencia de endpoints, parámetros, respuestas y ejemplos |
+| [**Pendientes**](docs/PENDIENTES.md) | Qué falta, por qué, y qué pasa si no se hace |
+
 ## Descripción
 App Android nativa para el Ministerio de Salud, diseñada específicamente para funcionar en entornos rurales sin conectividad. Permite a los encuestadores recopilar y actualizar datos demográficos sin conexión a internet y sincronizarlos automáticamente mediante procesos en background cuando el dispositivo recupera la red.
 
 ## Objetivo
 Garantizar la recolección íntegra de datos sobre el terreno y prevenir la pérdida o duplicación de información frente a concurrencia, resolviendo conflictos de manera autónoma.
+
+## De un vistazo
+
+| | |
+|---|---|
+| **Clientes** | Android nativo (Kotlin · Compose · Room) · PWA (JavaScript sin framework · IndexedDB) |
+| **Backend** | PHP 8 sin framework · MySQL 8.4 |
+| **Sincronización** | Bidireccional, por lotes, con Outbox y Last-Write-Wins |
+| **Pruebas** | 105 automatizadas — 68 Android (JVM) + 37 PWA |
+| **CI** | 3 trabajos · PHPStan nivel 8 · Android Lint · guardas de regresión |
+| **Despliegue** | Dokploy sobre Docker Swarm · TLS con acme.sh |
 
 ## Arquitectura
 El proyecto respeta rigurosamente **Clean Architecture**:
@@ -17,60 +41,23 @@ El proyecto respeta rigurosamente **Clean Architecture**:
 Dos clientes independientes escriben contra la misma API. Cada uno tiene su propia base local y su propia cola, porque ambos deben funcionar sin conexión.
 
 ```mermaid
-graph TB
-    subgraph Android["📱 App Android (Kotlin)"]
-        direction TB
-        AP["Presentation<br/><i>Compose · ViewModels</i><br/>Sin lógica de negocio"]
-        AD["Domain<br/><i>14 casos de uso · Result&lt;T&gt;</i><br/>Kotlin puro, sin framework"]
-        ADA["Data<br/><i>Repositorios · Mappers</i>"]
-        ARoom[("Room<br/><i>SQLite local</i>")]
-        AW["SyncWorker<br/><i>WorkManager</i>"]
-        AP --> AD
-        ADA -.implementa.-> AD
-        ADA --> ARoom
-        AW --> AD
-    end
+graph LR
+    AND["📱 Android<br/><i>Room · WorkManager</i>"]
+    PWA["🌐 PWA<br/><i>IndexedDB · SW</i>"]
+    API["⚙️ API PHP<br/><i>sync · cambios · auth</i>"]
+    DB[("🗄️ MySQL")]
+    ADM["🖥️ Panel admin"]
 
-    subgraph PWA["🌐 PWA (JavaScript)"]
-        direction TB
-        PS["Pantallas<br/><i>login · lista · formulario · sync</i>"]
-        PSync["sync.js<br/><i>Cola de reintentos</i>"]
-        PIDB[("IndexedDB<br/><i>personas · cola · credenciales</i>")]
-        PSW["Service Worker<br/><i>Caché offline</i>"]
-        PS --> PSync
-        PS --> PIDB
-        PSync --> PIDB
-    end
+    AND ==>|"sube y baja<br/>Bearer"| API
+    PWA ==>|"sube y baja<br/>Bearer"| API
+    API --> DB
+    ADM --> DB
 
-    subgraph API["⚙️ API REST (PHP)"]
-        direction TB
-        CORS["cors.php<br/><i>Lista blanca de orígenes</i>"]
-        AUTH["auth_token.php<br/><i>Emite y valida tokens</i>"]
-        LOGIN["auth/login.php<br/><i>bcrypt → token</i>"]
-        SYNC["personas/sync.php<br/><i>Valida · LWW · transacción</i>"]
-        MUNI["municipios/index.php"]
-        ADMIN["admin/index.php<br/><i>Panel · CSRF</i>"]
-        LOGIN --> AUTH
-        SYNC --> AUTH
-    end
-
-    DB[("🗄️ MySQL<br/><i>personas · encuestas<br/>encuestadores · sesiones</i>")]
-
-    AW -->|"HTTPS + Bearer"| SYNC
-    ADA -->|"login"| LOGIN
-    PSync -->|"HTTPS + Bearer"| SYNC
-    PS -->|"login"| LOGIN
-
-    LOGIN --> DB
-    SYNC --> DB
-    MUNI --> DB
-    ADMIN --> DB
-
-    style AD fill:#1B7A4B,color:#fff
-    style AUTH fill:#B3261E,color:#fff
-    style SYNC fill:#B3261E,color:#fff
+    style API fill:#12467E,color:#fff
     style DB fill:#12467E,color:#fff
 ```
+
+> **[Ver el diagrama de componentes completo →](docs/ARQUITECTURA.md#2-diagrama-de-componentes)** con las capas internas de cada cliente, el diagrama de despliegue y el modelo entidad-relación.
 
 **Reglas que sostienen el diseño:**
 
@@ -79,7 +66,7 @@ graph TB
 | `Domain` (Android) | Reglas de negocio y validaciones | No conoce Room, Retrofit ni Android |
 | `Data` (Android) | Persistencia y red; implementa las interfaces del dominio | No decide reglas de negocio |
 | `SyncWorker` | Reintentos con backoff cuando hay red | No transforma datos |
-| `auth_token.php` | Emitir y validar tokens | No autoriza por rol (no hay roles) |
+| `auth_token.php` | Emitir y validar tokens; resolver el rol | No decide qué puede hacer cada rol |
 | `sync.php` | Validar payload, resolver LWW, transacción atómica | No confía en el `id_encuestador` del cliente |
 | Service Worker | Servir la app sin conexión | No cachea `/api/` |
 
@@ -210,6 +197,10 @@ Los intentos se registran **exista o no el documento**, para que el bloqueo no d
 
 > La tabla `intentos_login` se crea sola la primera vez que se necesita, porque el despliegue de producción no tiene acceso SSH. `database/migrations/004_intentos_login.sql` deja el esquema versionado por si se prefiere crearla por adelantado.
 
+El **panel de administración** aplica el mismo límite. Estando bloqueado, incluso la contraseña correcta se rechaza: el corte ocurre antes de compararla, o el límite sería decorativo.
+
+> El contador del panel se guarda bajo la clave `#admin`, imposible de producir desde fuera porque `login.php` solo admite documentos con `[A-Za-z0-9-]`. Las dos cosas van juntas: si se relaja esa validación, un cliente podría bloquear el panel sin tocarlo. Hay una guarda de CI que lo impide.
+
 ### Política de contraseñas
 El panel `/api/admin` exige **mínimo 10 caracteres** al crear una cuenta o cambiar su contraseña. La regla se aplica solo al fijarla, de modo que las cuentas existentes no quedan bloqueadas retroactivamente.
 
@@ -217,7 +208,8 @@ El panel `/api/admin` exige **mínimo 10 caracteres** al crear una cuenta o camb
 - Consultas con **PDO preparado** y `EMULATE_PREPARES => false`.
 - Los mensajes de excepción van al log del servidor, nunca al cliente.
 - El payload de sincronización se valida y normaliza campo por campo antes de abrir la transacción, con un tope de 500 registros por lote.
-- El panel `/api/admin` usa token **CSRF** y contraseña por variable de entorno.
+- El panel `/api/admin` usa token **CSRF**, cookie `HttpOnly; SameSite=Strict; Secure` y regenera el identificador de sesión al autenticar (fijación de sesión).
+- El panel autentica contra **cuentas con rol**, no contra una contraseña compartida: cada acción administrativa queda con autor. Ver [Roles](#roles).
 - En builds de release no se registran los cuerpos HTTP y la cabecera `Authorization` va redactada.
 
 ## Variables de Entorno
@@ -232,13 +224,14 @@ Copiar `.env.example` a `.env` y completar:
 
 ## Pruebas
 ```bash
-./gradlew testDebugUnitTest       # 38 pruebas unitarias JVM
+./gradlew testDebugUnitTest       # 68 pruebas unitarias JVM
+node --test pwa/tests/*.test.mjs  # 37 pruebas de la PWA
 node scripts/check-pwa-assets.mjs # integridad del caché offline de la PWA
 ```
 
 **Android** cubre autenticación (`AuthRepositoryImplTest`), sincronización por lotes (`SyncRepositoryImplTest`), reglas de negocio y persistencia (`GuardarRegistroCompletoUseCaseTest`, `EliminarPersonaUseCaseTest`), validaciones (`ValidacionesTest`, `GuardarPersonaUseCaseTest`), estado de la interfaz (`ListaPersonasViewModelTest`) y manejo de errores (`SincronizarPendientesUseCaseTest`).
 
-**PWA** usa el runner nativo de Node, sin dependencias que instalar. Cubre la conversión de fechas y la vigencia del token. Las pruebas de fecha se ejecutan en dos husos horarios (`America/Bogota` y `Asia/Tokyo`) porque el fallo que las motivó —la fecha de nacimiento corriéndose un día en cada edición— solo aparecía con desfase negativo respecto a UTC.
+**PWA** usa el runner nativo de Node, sin dependencias que instalar. Cubre la conversión de fechas, la vigencia del token, la regla de mezcla al descargar (`mezcla.test.mjs`) y el reparto entre aceptado y rechazado tras un envío parcial (`reparto.test.mjs`). Las pruebas de fecha se ejecutan en dos husos horarios (`America/Bogota` y `Asia/Tokyo`) porque el fallo que las motivó —la fecha de nacimiento corriéndose un día en cada edición— solo aparecía con desfase negativo respecto a UTC.
 
 `check-pwa-assets.mjs` verifica que todo archivo listado en `pwa/sw.js` exista y que los recursos de `index.html` estén cacheados. Sin esa comprobación, dividir o renombrar un archivo rompe la app **sin conexión** — un fallo invisible al probar en línea.
 
@@ -263,9 +256,27 @@ Al tocar cualquier hoja hay que **subir la versión de `CACHE` en `pwa/sw.js`**:
 ## Integración Continua
 `.github/workflows/ci.yml` se ejecuta en cada push y pull request a `main`:
 
-- **android**: pruebas unitarias + `assembleDebug` sobre JDK 17, publicando el reporte de pruebas.
-- **php**: valida la sintaxis de todos los archivos de `api/` y falla si reaparece un CORS permisivo o si `sync.php` deja de exigir autenticación.
-- **pwa**: verifica la integridad del caché offline.
+- **android**: pruebas unitarias, **Android Lint**, cobertura con **JaCoCo** y `assembleDebug` sobre JDK 17, publicando el reporte.
+- **php**: sintaxis de todos los archivos de `api/` y **PHPStan nivel 8**, más las guardas de abajo.
+- **pwa**: pruebas con el runner de Node y verificación de la integridad del caché offline.
+
+**Guardas de regresión.** CI no solo comprueba que las pruebas pasen: falla si vuelve a aparecer un fallo ya corregido. Cada una nació de un problema real.
+
+| La compilación falla si… | Porque… |
+|---|---|
+| Reaparece `Access-Control-Allow-Origin: *` | Cualquier sitio podría llamar a la API desde el navegador |
+| `sync.php` deja de exigir token | Cualquiera con `curl` podría insertar registros |
+| `cambios.php` deja de exigir token | Expondría los datos de todos los dispositivos |
+| La descarga filtra por `updated_at` | Las filas de un teléfono con el reloj atrasado no se descargarían nunca |
+| `sync.php` deja de validar el documento | En producción llegó a colarse una persona con documento `"hola"` |
+| Las validaciones vuelven a abortar el lote entero | Un registro irreparable bloqueaba la cola de un encuestador para siempre |
+| El borrado de personas pasa a ser `DELETE` | Los dispositivos que ya la descargaron se la quedarían para siempre |
+| Desaparece el límite de intentos del panel | La URL es pública y no pedía usuario |
+| `login.php` deja de validar el formato del documento | Se podría bloquear el panel desde fuera |
+| El panel deja de usar cuentas con rol | Ninguna acción administrativa tendría autor |
+| Se puede quitar el rol al último administrador | Uno se dejaría fuera sin forma de volver a entrar |
+
+Además, **Dependabot** vigila las dependencias de Gradle, Composer y las acciones de GitHub.
 
 ## Estructura del Proyecto
 ```
@@ -323,7 +334,10 @@ No es posible quitarse el rol ni desactivarse siendo el único administrador act
 ## Estado Actual del Proyecto
 - **Android**: Scaffolding, Data, Domain, UseCases, Repositorios, ViewModels, UI Compose, WorkManager Sync completados.
 - **Backend/DB**: Completados Scripts DDL y Endpoints de resolución de conflictos.
-- **Calidad**: 69 pruebas automatizadas (50 Android + 19 PWA), integración continua en GitHub Actions y autenticación por token en los endpoints de escritura.
+- **Calidad**: 105 pruebas automatizadas (68 Android + 37 PWA), PHPStan nivel 8, Android Lint, cobertura con JaCoCo y guardas de regresión en CI.
+- **Seguridad**: autenticación por token con revocación, cuentas por rol, límite de intentos en API y panel, CORS por lista blanca.
+
+El detalle de lo que falta y por qué está en [docs/PENDIENTES.md](docs/PENDIENTES.md).
 
 ## Licencia
 Distribuido bajo licencia MIT. Ver [LICENSE](LICENSE).
