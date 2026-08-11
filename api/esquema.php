@@ -59,3 +59,45 @@ function asegurarServerUpdatedAt(PDO $pdo): void
 
     $verificado = true;
 }
+
+/**
+ * Añade la columna `rol` a encuestadores si falta.
+ *
+ * Antes había dos sistemas de autenticación sin relación: los encuestadores
+ * contra esta tabla, y el panel contra una única contraseña compartida en
+ * ADMIN_PASSWORD. Eso significaba que el panel no sabía QUIÉN entraba, así que
+ * ninguna acción administrativa tenía autor.
+ *
+ * Se usa el mismo patrón de comprobación por information_schema que
+ * asegurarServerUpdatedAt, y por el mismo motivo: permite desplegar sin acceso
+ * SSH a la base.
+ *
+ * El valor por defecto es 'encuestador' a propósito. Las cuentas que ya existen
+ * se crearon para trabajo de campo, y darles rol de administrador al migrar
+ * convertiría a toda la plantilla en administradores de golpe.
+ */
+function asegurarRolEncuestador(PDO $pdo): void
+{
+    static $verificado = false;
+    if ($verificado) {
+        return;
+    }
+
+    $stmt = $pdo->prepare(
+        'SELECT COUNT(*) FROM information_schema.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE()
+           AND TABLE_NAME = ?
+           AND COLUMN_NAME = ?'
+    );
+    $stmt->execute(['encuestadores', 'rol']);
+
+    if ((int)$stmt->fetchColumn() === 0) {
+        $pdo->exec(
+            "ALTER TABLE encuestadores
+                ADD COLUMN rol ENUM('encuestador', 'admin') NOT NULL DEFAULT 'encuestador'"
+        );
+        error_log('[esquema] columna rol creada automáticamente en encuestadores');
+    }
+
+    $verificado = true;
+}

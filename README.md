@@ -227,7 +227,7 @@ Copiar `.env.example` a `.env` y completar:
 |---|---|
 | `DB_PASS` | Contraseña del usuario de la base de datos |
 | `MYSQL_ROOT_PASS` | Contraseña root de MySQL |
-| `ADMIN_PASSWORD` | Acceso al panel `/api/admin` |
+| `ADMIN_PASSWORD` | **Solo para el arranque.** Permite entrar al panel mientras no exista ninguna cuenta con rol `admin`, para poder crear la primera. En cuanto existe una, deja de aceptarse y la variable se puede borrar del entorno. |
 | `ALLOWED_ORIGINS` | Orígenes autorizados para CORS, separados por comas y sin barra final |
 
 ## Pruebas
@@ -297,14 +297,28 @@ Las instalaciones nuevas obtienen todo desde `database/schema.sql`, que solo se 
 
 **Con acceso a la base de datos:**
 ```bash
-docker exec -i encuestas_offline_db mysql -u root -p minsalud_encuestas < database/migrations/003_sesiones.sql
+docker exec -i $(docker ps --format '{{.Names}}' | grep offlinedb) \
+  mysql -u root -p minsalud_encuestas < database/migrations/003_sesiones.sql
 ```
 
-**Sin acceso SSH (despliegue por Dokploy):** abrir `https://TU_DOMINIO/api/setup/migrate.php` en el navegador e ingresar la contraseña de `ADMIN_PASSWORD` en el formulario. El endpoint es idempotente y aplica las migraciones 002 y 003 más la cuenta de prueba.
+> El nombre del contenedor se obtiene con `docker ps` porque Dokploy despliega sobre Docker Swarm y le añade un sufijo que **cambia en cada despliegue**. Los nombres fijos del `docker-compose.yml` de este repositorio no son los que corren en producción.
 
-> El SQL va embebido en `migrate.php` porque `.dockerignore` excluye `database/` de la imagen — si no lo hiciera, los `.sql` quedarían descargables por HTTP desde el docroot.
->
-> **Borrar `api/setup/migrate.php` y volver a desplegar** una vez aplicada la migración. Es un endpoint administrativo; no debe quedar expuesto de forma permanente.
+**Sin acceso SSH:** los cambios de esquema posteriores se aplican solos. `api/esquema.php` comprueba contra `information_schema` si falta una columna y la crea en la primera petición que la necesite (`server_updated_at` en `personas`, `rol` en `encuestadores`). No hay endpoint de migración que exponer ni que recordar borrar.
+
+## Roles
+
+La tabla `encuestadores` tiene una columna `rol` con dos valores:
+
+| Rol | Qué puede hacer |
+|---|---|
+| `encuestador` | Iniciar sesión en la PWA y en la app de Android, registrar y sincronizar encuestas. Por defecto. |
+| `admin` | Todo lo anterior, y además entrar al panel `/api/admin` con su documento y contraseña. |
+
+El panel valida contra esta tabla, no contra una contraseña compartida, de modo que cada acción administrativa queda con autor: al borrar una persona, `device_id` guarda `admin:<nombre>`.
+
+**Primera puesta en marcha:** define `ADMIN_PASSWORD`, entra al panel con ella, y crea desde *Cuentas* una cuenta con rol Administrador. Al guardarla se cierra la sesión, la contraseña compartida deja de aceptarse y ya puedes retirar la variable del entorno.
+
+No es posible quitarse el rol ni desactivarse siendo el único administrador activo: el panel lo rechaza, porque recuperarse de eso exigiría entrar a la base de datos a mano.
 
 ## Estado Actual del Proyecto
 - **Android**: Scaffolding, Data, Domain, UseCases, Repositorios, ViewModels, UI Compose, WorkManager Sync completados.
