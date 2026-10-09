@@ -109,6 +109,35 @@ function asegurarTablasSincronizacion(PDO $pdo): void
 }
 
 /**
+ * Crea la tabla de auditoría del panel si falta.
+ *
+ * Antes, de una acción de administración solo quedaba "admin:<nombre>" en el
+ * device_id de la persona, y la siguiente sincronización lo sobrescribía. No
+ * había forma de saber quién borró, restauró o editó qué, ni cuándo.
+ */
+function asegurarTablaAuditoria(PDO $pdo): void
+{
+    static $verificado = false;
+    if ($verificado) {
+        return;
+    }
+    $pdo->exec(
+        'CREATE TABLE IF NOT EXISTS auditoria_admin (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            id_admin INT NULL,
+            nombre_admin VARCHAR(100) NOT NULL,
+            accion VARCHAR(40) NOT NULL,
+            objeto VARCHAR(80) NOT NULL,
+            detalle TEXT NULL,
+            creado_en BIGINT NOT NULL,
+            INDEX idx_auditoria_fecha (creado_en),
+            INDEX idx_auditoria_objeto (objeto)
+        )'
+    );
+    $verificado = true;
+}
+
+/**
  * Registra que un celular se comunicó con el servidor.
  *
  * El identificador llega en la cabecera X-Device-Id; si falta (clientes

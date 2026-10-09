@@ -426,6 +426,7 @@ ul, ol { list-style: none; }
 .tabla .acciones { text-align: right; white-space: nowrap; }
 .tabla .apagado { color: var(--texto-3); }
 .tabla-compacta th, .tabla-compacta td { padding: 7px 12px; }
+.tabla-densa th, .tabla-densa td { padding-left: 10px; padding-right: 10px; }
 
 /* Sin cortar: en pantallas estrechas la tabla se desplaza en horizontal antes
    que partir un nombre en tres líneas. */
@@ -507,6 +508,83 @@ ul, ol { list-style: none; }
 .form-cuenta .tarjeta-cuerpo { display: flex; flex-direction: column; gap: 16px; }
 .form-cuenta .campo + .campo { margin-top: 0; }
 .form-acciones { display: flex; flex-wrap: wrap; gap: 8px; padding-top: 4px; }
+
+/* ======================================================= Filtros de personas */
+
+.filtros { border-bottom: 1px solid var(--divisor); }
+.filtros summary {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 10px 16px; cursor: pointer;
+  font-size: 0.85rem; font-weight: 600; color: var(--primary);
+}
+.filtros summary:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+.filtros-campos {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 180px), 1fr));
+  gap: 12px; padding: 0 16px 16px; align-items: end;
+}
+.filtros-campos .campo + .campo { margin-top: 0; }
+.filtros-acciones { display: flex; gap: 8px; flex-wrap: wrap; }
+
+.celda-enlace { color: var(--texto); text-decoration: none; }
+.celda-enlace:hover { color: var(--primary); text-decoration: underline; }
+.celda-codigo { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 0.8rem; font-weight: 500; }
+.celda-motivo { min-width: 220px; color: var(--texto); }
+
+/* ========================================================= Ficha de persona */
+
+.volver-lista {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 0.85rem; font-weight: 600; text-decoration: none; width: max-content;
+}
+.volver-lista:hover { text-decoration: underline; }
+
+.ficha-cabecera {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;
+  gap: 16px; padding: 20px;
+}
+.ficha-identidad { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.ficha-identidad h2 { font-size: 1.2rem; font-weight: 700; line-height: 1.25; }
+.ficha-identidad p { font-size: 0.85rem; color: var(--texto-2); margin-top: 2px; }
+.avatar-grande { width: 48px; height: 48px; font-size: 1rem; }
+.ficha-acciones { display: flex; flex-wrap: wrap; gap: 8px; }
+.ficha-acciones form { margin: 0; }
+
+.datos-persona { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 200px), 1fr)); gap: 14px 20px; }
+.datos-persona dt { font-size: 0.75rem; font-weight: 600; color: var(--texto-2); }
+.datos-persona dd { margin-top: 2px; font-size: 0.9rem; word-break: break-word; }
+
+.rejilla-campos { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr)); gap: 14px 16px; }
+.rejilla-campos .campo + .campo { margin-top: 0; }
+.form-persona { display: flex; flex-direction: column; gap: 16px; }
+
+/* Línea de tiempo: historial de encuestas y cambios del panel. */
+.linea-tiempo { display: flex; flex-direction: column; }
+.linea-tiempo li { position: relative; display: grid; grid-template-columns: 14px minmax(0, 1fr); gap: 12px; padding-bottom: 16px; }
+.linea-tiempo li:not(:last-child)::before {
+  content: ''; position: absolute; left: 6px; top: 14px; bottom: 0;
+  border-left: 2px solid var(--divisor);
+}
+.linea-punto { width: 14px; height: 14px; margin-top: 3px; border-radius: 50%; background: var(--surface); border: 3px solid var(--primary); }
+.linea-titulo { font-size: 0.875rem; font-weight: 600; }
+.linea-meta { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; font-size: 0.78rem; color: var(--texto-2); margin-top: 2px; }
+.linea-detalle { font-size: 0.8rem; color: var(--texto); margin-top: 4px; }
+
+/* ============================================ Monitor y seguridad de cuentas */
+
+.cifras-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.cifra-alerta { color: var(--advertencia); }
+.estado-alerta { color: var(--advertencia); }
+.estado-alerta::before { background: var(--advertencia); }
+
+.seguridad-cuenta { border-top: 1px solid var(--divisor); display: flex; flex-direction: column; gap: 10px; }
+.seguridad-cuenta h3 { font-size: 0.9rem; font-weight: 700; }
+.seguridad-cuenta form { margin: 0; }
+
+@media (max-width: 760px) {
+  .cifras-3 { grid-template-columns: minmax(0, 1fr); }
+  .cifras-3 .cifra { border-left: 0; border-top: 1px solid var(--divisor); }
+  .cifras-3 .cifra:first-child { border-top: 0; }
+}
 
 /* ============================================================ Adaptación */
 

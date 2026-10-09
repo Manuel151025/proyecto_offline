@@ -81,26 +81,57 @@ function resumenGeneral(PDO $pdo): array
  * tabla entera. El carácter de escape es '!' y no la barra invertida, cuyo
  * comportamiento depende del sql_mode del servidor.
  *
- * @return array{0: string, 1: list<string>}
+ * Los filtros (departamento o municipio, encuestador y rango de fechas de la
+ * última actualización) se suman a la búsqueda. Filtrar por encuestador mira
+ * TODAS las encuestas de la persona: quien la registró o la actualizó.
+ *
+ * @param array{departamento?: string, municipio?: string, encuestador?: int, desde?: int, hasta?: int} $filtros
+ * @return array{0: string, 1: list<string|int>}
  */
-function filtroPersonas(string $busqueda, bool $borradas): array
+function filtroPersonas(string $busqueda, bool $borradas, array $filtros = []): array
 {
     $where = $borradas ? 'p.deleted_at IS NOT NULL' : 'p.deleted_at IS NULL';
-    if ($busqueda === '') {
-        return [$where, []];
+    $params = [];
+
+    if ($busqueda !== '') {
+        $like = '%' . strtr($busqueda, ['!' => '!!', '%' => '!%', '_' => '!_']) . '%';
+        $where .= " AND (CONCAT_WS(' ', p.nombres, p.apellidos) LIKE ? ESCAPE '!'"
+                . " OR p.numero_documento LIKE ? ESCAPE '!')";
+        $params[] = $like;
+        $params[] = $like;
+    }
+    if (($filtros['municipio'] ?? '') !== '') {
+        $where .= ' AND p.municipio_codigo = ?';
+        $params[] = $filtros['municipio'];
+    } elseif (($filtros['departamento'] ?? '') !== '') {
+        $where .= ' AND p.municipio_codigo IN (SELECT codigo FROM municipios WHERE departamento = ?)';
+        $params[] = $filtros['departamento'];
+    }
+    if (!empty($filtros['encuestador'])) {
+        $where .= ' AND EXISTS (SELECT 1 FROM encuestas en WHERE en.tipo_documento = p.tipo_documento'
+                . ' AND en.numero_documento = p.numero_documento AND en.id_encuestador = ?)';
+        $params[] = $filtros['encuestador'];
+    }
+    if (!empty($filtros['desde'])) {
+        $where .= ' AND p.updated_at >= ?';
+        $params[] = $filtros['desde'];
+    }
+    if (!empty($filtros['hasta'])) {
+        $where .= ' AND p.updated_at < ?';
+        $params[] = $filtros['hasta'];
     }
 
-    $like = '%' . strtr($busqueda, ['!' => '!!', '%' => '!%', '_' => '!_']) . '%';
-    $where .= " AND (CONCAT_WS(' ', p.nombres, p.apellidos) LIKE ? ESCAPE '!'"
-            . " OR p.numero_documento LIKE ? ESCAPE '!')";
-
-    return [$where, [$like, $like]];
+    return [$where, $params];
 }
 
-/** Total de personas que coinciden con la búsqueda, para paginar. */
-function contarPersonas(PDO $pdo, string $busqueda = '', bool $borradas = false): int
+/**
+ * Total de personas que coinciden con la búsqueda, para paginar.
+ *
+ * @param array{departamento?: string, municipio?: string, encuestador?: int, desde?: int, hasta?: int} $filtros
+ */
+function contarPersonas(PDO $pdo, string $busqueda = '', bool $borradas = false, array $filtros = []): int
 {
-    [$where, $params] = filtroPersonas($busqueda, $borradas);
+    [$where, $params] = filtroPersonas($busqueda, $borradas, $filtros);
 
     $stmt = $pdo->prepare("SELECT COUNT(*) FROM personas p WHERE $where");
     $stmt->execute($params);
@@ -110,6 +141,7 @@ function contarPersonas(PDO $pdo, string $busqueda = '', bool $borradas = false)
 /**
  * Personas registradas, con el municipio resuelto a nombre.
  *
+ * @param array{departamento?: string, municipio?: string, encuestador?: int, desde?: int, hasta?: int} $filtros
  * @return array<int, array<string, mixed>>
  */
 function consultarPersonas(
@@ -117,7 +149,8 @@ function consultarPersonas(
     string $busqueda = '',
     int $limite = 25,
     int $desde = 0,
-    bool $borradas = false
+    bool $borradas = false,
+    array $filtros = []
 ): array {
     // LIMIT y OFFSET no admiten parámetros en todas las versiones de MySQL con
     // EMULATE_PREPARES desactivado, así que se fuerzan a entero y se
@@ -125,7 +158,7 @@ function consultarPersonas(
     $limite = max(1, min(200, $limite));
     $desde  = max(0, $desde);
 
-    [$where, $params] = filtroPersonas($busqueda, $borradas);
+    [$where, $params] = filtroPersonas($busqueda, $borradas, $filtros);
     // En la papelera interesa lo último que se borró, no lo último editado.
     $orden = $borradas ? 'p.deleted_at DESC' : 'p.updated_at DESC';
 
@@ -260,14 +293,17 @@ function encuestasPorEncuestador(PDO $pdo, int $limite = 8): array
 }
 
 /**
- * Todas las personas para exportar a CSV. Sin paginar: el archivo se descarga
- * entero, y el volumen esperado (miles, no millones) lo permite.
+ * Personas activas para exportar a CSV, con la MISMA búsqueda y filtros que
+ * la tabla: antes se exportaba todo aunque se estuviera viendo un filtro.
+ * Sin paginar: el volumen esperado (miles, no millones) lo permite.
  *
+ * @param array{departamento?: string, municipio?: string, encuestador?: int, desde?: int, hasta?: int} $filtros
  * @return array<int, array<string, mixed>>
  */
-function personasParaExportar(PDO $pdo): array
+function personasParaExportar(PDO $pdo, string $busqueda = '', array $filtros = []): array
 {
-    $stmt = $pdo->query(
+    [$where, $params] = filtroPersonas($busqueda, false, $filtros);
+    $stmt = $pdo->prepare(
         "SELECT p.tipo_documento, p.numero_documento, p.nombres, p.apellidos,
                 p.fecha_nacimiento, p.telefono, p.email, p.direccion, p.vereda,
                 p.eps, p.ocupacion, p.estrato,
@@ -275,10 +311,11 @@ function personasParaExportar(PDO $pdo): array
                 p.updated_at, p.device_id
          FROM personas p
          LEFT JOIN municipios m ON m.codigo = p.municipio_codigo
-         WHERE p.deleted_at IS NULL
+         WHERE $where
          ORDER BY p.apellidos, p.nombres"
     );
-    return $stmt === false ? [] : $stmt->fetchAll();
+    $stmt->execute($params);
+    return $stmt->fetchAll();
 }
 
 /**
@@ -447,4 +484,248 @@ function esUltimoAdminActivo(PDO $pdo, int $id): bool
 function revocarSesionesApi(PDO $pdo, int $idCuenta): void
 {
     $pdo->prepare('DELETE FROM sesiones WHERE id_encuestador = ?')->execute([$idCuenta]);
+}
+
+// --- Ficha de persona --------------------------------------------------------
+
+/**
+ * Una persona con todos sus campos (activa o borrada).
+ *
+ * @return array<string, mixed>|null
+ */
+function buscarPersonaCompleta(PDO $pdo, string $tipo, string $numero): ?array
+{
+    $stmt = $pdo->prepare(
+        'SELECT p.*, m.nombre AS municipio, m.departamento
+           FROM personas p
+           LEFT JOIN municipios m ON m.codigo = p.municipio_codigo
+          WHERE p.tipo_documento = ? AND p.numero_documento = ?'
+    );
+    $stmt->execute([$tipo, $numero]);
+    return $stmt->fetch() ?: null;
+}
+
+/**
+ * Historial de encuestas de una persona: quién, cuándo, qué acción y desde
+ * qué celular. La tabla `encuestas` es el registro de trazabilidad y hasta
+ * ahora no se mostraba en ninguna parte.
+ *
+ * @return array<int, array<string, mixed>>
+ */
+function encuestasDePersona(PDO $pdo, string $tipo, string $numero): array
+{
+    $stmt = $pdo->prepare(
+        "SELECT en.id, en.fecha_encuesta, en.accion, en.device_id, en.server_sync_time,
+                COALESCE(e.nombre, CONCAT('Cuenta #', en.id_encuestador)) AS encuestador
+           FROM encuestas en
+           LEFT JOIN encuestadores e ON e.id = en.id_encuestador
+          WHERE en.tipo_documento = ? AND en.numero_documento = ?
+          ORDER BY en.fecha_encuesta DESC"
+    );
+    $stmt->execute([$tipo, $numero]);
+    return $stmt->fetchAll();
+}
+
+/**
+ * Edita una persona desde el panel.
+ *
+ * Sella `updated_at` y `server_updated_at` con la hora del servidor, igual que
+ * el borrado, para que la edición gane por Last-Write-Wins y se descargue en
+ * todos los celulares.
+ *
+ * @param array<string, mixed> $datos campos ya validados
+ */
+function actualizarPersonaDesdePanel(PDO $pdo, string $tipo, string $numero, array $datos, string $autor): bool
+{
+    asegurarServerUpdatedAt($pdo);
+    $ahora = (int)round(microtime(true) * 1000);
+
+    $stmt = $pdo->prepare(
+        'UPDATE personas
+            SET nombres = ?, apellidos = ?, fecha_nacimiento = ?, telefono = ?, email = ?,
+                direccion = ?, vereda = ?, eps = ?, ocupacion = ?, estrato = ?, municipio_codigo = ?,
+                updated_at = ?, server_updated_at = ?, device_id = ?
+          WHERE tipo_documento = ? AND numero_documento = ?'
+    );
+    $stmt->execute([
+        $datos['nombres'], $datos['apellidos'], $datos['fecha_nacimiento'], $datos['telefono'], $datos['email'],
+        $datos['direccion'], $datos['vereda'], $datos['eps'], $datos['ocupacion'], $datos['estrato'],
+        $datos['municipio_codigo'], $ahora, $ahora, mb_substr($autor, 0, 50), $tipo, $numero,
+    ]);
+    return $stmt->rowCount() > 0;
+}
+
+/**
+ * Municipios para los filtros y el formulario de edición.
+ *
+ * @return array<int, array<string, mixed>>
+ */
+function listarMunicipios(PDO $pdo): array
+{
+    $stmt = $pdo->query('SELECT codigo, nombre, departamento FROM municipios ORDER BY departamento, nombre');
+    return $stmt === false ? [] : $stmt->fetchAll();
+}
+
+/**
+ * Cuentas que pueden aparecer en el filtro de encuestador.
+ *
+ * @return array<int, array<string, mixed>>
+ */
+function encuestadoresParaFiltro(PDO $pdo): array
+{
+    asegurarRolEncuestador($pdo);
+    $stmt = $pdo->query(
+        "SELECT e.id, e.nombre FROM encuestadores e
+          WHERE e.rol = 'encuestador' OR EXISTS (SELECT 1 FROM encuestas en WHERE en.id_encuestador = e.id)
+          ORDER BY e.nombre"
+    );
+    return $stmt === false ? [] : $stmt->fetchAll();
+}
+
+// --- Auditoría ---------------------------------------------------------------
+
+/**
+ * Deja constancia de una acción de administración.
+ *
+ * Nunca debe impedir la acción: si el registro falla, se anota en el log.
+ *
+ * @param array<string, mixed>|null $detalle
+ */
+function registrarAuditoria(PDO $pdo, ?int $idAdmin, string $nombreAdmin, string $accion, string $objeto, ?array $detalle = null): void
+{
+    try {
+        asegurarTablaAuditoria($pdo);
+        $pdo->prepare(
+            'INSERT INTO auditoria_admin (id_admin, nombre_admin, accion, objeto, detalle, creado_en)
+             VALUES (?, ?, ?, ?, ?, ?)'
+        )->execute([
+            $idAdmin, mb_substr($nombreAdmin, 0, 100), $accion, mb_substr($objeto, 0, 80),
+            $detalle === null ? null : json_encode($detalle, JSON_UNESCAPED_UNICODE),
+            (int)round(microtime(true) * 1000),
+        ]);
+    } catch (PDOException $e) {
+        error_log('[auditoria] ' . $e->getMessage());
+    }
+}
+
+/**
+ * Registro de auditoría, lo más reciente primero. `$objeto` filtra por la
+ * entidad afectada (por ejemplo "persona:CC 1061702334").
+ *
+ * @return array<int, array<string, mixed>>
+ */
+function consultarAuditoria(PDO $pdo, int $limite = 50, int $desde = 0, string $objeto = ''): array
+{
+    asegurarTablaAuditoria($pdo);
+    $limite = max(1, min(200, $limite));
+    $desde = max(0, $desde);
+    $where = $objeto === '' ? '1 = 1' : 'objeto = ?';
+    $stmt = $pdo->prepare("SELECT * FROM auditoria_admin WHERE $where ORDER BY id DESC LIMIT $limite OFFSET $desde");
+    $stmt->execute($objeto === '' ? [] : [$objeto]);
+    return $stmt->fetchAll();
+}
+
+function contarAuditoria(PDO $pdo): int
+{
+    asegurarTablaAuditoria($pdo);
+    $stmt = $pdo->query('SELECT COUNT(*) FROM auditoria_admin');
+    return $stmt === false ? 0 : (int)$stmt->fetchColumn();
+}
+
+// --- Sesiones de los celulares ------------------------------------------------
+
+/**
+ * Sesiones de API vigentes de una cuenta (una por celular donde entró).
+ *
+ * @return array<int, array<string, mixed>>
+ */
+function sesionesDeCuenta(PDO $pdo, int $idCuenta): array
+{
+    $stmt = $pdo->prepare(
+        'SELECT id, creado_en, ultimo_uso, expira_en FROM sesiones
+          WHERE id_encuestador = ? AND expira_en > ? ORDER BY COALESCE(ultimo_uso, creado_en) DESC'
+    );
+    $stmt->execute([$idCuenta, time()]);
+    return $stmt->fetchAll();
+}
+
+/**
+ * Sesiones vigentes por cuenta, para la tabla de cuentas.
+ *
+ * @return array<int, int> id de cuenta => número de sesiones
+ */
+function contarSesionesPorCuenta(PDO $pdo): array
+{
+    $stmt = $pdo->prepare('SELECT id_encuestador, COUNT(*) AS total FROM sesiones WHERE expira_en > ? GROUP BY id_encuestador');
+    $stmt->execute([time()]);
+    $conteo = [];
+    foreach ($stmt->fetchAll() as $f) {
+        $conteo[(int)$f['id_encuestador']] = (int)$f['total'];
+    }
+    return $conteo;
+}
+
+// --- Monitor de sincronización ------------------------------------------------
+
+/** Días sin sincronizar a partir de los cuales un celular se marca como alerta. */
+const DIAS_ALERTA_DISPOSITIVO = 3;
+
+/**
+ * Celulares que se han comunicado con el servidor, el más reciente primero.
+ *
+ * @return array<int, array<string, mixed>>
+ */
+function consultarDispositivos(PDO $pdo): array
+{
+    asegurarTablasSincronizacion($pdo);
+    $stmt = $pdo->query(
+        'SELECT d.*, e.nombre AS encuestador
+           FROM dispositivos d
+           LEFT JOIN encuestadores e ON e.id = d.id_encuestador
+          ORDER BY d.ultima_actividad DESC'
+    );
+    return $stmt === false ? [] : $stmt->fetchAll();
+}
+
+/**
+ * Registros rechazados por la sincronización, los más recientes primero.
+ *
+ * @return array<int, array<string, mixed>>
+ */
+function rechazosRecientes(PDO $pdo, int $limite = 50): array
+{
+    asegurarTablasSincronizacion($pdo);
+    $limite = max(1, min(200, $limite));
+    $stmt = $pdo->query(
+        "SELECT r.*, e.nombre AS encuestador
+           FROM sync_rechazos r
+           LEFT JOIN encuestadores e ON e.id = r.id_encuestador
+          ORDER BY r.creado_en DESC
+          LIMIT $limite"
+    );
+    return $stmt === false ? [] : $stmt->fetchAll();
+}
+
+/**
+ * Cifras para las alertas del resumen y del monitor.
+ *
+ * @return array{rechazos_7_dias: int, dispositivos_inactivos: int, dispositivos: int}
+ */
+function resumenMonitor(PDO $pdo): array
+{
+    asegurarTablasSincronizacion($pdo);
+    $ahora = (int)round(microtime(true) * 1000);
+    $uno = function (string $sql, array $params) use ($pdo): int {
+        $stmt = $pdo->prepare($sql);
+        $stmt->execute($params);
+        return (int)$stmt->fetchColumn();
+    };
+    return [
+        'rechazos_7_dias' => $uno('SELECT COUNT(*) FROM sync_rechazos WHERE creado_en >= ?', [$ahora - 7 * 86400000]),
+        'dispositivos_inactivos' => $uno(
+            'SELECT COUNT(*) FROM dispositivos WHERE ultima_actividad < ?',
+            [$ahora - DIAS_ALERTA_DISPOSITIVO * 86400000]
+        ),
+        'dispositivos' => $uno('SELECT COUNT(*) FROM dispositivos', []),
+    ];
 }

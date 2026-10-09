@@ -14,9 +14,16 @@ aplicarCabecerasDeSeguridad();
 // Datos personales de salud: ni el navegador ni un proxy intermedio deben
 // guardar copia de estas páginas ni del CSV exportado.
 header('Cache-Control: no-store');
+// Solo recursos propios: aunque se colara HTML en algún dato, no podría cargar
+// scripts de fuera ni enviar formularios a otro sitio. Los estilos en línea
+// se permiten porque el gráfico pasa sus alturas como variables CSS.
+header("Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
+     . "img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; form-action 'self'; "
+     . "base-uri 'self'; object-src 'none'");
 require_once __DIR__ . '/../db.php';
 require_once __DIR__ . '/../esquema.php';
 require_once __DIR__ . '/../rate_limit.php';
+require_once __DIR__ . '/../personas/validacion.php';
 require_once __DIR__ . '/consultas.php';
 require_once __DIR__ . '/vista.php';
 $pdo = conectarBD();
@@ -98,6 +105,53 @@ function redirigir(string $url): never
     exit;
 }
 
+/**
+ * Deja constancia de una acción del administrador que está dentro.
+ *
+ * @param array<string, mixed>|null $detalle
+ */
+function auditar(PDO $pdo, string $accion, string $objeto, ?array $detalle = null): void
+{
+    $id = $_SESSION['admin_id'] ?? null;
+    registrarAuditoria($pdo, $id === null ? null : (int)$id, (string)($_SESSION['admin_nombre'] ?? '?'), $accion, $objeto, $detalle);
+}
+
+/** 'YYYY-MM-DD' de un campo de fecha → medianoche UTC en ms (como la guardan los celulares). */
+function fechaFormularioAMs(string $valor): ?int
+{
+    $fecha = DateTimeImmutable::createFromFormat('!Y-m-d', $valor, new DateTimeZone('UTC'));
+    return $fecha === false ? null : $fecha->getTimestamp() * 1000;
+}
+
+/**
+ * Lee los filtros de la lista de personas desde la URL.
+ *
+ * Las fechas se interpretan en hora de Colombia: "hasta el 8" incluye todo el
+ * día 8, hasta la medianoche local.
+ *
+ * @return array{departamento?: string, municipio?: string, encuestador?: int, desde?: int, hasta?: int}
+ */
+function filtrosDeLaUrl(DateTimeZone $zona): array
+{
+    $filtros = [];
+    if (textoGet('municipio') !== '') {
+        $filtros['municipio'] = mb_substr(textoGet('municipio'), 0, 10);
+    }
+    if (textoGet('departamento') !== '') {
+        $filtros['departamento'] = mb_substr(textoGet('departamento'), 0, 100);
+    }
+    if (ctype_digit(textoGet('encuestador'))) {
+        $filtros['encuestador'] = (int)textoGet('encuestador');
+    }
+    foreach (['desde' => '+0 days', 'hasta' => '+1 day'] as $clave => $desplazamiento) {
+        $dia = DateTimeImmutable::createFromFormat('!Y-m-d', textoGet($clave), $zona);
+        if ($dia !== false) {
+            $filtros[$clave] = $dia->modify($desplazamiento)->getTimestamp() * 1000;
+        }
+    }
+    return $filtros;
+}
+
 /** Huella del hash de contraseña: permite notar que cambió sin guardarlo en la sesión. */
 function huellaDe(mixed $hash): string
 {
@@ -168,6 +222,8 @@ if (!empty($_SESSION['admin_ok'])) {
 }
 
 $error = null;          // Error general: acceso o petición caducada.
+$errorPersona = null;   // Error del formulario de edición de una persona.
+$formPersona = null;    // Lo enviado al editar una persona, para repintarlo tras un error.
 $errorCuenta = null;    // Error del formulario de cuentas.
 $formCuenta = null;     // Lo enviado, para no obligar a reescribirlo tras un error.
 $documentoLogin = '';
@@ -229,6 +285,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                         // Entrar bien borra el historial: al administrador legítimo no
                         // le debe quedar deuda por unos tecleos mal puestos de ayer.
                         limpiarIntentos($pdo, $claveIntentos);
+                        auditar($pdo, 'entrar', 'panel');
                         redirigir(urlPanel(['seccion' => textoGet('seccion')]));
                     }
 
@@ -244,6 +301,9 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             }
         }
     } elseif ($action === 'logout') {
+        if (!empty($_SESSION['admin_ok'])) {
+            auditar($pdo, 'salir', 'panel');
+        }
         // Se destruye la sesión entera, no solo la marca de autenticado.
         reiniciarSesion();
         avisar('ok', 'Sesión cerrada.');
@@ -268,6 +328,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             'q'        => textoPost('volver_q'),
             'p'        => ctype_digit(textoPost('volver_p')) ? textoPost('volver_p') : null,
         ]);
+        // Con filtros, `volver` trae la consulta completa de la lista. Solo se
+        // aceptan las claves conocidas: nunca una URL arbitraria.
+        parse_str(textoPost('volver'), $consultaVolver);
+        if (($consultaVolver['seccion'] ?? '') === 'personas' || ($consultaVolver['seccion'] ?? '') === 'persona') {
+            $permitidas = ['seccion', 'borradas', 'q', 'p', 'departamento', 'municipio', 'encuestador', 'desde', 'hasta', 'tipo', 'numero'];
+            $volver = urlPanel(array_map('strval', array_filter(
+                array_intersect_key($consultaVolver, array_flip($permitidas)),
+                'is_string'
+            )));
+        }
 
         if ($tipo === '' || $numero === '') {
             avisar('error', 'Falta el documento de la persona.');
@@ -281,6 +351,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         try {
             if ($action === 'borrar_persona') {
                 if (borrarPersona($pdo, $tipo, $numero, $autor)) {
+                    auditar($pdo, 'borrar_persona', "persona:$tipo $numero", ['nombre' => $quien]);
                     avisar(
                         'ok',
                         "Se borró a $quien. Los celulares la retirarán en su próxima sincronización.",
@@ -290,6 +361,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     avisar('info', 'Esa persona ya no estaba en la base de datos.');
                 }
             } elseif (restaurarPersona($pdo, $tipo, $numero, $autor)) {
+                auditar($pdo, 'restaurar_persona', "persona:$tipo $numero", ['nombre' => $quien]);
                 avisar('ok', "Se restauró a $quien. Volverá a los celulares en su próxima sincronización.");
             } else {
                 avisar('info', 'Esa persona no estaba borrada.');
@@ -299,6 +371,76 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             avisar('error', 'No se pudo completar la acción. Intenta de nuevo.');
         }
         redirigir($volver);
+    } elseif ($action === 'editar_persona') {
+        $tipo = textoPost('tipo_documento');
+        $numero = textoPost('numero_documento');
+        $fichaUrl = urlPanel(['seccion' => 'persona', 'tipo' => $tipo, 'numero' => $numero]);
+        $fila = [
+            'nombres' => textoPost('nombres'), 'apellidos' => textoPost('apellidos'),
+            'fecha_nacimiento' => fechaFormularioAMs(textoPost('fecha_nacimiento')),
+            'telefono' => textoPost('telefono'), 'email' => textoPost('email'), 'direccion' => textoPost('direccion'),
+            'vereda' => textoPost('vereda'), 'eps' => textoPost('eps'), 'ocupacion' => textoPost('ocupacion'),
+            'estrato' => textoPost('estrato') === '' ? null : textoPost('estrato'),
+            'municipio_codigo' => textoPost('municipio_codigo'),
+        ];
+        $formPersona = $fila;
+
+        $antes = buscarPersonaCompleta($pdo, $tipo, $numero);
+        if ($antes === null) {
+            avisar('error', 'Esa persona ya no existe.');
+            redirigir(urlPanel(['seccion' => 'personas']));
+        }
+        try {
+            // Las MISMAS reglas que aplica la sincronización (api/personas/validacion.php).
+            $codigos = array_flip(array_map('strval', array_column(listarMunicipios($pdo), 'codigo')));
+            $datos = [
+                'nombres' => nombreValidado($fila, 'nombres'),
+                'apellidos' => nombreValidado($fila, 'apellidos'),
+                'fecha_nacimiento' => fechaNacimientoValidada($fila),
+                'telefono' => textoOpcional($fila, 'telefono', 20),
+                'email' => emailValidado($fila),
+                'direccion' => textoOpcional($fila, 'direccion', 150),
+                'vereda' => textoOpcional($fila, 'vereda', 100),
+                'eps' => textoOpcional($fila, 'eps', 50),
+                'ocupacion' => textoOpcional($fila, 'ocupacion', 100),
+                'estrato' => estratoValidado($fila),
+                'municipio_codigo' => municipioValidado($fila, $codigos),
+            ];
+            actualizarPersonaDesdePanel($pdo, $tipo, $numero, $datos, 'admin:' . (string)($_SESSION['admin_nombre'] ?? '?'));
+            $cambios = [];
+            foreach ($datos as $campo => $valor) {
+                if ((string)($antes[$campo] ?? '') !== (string)($valor ?? '')) {
+                    $cambios[$campo] = ['antes' => $antes[$campo] ?? null, 'despues' => $valor];
+                }
+            }
+            auditar($pdo, 'editar_persona', "persona:$tipo $numero", ['cambios' => $cambios]);
+            avisar('ok', 'Cambios guardados. Llegarán a los celulares en su próxima sincronización.');
+            redirigir($fichaUrl);
+        } catch (DatoInvalido $e) {
+            $errorPersona = $e->getMessage();
+        } catch (PDOException $e) {
+            error_log('[admin] editar persona: ' . $e->getMessage());
+            $errorPersona = 'No se pudo guardar. Intenta de nuevo.';
+        }
+    } elseif ($action === 'cerrar_sesiones' || $action === 'desbloquear_cuenta') {
+        $id = textoPost('id');
+        $cuenta = ctype_digit($id) ? buscarCuentaPorId($pdo, (int)$id) : null;
+        if ($cuenta === null) {
+            avisar('error', 'Esa cuenta ya no existe.');
+            redirigir(urlPanel(['seccion' => 'cuentas']));
+        }
+        $documentoCuenta = (string)($cuenta['numero_documento'] ?? '');
+        if ($action === 'cerrar_sesiones') {
+            revocarSesionesApi($pdo, (int)$id);
+            auditar($pdo, 'cerrar_sesiones', "cuenta:$documentoCuenta");
+            avisar('ok', 'Se cerraron las sesiones de ' . (string)$cuenta['nombre'] . ' en los celulares. '
+                       . 'Tendrá que volver a entrar con conexión; lo que tenga sin enviar no se pierde.');
+        } else {
+            limpiarIntentos($pdo, $documentoCuenta);
+            auditar($pdo, 'desbloquear_cuenta', "cuenta:$documentoCuenta");
+            avisar('ok', (string)$cuenta['nombre'] . ' ya puede volver a intentar entrar.');
+        }
+        redirigir(urlPanel(['seccion' => 'cuentas', 'editar' => $id]) . '#form-cuenta');
     } elseif ($action === 'save') {
         $id = textoPost('id');
         $nombre = textoPost('nombre');
@@ -366,6 +508,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $stmt->execute([$nombre, $documento, $nuevoHash, $activo, $rol]);
                 }
 
+                // Nunca la contraseña: solo si cambió.
+                auditar($pdo, $cuentaActual === null ? 'crear_cuenta' : 'editar_cuenta', "cuenta:$documento", [
+                    'nombre' => $nombre, 'rol' => $rol, 'activo' => $activo, 'cambio_contrasena' => $nuevoHash !== null,
+                    'antes' => $cuentaActual === null ? null : [
+                        'nombre' => $cuentaActual['nombre'], 'rol' => $cuentaActual['rol'], 'activo' => (int)$cuentaActual['activo'],
+                    ],
+                ]);
+
                 // Si se acaba de crear el primer administrador estando en modo
                 // arranque, la sesión sigue siendo la de la contraseña
                 // compartida. Se cierra para obligar a entrar con la cuenta
@@ -395,11 +545,15 @@ $loggedIn = !empty($_SESSION['admin_ok']);
 $aviso = is_array($_SESSION['aviso'] ?? null) ? $_SESSION['aviso'] : null;
 unset($_SESSION['aviso']);
 
+$busqueda = mb_substr(textoGet('q'), 0, 100);
+$filtros = filtrosDeLaUrl($zona);
+
 // --- Exportación a CSV -------------------------------------------------------
 // Va antes de emitir HTML: una vez enviado el cuerpo ya no se pueden cambiar
 // las cabeceras.
 if ($loggedIn && textoGet('exportar') === 'personas') {
-    $filas = personasParaExportar($pdo);
+    // Lo mismo que muestra la tabla: búsqueda y filtros incluidos.
+    $filas = personasParaExportar($pdo, $busqueda, $filtros);
     header('Content-Type: text/csv; charset=UTF-8');
     header('Content-Disposition: attachment; filename="personas-' . date('Y-m-d') . '.csv"');
     $salida = fopen('php://output', 'w');
@@ -433,7 +587,7 @@ if ($seccion === 'encuestadores') {
     // Nombre anterior de la sección: los enlaces guardados siguen sirviendo.
     $seccion = 'cuentas';
 }
-if (!in_array($seccion, ['resumen', 'personas', 'cuentas'], true)) {
+if (!in_array($seccion, ['resumen', 'personas', 'persona', 'cuentas', 'sincronizacion', 'auditoria'], true)) {
     $seccion = 'resumen';
 }
 
@@ -466,7 +620,6 @@ $porMunicipio = [];
 $porEncuestador = [];
 $cuentas = [];
 
-$busqueda = mb_substr(textoGet('q'), 0, 100);
 $verBorradas = textoGet('borradas') === '1';
 $pagina = max(1, (int)textoGet('p'));
 $personas = [];
@@ -475,41 +628,108 @@ $totalBorradas = 0;
 $totalPersonas = 0;
 $totalPaginas = 1;
 
+$monitor = ['rechazos_7_dias' => 0, 'dispositivos_inactivos' => 0, 'dispositivos' => 0];
+$municipios = [];
+$encuestadoresFiltro = [];
+$personaFicha = null;
+$historial = [];
+$auditoriaPersona = [];
+$sesionesPorCuenta = [];
+$sesionesCuenta = [];
+$bloqueoCuenta = 0;
+$dispositivos = [];
+$rechazos = [];
+$registrosAuditoria = [];
+$totalAuditoria = 0;
+$hayFiltros = $filtros !== [];
+
 if ($loggedIn) {
     if ($seccion === 'resumen') {
         $resumen        = resumenGeneral($pdo);
         $porDia         = encuestasPorDia($pdo, $zona, 14);
         $porMunicipio   = personasPorMunicipio($pdo);
         $porEncuestador = encuestasPorEncuestador($pdo);
+        $monitor        = resumenMonitor($pdo);
     } elseif ($seccion === 'personas') {
+        $municipios = listarMunicipios($pdo);
+        $encuestadoresFiltro = encuestadoresParaFiltro($pdo);
         $totalActivas  = contarPersonas($pdo);
         $totalBorradas = contarPersonas($pdo, '', true);
-        $totalPersonas = $busqueda === ''
+        $totalPersonas = $busqueda === '' && !$hayFiltros
             ? ($verBorradas ? $totalBorradas : $totalActivas)
-            : contarPersonas($pdo, $busqueda, $verBorradas);
+            : contarPersonas($pdo, $busqueda, $verBorradas, $filtros);
         $totalPaginas = max(1, (int)ceil($totalPersonas / PERSONAS_POR_PAGINA));
         // Una página fuera de rango (?p=999, o la última tras borrar su única
         // fila) decía "todavía no se ha sincronizado ninguna persona" y
         // escondía la paginación. Se lleva a la última que existe.
         $pagina = min($pagina, $totalPaginas);
-        $personas = consultarPersonas($pdo, $busqueda, PERSONAS_POR_PAGINA, ($pagina - 1) * PERSONAS_POR_PAGINA, $verBorradas);
+        $personas = consultarPersonas($pdo, $busqueda, PERSONAS_POR_PAGINA, ($pagina - 1) * PERSONAS_POR_PAGINA, $verBorradas, $filtros);
+    } elseif ($seccion === 'persona') {
+        $tipoFicha = textoGet('tipo') !== '' ? textoGet('tipo') : textoPost('tipo_documento');
+        $numeroFicha = textoGet('numero') !== '' ? textoGet('numero') : textoPost('numero_documento');
+        $personaFicha = buscarPersonaCompleta($pdo, $tipoFicha, $numeroFicha);
+        if ($personaFicha === null) {
+            avisar('error', 'Esa persona no existe.');
+            redirigir(urlPanel(['seccion' => 'personas']));
+        }
+        $historial = encuestasDePersona($pdo, $tipoFicha, $numeroFicha);
+        $auditoriaPersona = consultarAuditoria($pdo, 20, 0, "persona:$tipoFicha $numeroFicha");
+        $municipios = listarMunicipios($pdo);
+    } elseif ($seccion === 'sincronizacion') {
+        $monitor = resumenMonitor($pdo);
+        $dispositivos = consultarDispositivos($pdo);
+        $rechazos = rechazosRecientes($pdo, 50);
+    } elseif ($seccion === 'auditoria') {
+        $totalAuditoria = contarAuditoria($pdo);
+        $totalPaginas = max(1, (int)ceil($totalAuditoria / 50));
+        $pagina = min($pagina, $totalPaginas);
+        $registrosAuditoria = consultarAuditoria($pdo, 50, ($pagina - 1) * 50);
     } else {
         $cuentas = consultarEncuestadores($pdo);
+        $sesionesPorCuenta = contarSesionesPorCuenta($pdo);
+        if ($editando) {
+            $sesionesCuenta = sesionesDeCuenta($pdo, (int)$formCuenta['id']);
+            if ($formCuenta['numero_documento'] !== '' && preg_match(PATRON_DOCUMENTO_CUENTA, $formCuenta['numero_documento'])) {
+                $bloqueoCuenta = segundosDeBloqueo($pdo, $formCuenta['numero_documento']);
+            }
+        }
     }
 }
 
-$titulos = ['resumen' => 'Resumen', 'personas' => 'Personas', 'cuentas' => 'Cuentas'];
+// Estado completo de la lista de personas (búsqueda, filtros, página), para
+// enlaces y para volver a ella tras una acción.
+$parametrosLista = array_filter([
+    'seccion' => 'personas',
+    'borradas' => $verBorradas ? '1' : null,
+    'q' => $busqueda,
+    'departamento' => textoGet('departamento'),
+    'municipio' => textoGet('municipio'),
+    'encuestador' => textoGet('encuestador'),
+    'desde' => textoGet('desde'),
+    'hasta' => textoGet('hasta'),
+], fn ($v) => $v !== null && $v !== '');
+
+$titulos = [
+    'resumen' => 'Resumen', 'personas' => 'Personas', 'cuentas' => 'Cuentas',
+    'sincronizacion' => 'Sincronización', 'auditoria' => 'Auditoría', 'persona' => 'Ficha de persona',
+];
+// La ficha no es una sección del menú: se llega desde la lista.
+$navegacion = array_diff_key($titulos, ['persona' => true]);
 $descripciones = [
     'resumen'  => 'Cómo va la recolección en campo.',
     'personas' => 'Personas registradas por los encuestadores, tal como llegan a todos los celulares.',
+    'persona'  => 'Todos los datos de la persona, su historial de encuestas y los cambios hechos desde el panel.',
     'cuentas'  => 'Encuestadores de campo y administradores de este panel.',
+    'sincronizacion' => 'Celulares conectados, registros rechazados y equipos que llevan días sin enviar.',
+    'auditoria' => 'Todo lo que hacen los administradores en este panel.',
 ];
 $csrf = (string)$_SESSION['csrf'];
 $idAdmin = $_SESSION['admin_id'] ?? null;
 $version = fn (string $archivo): int => (int)(filemtime(__DIR__ . '/' . $archivo) ?: 0);
 
 // Estado de la lista de personas, para volver a ella tras borrar o restaurar.
-$camposVolver = '<input type="hidden" name="volver_q" value="' . h($busqueda) . '">'
+$camposVolver = '<input type="hidden" name="volver" value="' . h(http_build_query($parametrosLista + ($pagina > 1 ? ['p' => $pagina] : []))) . '">'
+              . '<input type="hidden" name="volver_q" value="' . h($busqueda) . '">'
               . '<input type="hidden" name="volver_p" value="' . $pagina . '">'
               . '<input type="hidden" name="volver_borradas" value="' . ($verBorradas ? '1' : '') . '">';
 
@@ -613,7 +833,7 @@ if ($aviso !== null) {
     </div>
 
     <nav class="nav" aria-label="Secciones">
-      <?php foreach ($titulos as $clave => $titulo): ?>
+      <?php foreach ($navegacion as $clave => $titulo): ?>
         <a href="<?= h(urlPanel(['seccion' => $clave])) ?>"<?= $seccion === $clave ? ' aria-current="page"' : '' ?>>
           <?= icono($clave) ?><span><?= h($titulo) ?></span>
         </a>
@@ -646,7 +866,7 @@ if ($aviso !== null) {
       </div>
       <div class="encabezado-acciones">
         <?php if ($seccion === 'personas' && !$verBorradas && $totalActivas > 0): ?>
-          <a class="btn btn-secundario" href="<?= h(urlPanel(['exportar' => 'personas'])) ?>">
+          <a class="btn btn-secundario" href="<?= h(urlPanel(['exportar' => 'personas'] + array_diff_key($parametrosLista, ['seccion' => 1, 'borradas' => 1]))) ?>">
             <?= icono('descargar', 16) ?>Exportar CSV
           </a>
         <?php elseif ($seccion === 'cuentas'): ?>
@@ -661,429 +881,7 @@ if ($aviso !== null) {
     <?= $htmlAviso ?>
     <?php if ($error !== null): ?><?= cajaAviso('error', h($error)) ?><?php endif; ?>
 
-    <?php if ($seccion === 'resumen'):
-        $totales = array_column($porDia, 'total');
-        $totalDias = array_sum($totales);
-        $maxDia = $totales === [] ? 0 : max($totales);
-        $tope = topeEje($maxDia);
-        $indiceMax = $maxDia > 0 ? array_search($maxDia, $totales, true) : false;
-        $ultimoDia = count($porDia) - 1;
-    ?>
-
-      <section class="tarjeta cifras" aria-label="Totales">
-        <div class="cifra">
-          <p class="cifra-etiqueta">Personas activas</p>
-          <p class="cifra-valor"><?= numero($resumen['personas']) ?></p>
-          <p class="cifra-nota"><?= $resumen['borradas'] > 0 ? h(numero($resumen['borradas']) . ' en la papelera') : 'Papelera vacía' ?></p>
-        </div>
-        <div class="cifra">
-          <p class="cifra-etiqueta">Encuestas</p>
-          <p class="cifra-valor"><?= numero($resumen['encuestas']) ?></p>
-          <p class="cifra-nota"><?= h(numero($totalDias)) ?> en los últimos 14 días</p>
-        </div>
-        <div class="cifra">
-          <p class="cifra-etiqueta">Encuestadores activos</p>
-          <p class="cifra-valor"><?= numero($resumen['encuestadores']) ?></p>
-          <p class="cifra-nota"><?= h(cantidad($resumen['cuentas'], 'cuenta', 'cuentas')) ?> en total</p>
-        </div>
-        <div class="cifra">
-          <p class="cifra-etiqueta">Dispositivos</p>
-          <p class="cifra-valor"><?= numero($resumen['dispositivos']) ?></p>
-          <p class="cifra-nota">Han enviado alguna encuesta</p>
-        </div>
-      </section>
-
-      <section class="tarjeta" aria-labelledby="t-dias">
-        <div class="tarjeta-cabecera">
-          <div>
-            <h2 id="t-dias">Encuestas por día</h2>
-            <?php // El eje solo lleva el número del día: el rango dice de qué meses son. ?>
-            <p>
-              <?= $porDia === [] ? 'Últimos 14 días' : h(etiquetaDia($porDia[0]['dia'])['larga'] . ' – ' . etiquetaDia($porDia[$ultimoDia]['dia'])['larga']) ?>
-              · hora de Colombia
-            </p>
-          </div>
-          <p class="tarjeta-dato">Última sincronización<br><strong><?= h(haceCuanto($resumen['ultima_sync'])) ?></strong></p>
-        </div>
-        <div class="tarjeta-cuerpo">
-          <?php if ($totalDias === 0): ?>
-            <div class="vacio">
-              <?= icono('vacio', 28) ?>
-              <strong>Sin encuestas en los últimos 14 días</strong>
-              Cuando los encuestadores sincronicen, aquí verás la actividad de cada día.
-            </div>
-          <?php else: ?>
-            <p class="sr-only">
-              En los últimos 14 días se sincronizaron <?= h(cantidad($totalDias, 'encuesta', 'encuestas')) ?>.
-              <?php if ($indiceMax !== false): ?>El día con más fue <?= h(etiquetaDia($porDia[$indiceMax]['dia'])['larga']) ?>, con <?= numero($maxDia) ?>.<?php endif; ?>
-              Los valores de cada día están en la tabla "Ver datos".
-            </p>
-            <div class="grafico" aria-hidden="true" style="--columnas: <?= count($porDia) ?>">
-              <div class="grafico-eje-y">
-                <span style="top: 0"><?= numero($tope) ?></span>
-                <span style="top: 50%"><?= numero(intdiv($tope, 2)) ?></span>
-                <span style="top: 100%">0</span>
-              </div>
-              <div class="grafico-area">
-                <span class="grafico-guia" style="top: 0"></span>
-                <span class="grafico-guia" style="top: 50%"></span>
-                <?php foreach ($porDia as $i => $d):
-                    $etiqueta = etiquetaDia($d['dia']);
-                    $borde = $i < 2 ? ' borde-ini' : ($i > $ultimoDia - 2 ? ' borde-fin' : ''); ?>
-                  <div class="grafico-col<?= $borde ?>" style="--h: <?= round(100 * $d['total'] / $tope, 2) ?>%">
-                    <span class="grafico-barra"></span>
-                    <?php if ($i === $indiceMax): ?><span class="grafico-valor"><?= numero($d['total']) ?></span><?php endif; ?>
-                    <span class="grafico-tip"><?= h($etiqueta['larga']) ?> · <strong><?= h(cantidad($d['total'], 'encuesta', 'encuestas')) ?></strong></span>
-                  </div>
-                <?php endforeach; ?>
-              </div>
-              <div class="grafico-eje-x">
-                <?php foreach ($porDia as $i => $d):
-                    $etiqueta = etiquetaDia($d['dia']);
-                    // Hoy siempre rotulado; en pantallas estrechas se oculta uno de cada dos.
-                    $clases = trim(($i === $ultimoDia ? 'hoy' : '') . (($ultimoDia - $i) % 2 === 1 ? ' alterno' : '')); ?>
-                  <span class="<?= $clases ?>"><?= h($etiqueta['dia']) ?><span class="semana"><?= $i === $ultimoDia ? 'hoy' : h($etiqueta['semana']) ?></span></span>
-                <?php endforeach; ?>
-              </div>
-            </div>
-
-            <details class="datos">
-              <summary>Ver datos</summary>
-              <div class="tabla-contenedor">
-                <table class="tabla tabla-compacta">
-                  <thead><tr><th scope="col">Día</th><th scope="col" class="num">Encuestas</th></tr></thead>
-                  <tbody>
-                    <?php foreach (array_reverse($porDia) as $d): ?>
-                      <tr><td><?= h(etiquetaDia($d['dia'])['larga']) ?></td><td class="num"><?= numero($d['total']) ?></td></tr>
-                    <?php endforeach; ?>
-                  </tbody>
-                </table>
-              </div>
-            </details>
-          <?php endif; ?>
-        </div>
-      </section>
-
-      <div class="dos-columnas">
-        <section class="tarjeta" aria-labelledby="t-municipios">
-          <div class="tarjeta-cabecera">
-            <div>
-              <h2 id="t-municipios">Personas por municipio</h2>
-              <p>Los municipios con más personas activas</p>
-            </div>
-          </div>
-          <div class="tarjeta-cuerpo">
-            <?php if ($porMunicipio === []): ?>
-              <div class="vacio">Todavía no hay personas registradas.</div>
-            <?php else:
-                $maxMunicipio = max(array_column($porMunicipio, 'total')) ?: 1; ?>
-              <ol class="ranking">
-                <?php foreach ($porMunicipio as $m): ?>
-                  <li>
-                    <span class="ranking-nombre"><?= h($m['municipio']) ?><?php if ($m['departamento'] !== '—' && $m['departamento'] !== $m['municipio']): ?> <small>· <?= h($m['departamento']) ?></small><?php endif; ?></span>
-                    <span class="ranking-valor"><?= numero($m['total']) ?></span>
-                    <span class="ranking-pista" aria-hidden="true"><span class="ranking-relleno" style="--w: <?= round(100 * $m['total'] / $maxMunicipio, 2) ?>%"></span></span>
-                  </li>
-                <?php endforeach; ?>
-              </ol>
-            <?php endif; ?>
-          </div>
-        </section>
-
-        <section class="tarjeta" aria-labelledby="t-encuestadores">
-          <div class="tarjeta-cabecera">
-            <div>
-              <h2 id="t-encuestadores">Encuestas por encuestador</h2>
-              <p>Encuestadores activos y cualquier cuenta con encuestas</p>
-            </div>
-          </div>
-          <div class="tarjeta-cuerpo">
-            <?php if ($porEncuestador === []): ?>
-              <div class="vacio">Todavía no hay encuestadores activos.</div>
-            <?php else:
-                $maxEncuestador = max(array_column($porEncuestador, 'total')) ?: 1; ?>
-              <ol class="ranking">
-                <?php foreach ($porEncuestador as $e): ?>
-                  <li>
-                    <span class="ranking-nombre"><?= h($e['nombre']) ?></span>
-                    <span class="ranking-valor"><?= numero($e['total']) ?></span>
-                    <span class="ranking-pista" aria-hidden="true"><span class="ranking-relleno" style="--w: <?= round(100 * $e['total'] / $maxEncuestador, 2) ?>%"></span></span>
-                  </li>
-                <?php endforeach; ?>
-              </ol>
-            <?php endif; ?>
-          </div>
-        </section>
-      </div>
-
-    <?php elseif ($seccion === 'personas'): ?>
-
-      <section class="tarjeta" aria-label="<?= $verBorradas ? 'Papelera' : 'Personas activas' ?>">
-        <div class="barra-herramientas">
-          <nav class="pestanas" aria-label="Estado de las personas">
-            <a href="<?= h(urlPanel(['seccion' => 'personas'])) ?>"<?= !$verBorradas ? ' aria-current="page"' : '' ?>>
-              Activas <span class="conteo"><?= numero($totalActivas) ?></span>
-            </a>
-            <a href="<?= h(urlPanel(['seccion' => 'personas', 'borradas' => '1'])) ?>"<?= $verBorradas ? ' aria-current="page"' : '' ?>>
-              Papelera <span class="conteo"><?= numero($totalBorradas) ?></span>
-            </a>
-          </nav>
-
-          <form class="buscador" method="get" action="index.php" role="search">
-            <input type="hidden" name="seccion" value="personas">
-            <?php if ($verBorradas): ?><input type="hidden" name="borradas" value="1"><?php endif; ?>
-            <div class="buscador-campo">
-              <label class="sr-only" for="buscar">Buscar personas</label>
-              <?= icono('buscar', 16) ?>
-              <input class="input" type="search" id="buscar" name="q" value="<?= h($busqueda) ?>"
-                     placeholder="Nombre completo o documento" maxlength="100">
-            </div>
-            <button class="btn btn-secundario" type="submit">Buscar</button>
-            <?php if ($busqueda !== ''): ?>
-              <a class="btn btn-fantasma" href="<?= h(urlPanel(['seccion' => 'personas', 'borradas' => $verBorradas ? '1' : null])) ?>">
-                <?= icono('cerrar', 16) ?>Limpiar
-              </a>
-            <?php endif; ?>
-          </form>
-        </div>
-
-        <?php if ($verBorradas && $totalBorradas > 0): ?>
-          <?= cajaAviso('info', 'Siguen en la base de datos, marcadas como borradas, y los celulares las ocultan. '
-              . 'Restaurar devuelve la persona a todos los dispositivos en su próxima sincronización.') ?>
-        <?php endif; ?>
-
-        <?php if ($busqueda !== '' && $personas !== []): ?>
-          <p class="nota-lista" role="status"><?= h(cantidad($totalPersonas, 'resultado', 'resultados')) ?> para «<?= h($busqueda) ?>»</p>
-        <?php endif; ?>
-
-        <?php if ($personas === []): ?>
-          <div class="vacio">
-            <?= icono($busqueda !== '' ? 'buscar' : 'vacio', 28) ?>
-            <?php if ($busqueda !== ''): ?>
-              <strong>Sin resultados</strong>
-              Ninguna persona <?= $verBorradas ? 'de la papelera ' : '' ?>coincide con «<?= h($busqueda) ?>».
-              <br><a class="btn btn-secundario" href="<?= h(urlPanel(['seccion' => 'personas', 'borradas' => $verBorradas ? '1' : null])) ?>">Limpiar búsqueda</a>
-            <?php elseif ($verBorradas): ?>
-              <strong>La papelera está vacía</strong>
-              Las personas que borres aparecerán aquí y podrás restaurarlas.
-            <?php else: ?>
-              <strong>Todavía no hay personas</strong>
-              Aparecerán aquí cuando los encuestadores sincronicen sus registros.
-            <?php endif; ?>
-          </div>
-        <?php else: ?>
-          <div class="tabla-contenedor">
-            <table class="tabla">
-              <thead>
-                <tr>
-                  <th scope="col">Persona</th>
-                  <th scope="col">Municipio</th>
-                  <th scope="col">Vereda</th>
-                  <th scope="col">EPS</th>
-                  <th scope="col" class="num">Estrato</th>
-                  <th scope="col"><?= $verBorradas ? 'Borrada' : 'Actualizada' ?></th>
-                  <th scope="col"><span class="sr-only">Acciones</span></th>
-                </tr>
-              </thead>
-              <tbody>
-                <?php foreach ($personas as $p):
-                    $nombreCompleto = trim((string)$p['nombres'] . ' ' . (string)$p['apellidos']);
-                    $confirmacion = $verBorradas
-                        ? "¿Restaurar a $nombreCompleto? Volverá a aparecer en todos los celulares en su próxima sincronización."
-                        : "¿Borrar a $nombreCompleto? Desaparecerá también de los celulares en su próxima sincronización."; ?>
-                  <tr>
-                    <td>
-                      <span class="celda-principal"><?= h($nombreCompleto) ?></span>
-                      <span class="celda-sec"><?= h($p['tipo_documento']) ?> <?= h($p['numero_documento']) ?></span>
-                    </td>
-                    <td>
-                      <?php if (!empty($p['municipio'])): ?>
-                        <?= h($p['municipio']) ?><span class="celda-sec"><?= h($p['departamento']) ?></span>
-                      <?php else: ?><span class="apagado">—</span><?php endif; ?>
-                    </td>
-                    <td><?= !empty($p['vereda']) ? h($p['vereda']) : '<span class="apagado">—</span>' ?></td>
-                    <td><?= !empty($p['eps']) ? h($p['eps']) : '<span class="apagado">—</span>' ?></td>
-                    <td class="num"><?= !empty($p['estrato']) ? h($p['estrato']) : '<span class="apagado">—</span>' ?></td>
-                    <td class="celda-fecha"><?= h(fecha($verBorradas ? $p['deleted_at'] : $p['updated_at'])) ?></td>
-                    <td class="acciones">
-                      <?php // El confirm() no es seguridad, solo evita el clic accidental:
-                            // quien tenga la sesión puede enviar el POST igualmente. ?>
-                      <form method="post" action="index.php" data-confirmar="<?= h($confirmacion) ?>">
-                        <input type="hidden" name="csrf" value="<?= h($csrf) ?>">
-                        <input type="hidden" name="action" value="<?= $verBorradas ? 'restaurar_persona' : 'borrar_persona' ?>">
-                        <input type="hidden" name="tipo_documento" value="<?= h($p['tipo_documento']) ?>">
-                        <input type="hidden" name="numero_documento" value="<?= h($p['numero_documento']) ?>">
-                        <input type="hidden" name="nombre" value="<?= h($nombreCompleto) ?>">
-                        <?= $camposVolver ?>
-                        <?php if ($verBorradas): ?>
-                          <button type="submit" class="btn btn-secundario btn-sm" aria-label="Restaurar a <?= h($nombreCompleto) ?>">
-                            <?= icono('restaurar', 14) ?>Restaurar
-                          </button>
-                        <?php else: ?>
-                          <button type="submit" class="btn btn-peligro btn-sm" aria-label="Borrar a <?= h($nombreCompleto) ?>">
-                            <?= icono('borrar', 14) ?>Borrar
-                          </button>
-                        <?php endif; ?>
-                      </form>
-                    </td>
-                  </tr>
-                <?php endforeach; ?>
-              </tbody>
-            </table>
-          </div>
-
-          <?php
-            $desde = ($pagina - 1) * PERSONAS_POR_PAGINA + 1;
-            $hasta = min($pagina * PERSONAS_POR_PAGINA, $totalPersonas);
-            $base = ['seccion' => 'personas', 'borradas' => $verBorradas ? '1' : null, 'q' => $busqueda];
-          ?>
-          <nav class="paginacion" aria-label="Paginación">
-            <span>Mostrando <?= numero($desde) ?>–<?= numero($hasta) ?> de <?= numero($totalPersonas) ?></span>
-            <span class="paginacion-botones">
-              <?php if ($pagina > 1): ?>
-                <a class="btn btn-secundario btn-sm" href="<?= h(urlPanel($base + ['p' => $pagina - 1])) ?>"><?= icono('anterior', 14) ?>Anterior</a>
-              <?php else: ?>
-                <span class="btn btn-secundario btn-sm" aria-disabled="true"><?= icono('anterior', 14) ?>Anterior</span>
-              <?php endif; ?>
-              <span>Página <?= $pagina ?> de <?= $totalPaginas ?></span>
-              <?php if ($pagina < $totalPaginas): ?>
-                <a class="btn btn-secundario btn-sm" href="<?= h(urlPanel($base + ['p' => $pagina + 1])) ?>">Siguiente<?= icono('siguiente', 14) ?></a>
-              <?php else: ?>
-                <span class="btn btn-secundario btn-sm" aria-disabled="true">Siguiente<?= icono('siguiente', 14) ?></span>
-              <?php endif; ?>
-            </span>
-          </nav>
-        <?php endif; ?>
-      </section>
-
-    <?php else: ?>
-
-      <?php if ($modoArranque): ?>
-        <?= cajaAviso('advertencia', 'Estás dentro con la contraseña de arranque. Crea una cuenta con rol '
-            . '<strong>Administrador</strong>: al guardarla, esa contraseña dejará de aceptarse y entrarás '
-            . 'con documento y contraseña.') ?>
-      <?php endif; ?>
-
-      <div class="rejilla-cuentas">
-        <section class="tarjeta" aria-label="Lista de cuentas">
-          <?php if ($cuentas === []): ?>
-            <div class="vacio">
-              <?= icono('cuentas', 28) ?>
-              <strong>No hay cuentas</strong>
-              Crea la primera con el formulario.
-            </div>
-          <?php else: ?>
-            <div class="tabla-contenedor">
-              <table class="tabla">
-                <thead>
-                  <tr>
-                    <th scope="col">Cuenta</th>
-                    <th scope="col">Rol</th>
-                    <th scope="col">Estado</th>
-                    <th scope="col" class="num">Encuestas</th>
-                    <th scope="col">Última encuesta</th>
-                    <th scope="col"><span class="sr-only">Acciones</span></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <?php foreach ($cuentas as $c):
-                      $esAdmin = ($c['rol'] ?? 'encuestador') === 'admin';
-                      $esActiva = (int)$c['activo'] === 1;
-                      $esEditada = $editando && (string)$c['id'] === $formCuenta['id']; ?>
-                    <tr<?= $esEditada ? ' class="fila-activa"' : '' ?>>
-                      <td>
-                        <span class="celda-principal"><?= h($c['nombre']) ?></span><?php if ((int)$c['id'] === $idAdmin): ?><span class="insignia insignia-tu">Tú</span><?php endif; ?>
-                        <span class="celda-sec"><?= !empty($c['numero_documento']) ? h($c['numero_documento']) : 'Sin documento' ?></span>
-                      </td>
-                      <td><span class="insignia<?= $esAdmin ? ' insignia-admin' : '' ?>"><?= $esAdmin ? 'Administrador' : 'Encuestador' ?></span></td>
-                      <td><span class="estado<?= $esActiva ? ' estado-activo' : '' ?>"><?= $esActiva ? 'Activa' : 'Inactiva' ?></span></td>
-                      <td class="num"><?= numero((int)$c['encuestas']) ?></td>
-                      <td class="celda-fecha"><?= h(haceCuanto($c['ultima_actividad'])) ?></td>
-                      <td class="acciones">
-                        <a class="btn btn-fantasma btn-sm" href="<?= h(urlPanel(['seccion' => 'cuentas', 'editar' => (string)$c['id']])) ?>#form-cuenta"
-                           aria-label="Editar la cuenta de <?= h($c['nombre']) ?>"><?= icono('editar', 14) ?>Editar</a>
-                      </td>
-                    </tr>
-                  <?php endforeach; ?>
-                </tbody>
-              </table>
-            </div>
-          <?php endif; ?>
-        </section>
-
-        <section class="tarjeta form-cuenta" id="form-cuenta" aria-labelledby="t-form-cuenta">
-          <div class="tarjeta-cabecera">
-            <div>
-              <h2 id="t-form-cuenta"><?= $editando ? 'Editar cuenta' : 'Nueva cuenta' ?></h2>
-              <p><?= $editando ? h($formCuenta['nombre']) : 'Para un encuestador o un administrador.' ?></p>
-            </div>
-          </div>
-          <form class="tarjeta-cuerpo" method="post"
-                action="<?= h(urlPanel(['seccion' => 'cuentas', 'editar' => $editando ? $formCuenta['id'] : null])) ?>#form-cuenta">
-            <input type="hidden" name="csrf" value="<?= h($csrf) ?>">
-            <input type="hidden" name="action" value="save">
-            <input type="hidden" name="id" value="<?= h($formCuenta['id']) ?>">
-
-            <?php if ($errorCuenta !== null): ?><?= cajaAviso('error', h($errorCuenta)) ?><?php endif; ?>
-
-            <div class="campo">
-              <label class="campo-etiqueta" for="cuenta-nombre">Nombre completo</label>
-              <input class="input" type="text" id="cuenta-nombre" name="nombre" value="<?= h($formCuenta['nombre']) ?>"
-                     maxlength="100" required autocomplete="off">
-            </div>
-
-            <div class="campo">
-              <label class="campo-etiqueta" for="cuenta-doc">Número de documento</label>
-              <input class="input" type="text" id="cuenta-doc" name="numero_documento" value="<?= h($formCuenta['numero_documento']) ?>"
-                     maxlength="20" pattern="[A-Za-z0-9\-]{1,20}" required autocomplete="off" aria-describedby="ayuda-doc">
-              <p class="campo-ayuda" id="ayuda-doc">Con él se entra a la app. Letras, dígitos y guiones.</p>
-            </div>
-
-            <div class="campo">
-              <label class="campo-etiqueta" for="cuenta-clave">Contraseña</label>
-              <div class="input-grupo">
-                <input class="input" type="password" id="cuenta-clave" name="password" autocomplete="new-password"
-                       minlength="<?= MIN_LONGITUD_PASSWORD ?>" <?= $editando ? '' : 'required' ?> aria-describedby="ayuda-clave">
-                <button type="button" class="ver-clave" data-ver-clave="cuenta-clave" aria-pressed="false" hidden>Ver</button>
-              </div>
-              <p class="campo-ayuda" id="ayuda-clave">
-                <?= $editando
-                    ? 'Déjala vacía para no cambiarla. Si la cambias, se cierran sus sesiones en los celulares.'
-                    : 'Mínimo ' . MIN_LONGITUD_PASSWORD . ' caracteres.' ?>
-              </p>
-            </div>
-
-            <fieldset class="grupo-opciones">
-              <legend class="campo-etiqueta">Rol</legend>
-              <label class="opcion">
-                <input type="radio" name="rol" value="encuestador"<?= $formCuenta['rol'] !== 'admin' ? ' checked' : '' ?>>
-                <span><strong>Encuestador</strong><span>Registra personas desde la app en campo.</span></span>
-              </label>
-              <label class="opcion">
-                <input type="radio" name="rol" value="admin"<?= $formCuenta['rol'] === 'admin' ? ' checked' : '' ?>>
-                <span><strong>Administrador</strong><span>Además entra a este panel: ve y borra personas, y gestiona cuentas.</span></span>
-              </label>
-            </fieldset>
-
-            <div class="campo">
-              <label class="casilla">
-                <input type="checkbox" name="activo"<?= (int)$formCuenta['activo'] === 1 ? ' checked' : '' ?> aria-describedby="ayuda-activo">
-                Cuenta activa
-              </label>
-              <p class="campo-ayuda" id="ayuda-activo">Una cuenta inactiva no puede entrar ni sincronizar.</p>
-            </div>
-
-            <div class="form-acciones">
-              <button class="btn btn-primario" type="submit"><?= $editando ? 'Guardar cambios' : 'Crear cuenta' ?></button>
-              <?php if ($editando): ?>
-                <a class="btn btn-secundario" href="<?= h(urlPanel(['seccion' => 'cuentas'])) ?>">Cancelar</a>
-              <?php endif; ?>
-            </div>
-          </form>
-        </section>
-      </div>
-
-    <?php endif; ?>
+    <?php require __DIR__ . '/vistas/' . $seccion . '.php'; ?>
     </div>
   </main>
 </div>

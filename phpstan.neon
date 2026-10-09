@@ -13,6 +13,10 @@ parameters:
     # forma temporal, no debe frenar el CI.
     excludePaths:
         - api/setup/*
+        # Plantillas del panel: reciben sus variables de index.php al
+        # incluirse, y analizadas por separado todas parecerían indefinidas.
+        # La lógica vive en index.php y consultas.php, que sí se analizan.
+        - api/admin/vistas/*
 
     # Los endpoints son scripts, no librerías: leen superglobales y terminan
     # con exit(). PHPStan no sigue el flujo a través de responderError(), que

@@ -176,7 +176,83 @@ const TRAZOS_ICONOS = [
     'siguiente'   => '<polyline points="9 18 15 12 9 6"/>',
     'cerrar'      => '<line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>',
     'volver'      => '<line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/>',
+    'sincronizacion' => '<polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>',
+    'auditoria'   => '<path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/><line x1="9" y1="12" x2="15" y2="12"/><line x1="9" y1="16" x2="13" y2="16"/>',
+    'celular'     => '<rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/>',
+    'filtro'      => '<polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>',
 ];
+
+/** Qué hizo un administrador, en palabras, para el registro de auditoría. */
+const ETIQUETAS_AUDITORIA = [
+    'entrar' => 'Entró al panel',
+    'salir' => 'Salió del panel',
+    'borrar_persona' => 'Borró una persona',
+    'restaurar_persona' => 'Restauró una persona',
+    'editar_persona' => 'Editó una persona',
+    'crear_cuenta' => 'Creó una cuenta',
+    'editar_cuenta' => 'Editó una cuenta',
+    'cerrar_sesiones' => 'Cerró las sesiones de un celular',
+    'desbloquear_cuenta' => 'Desbloqueó una cuenta',
+];
+
+/** Acciones de encuesta tal como las envían los celulares, en palabras. */
+const ACCIONES_ENCUESTA = [
+    'CREACION' => 'Registro', 'REGISTRO' => 'Registro', 'ACTUALIZACION' => 'Actualización',
+    'ELIMINACION' => 'Eliminación',
+];
+
+/** Nombres legibles de los campos de una persona. */
+const CAMPOS_PERSONA = [
+    'nombres' => 'Nombres', 'apellidos' => 'Apellidos', 'fecha_nacimiento' => 'Fecha de nacimiento',
+    'telefono' => 'Teléfono', 'email' => 'Correo', 'direccion' => 'Dirección', 'vereda' => 'Vereda',
+    'eps' => 'EPS', 'ocupacion' => 'Ocupación', 'estrato' => 'Estrato', 'municipio_codigo' => 'Municipio',
+];
+
+/** Fecha de nacimiento (medianoche UTC en ms) como dd/mm/aaaa. */
+function fechaNacimiento(mixed $ms): string
+{
+    return is_numeric($ms) ? gmdate('d/m/Y', intdiv((int)$ms, 1000)) : '—';
+}
+
+/** Resumen legible del detalle JSON de una entrada de auditoría. */
+function describirAuditoria(mixed $detalleJson): string
+{
+    $detalle = is_string($detalleJson) ? json_decode($detalleJson, true) : null;
+    if (!is_array($detalle)) {
+        return '';
+    }
+    if (isset($detalle['cambios']) && is_array($detalle['cambios'])) {
+        if ($detalle['cambios'] === []) {
+            return 'Sin cambios en los datos';
+        }
+        $partes = [];
+        foreach ($detalle['cambios'] as $campo => $c) {
+            $antes = is_array($c) ? ($c['antes'] ?? '') : '';
+            $despues = is_array($c) ? ($c['despues'] ?? '') : '';
+            if ($campo === 'fecha_nacimiento') {
+                $antes = fechaNacimiento($antes);
+                $despues = fechaNacimiento($despues);
+            }
+            $etiqueta = CAMPOS_PERSONA[$campo] ?? (string)$campo;
+            $partes[] = $etiqueta . ': «' . (is_scalar($antes) ? (string)$antes : '') . '» → «' . (is_scalar($despues) ? (string)$despues : '') . '»';
+        }
+        return implode(' · ', $partes);
+    }
+    $partes = [];
+    if (isset($detalle['nombre']) && is_scalar($detalle['nombre'])) {
+        $partes[] = (string)$detalle['nombre'];
+    }
+    if (isset($detalle['rol']) && is_scalar($detalle['rol'])) {
+        $partes[] = $detalle['rol'] === 'admin' ? 'Administrador' : 'Encuestador';
+    }
+    if (isset($detalle['activo'])) {
+        $partes[] = $detalle['activo'] ? 'activa' : 'inactiva';
+    }
+    if (!empty($detalle['cambio_contrasena'])) {
+        $partes[] = 'cambió la contraseña';
+    }
+    return implode(' · ', $partes);
+}
 
 /** SVG de un icono decorativo: lo acompaña siempre un texto que lo nombra. */
 function icono(string $nombre, int $tamano = 18): string

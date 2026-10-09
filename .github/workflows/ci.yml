@@ -253,7 +253,7 @@ jobs:
           # responderError, que hace exit. Si vuelven a abortar el envío, un
           # solo registro irreparable deja la cola de un encuestador bloqueada:
           # se reintenta el mismo lote en cada sincronización y falla igual.
-          if ! grep -q "class DatoInvalido" api/personas/sync.php; then
+          if ! grep -q "class DatoInvalido" api/personas/validacion.php; then
             echo "::error::sync.php debe descartar la fila inválida, no abortar el lote completo."
             exit 1
           fi
