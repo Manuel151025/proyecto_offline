@@ -1,5 +1,7 @@
 const DB_NAME = 'encuestas_minsalud';
-const DB_VERSION = 2;
+// v3: almacén `kv` para datos que el service worker necesita leer (el token).
+// El service worker no tiene acceso a localStorage.
+const DB_VERSION = 3;
 
 let dbInstance = null;
 
@@ -21,6 +23,9 @@ function openDB() {
       }
       if (!db.objectStoreNames.contains('credenciales')) {
         db.createObjectStore('credenciales', { keyPath: 'documento' });
+      }
+      if (!db.objectStoreNames.contains('kv')) {
+        db.createObjectStore('kv');
       }
     };
     req.onsuccess = e => { dbInstance = e.target.result; resolve(dbInstance); };
@@ -197,6 +202,45 @@ export async function marcarRechazados(rechazos) {
     t.oncomplete = resolve;
     t.onerror = e => reject(e.target.error);
   });
+}
+
+/**
+ * Borra de la cola lo enviado hace más de `dias` días.
+ *
+ * La cola guardaba para siempre cada envío ya confirmado, y cada
+ * sincronización la recorría entera: tras meses de trabajo de campo se volvía
+ * lenta sin ningún motivo. Lo pendiente, con error o rechazado no se toca.
+ */
+export async function limpiarEnviados(dias = 30, ahora = Date.now()) {
+  const limite = ahora - dias * 86400000;
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const t = db.transaction('sync_queue', 'readwrite');
+    const store = t.objectStore('sync_queue');
+    let borrados = 0;
+    store.openCursor().onsuccess = e => {
+      const cursor = e.target.result;
+      if (!cursor) return;
+      const item = cursor.value;
+      if (item.status === 'SENT' && (item.created_at || 0) < limite) {
+        cursor.delete();
+        borrados++;
+      }
+      cursor.continue();
+    };
+    t.oncomplete = () => resolve(borrados);
+    t.onerror = e => reject(e.target.error);
+  });
+}
+
+// --- Clave-valor compartido con el service worker ---
+
+export async function guardarKV(clave, valor) {
+  return request('kv', 'readwrite', store => store.put(valor, clave));
+}
+
+export async function borrarKV(clave) {
+  return request('kv', 'readwrite', store => store.delete(clave));
 }
 
 export async function getAllSyncItems() {

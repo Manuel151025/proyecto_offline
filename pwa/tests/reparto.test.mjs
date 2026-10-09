@@ -83,3 +83,33 @@ test('un servidor que aún no envía rechazadas se trata como todo aceptado', ()
     assert.equal(r.rechazos.length, 0);
   }
 });
+
+/**
+ * La forma REAL de la cola: `id` es el autoincremental de IndexedDB y el
+ * servidor rechaza por el id de la ENCUESTA. La versión anterior comparaba
+ * contra el id de la cola, nunca coincidía, y todo rechazo se daba por
+ * enviado: la persona aparecía sincronizada sin existir en el servidor.
+ */
+test('el rechazo se cruza por el id de la encuesta, no por el de la cola', () => {
+  const real = (idCola, idEncuesta, documento) => ({
+    id: idCola,
+    persona: { tipo_documento: 'CC', numero_documento: documento },
+    encuesta: { id: idEncuesta }
+  });
+  const pendientes = [real(7, 'uuid-bueno', '1098765432'), real(8, 'uuid-malo', '123')];
+
+  const r = repartirRespuesta(pendientes, { rechazadas: [{ id: 'uuid-malo', motivo: 'documento corto' }] });
+
+  assert.deepEqual(r.idsAceptados, [7]);
+  assert.deepEqual(r.rechazos, [{ id: 8, motivo: 'documento corto' }]);
+  assert.deepEqual(r.clavesAceptadas, [['CC', '1098765432']]);
+});
+
+test('la cola se envía en lotes de 100 como máximo', async () => {
+  const { enLotes, TAMANO_LOTE } = await import('../js/sync.js');
+  const lotes = enLotes(Array.from({ length: 1234 }, (_, i) => i));
+  assert.equal(TAMANO_LOTE, 100);
+  assert.equal(lotes.length, 13);
+  assert.ok(lotes.every(l => l.length <= 100));
+  assert.equal(lotes.flat().length, 1234);
+});

@@ -1,5 +1,7 @@
 // Subir esta versión en cada cambio de JS/CSS: el fetch es cache-first, así que
 // sin bump los navegadores seguirían sirviendo los archivos viejos.
+// v17: subida por lotes, cursor de descarga, reintentos, validación del formulario,
+//      rechazados visibles y subida en segundo plano desde el service worker.
 // v16: un registro rechazado por el servidor deja de reintentarse (bloqueaba la cola).
 // v15: la sincronización ahora también DESCARGA lo de otros dispositivos.
 // v14: resumen del dispositivo en inicio y refresco tras sincronizar.
@@ -12,7 +14,7 @@
 // v7: .hidden pasa a !important (el spinner del login se veía siempre).
 // v6: styles.css se dividió en 7 hojas por responsabilidad.
 // v5: api.js y session.js ahora envían el token de autenticación en la sincronización.
-const CACHE = 'encuestas-v16';
+const CACHE = 'encuestas-v17';
 
 const ASSETS = [
   './index.html',
@@ -31,6 +33,7 @@ const ASSETS = [
   './js/sync.js',
   './js/router.js',
   './js/session.js',
+  './js/validacion.js',
   './js/app.js',
   './js/screens/lista-personas.js',
   './js/screens/formulario-encuesta.js',
@@ -106,12 +109,116 @@ self.addEventListener('fetch', e => {
   );
 });
 
+/*
+ * Sincronización en segundo plano (Chrome y Edge en Android).
+ *
+ * Antes este evento solo avisaba a las ventanas abiertas: con la app cerrada
+ * no había ninguna, el evento terminaba "con éxito" y el navegador daba la
+ * tarea por hecha sin haber subido nada. Ahora, si no hay ventana, el propio
+ * service worker sube la cola. Si falla por falta de red, la promesa se
+ * rechaza y el navegador vuelve a intentarlo más tarde.
+ *
+ * Solo SUBE: la descarga y la mezcla se hacen al abrir la app. iOS no
+ * implementa este evento; allí la cola se envía al abrir la app.
+ */
 self.addEventListener('sync', e => {
-  if (e.tag === 'sync-encuestas') {
-    e.waitUntil(
-      self.clients.matchAll({ includeUncontrolled: true }).then(clients =>
-        clients.forEach(c => c.postMessage({ type: 'SYNC_NOW' }))
-      )
+  if (e.tag !== 'sync-encuestas') return;
+  e.waitUntil((async () => {
+    const ventanas = await self.clients.matchAll({ includeUncontrolled: true, type: 'window' });
+    if (ventanas.length) {
+      ventanas.forEach(c => c.postMessage({ type: 'SYNC_NOW' }));
+      return;
+    }
+    await subirEnSegundoPlano();
+  })());
+});
+
+const LOTE_SEGUNDO_PLANO = 100;
+
+function abrirBase() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open('encuestas_minsalud');
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+function leer(db, almacen, clave) {
+  return new Promise((resolve, reject) => {
+    const req = db.transaction(almacen, 'readonly').objectStore(almacen).get(clave);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+function leerTodo(db, almacen) {
+  return new Promise((resolve, reject) => {
+    const req = db.transaction(almacen, 'readonly').objectStore(almacen).getAll();
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+
+/** Aplica estados a la cola y limpia la marca de pendiente de las personas aceptadas. */
+function aplicarResultado(db, aceptados, rechazos) {
+  return new Promise((resolve, reject) => {
+    const t = db.transaction(['sync_queue', 'personas'], 'readwrite');
+    const cola = t.objectStore('sync_queue');
+    const personas = t.objectStore('personas');
+    for (const item of aceptados) {
+      cola.put({ ...item, status: 'SENT' });
+      const req = personas.get([item.persona.tipo_documento, item.persona.numero_documento]);
+      req.onsuccess = () => {
+        if (req.result) personas.put({ ...req.result, _pendingSync: false });
+      };
+    }
+    for (const { item, motivo } of rechazos) cola.put({ ...item, status: 'RECHAZADO', error: motivo });
+    t.oncomplete = resolve;
+    t.onerror = () => reject(t.error);
+  });
+}
+
+async function subirEnSegundoPlano() {
+  const db = await abrirBase();
+  if (!db.objectStoreNames.contains('kv')) return;
+
+  const sesion = await leer(db, 'kv', 'sesion');
+  // Sin sesión válida no hay nada que hacer aquí: lo resolverá la app al abrirse.
+  if (!sesion?.token || (sesion.expiraEn && Date.now() / 1000 > sesion.expiraEn)) return;
+
+  const pendientes = (await leerTodo(db, 'sync_queue'))
+    .filter(i => i.status === 'PENDING' || i.status === 'ERROR');
+  const url = new URL('../api/personas/sync.php', self.registration.scope);
+
+  for (let i = 0; i < pendientes.length; i += LOTE_SEGUNDO_PLANO) {
+    const lote = pendientes.slice(i, i + LOTE_SEGUNDO_PLANO);
+    // Un fallo de red lanza aquí, y el navegador reprograma el evento.
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${sesion.token}`,
+        'X-Device-Id': sesion.deviceId || '',
+        'X-Plataforma': 'pwa',
+        'X-App-Version': 'sw'
+      },
+      body: JSON.stringify({
+        personas: lote.map(({ persona }) => {
+          const { _pendingSync, ...limpia } = persona;
+          return limpia;
+        }),
+        encuestas: lote.map(item => item.encuesta)
+      })
+    });
+    if (res.status === 401 || res.status === 403) return; // la app pedirá entrar de nuevo
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+    const datos = await res.json();
+    const motivos = new Map((datos.rechazadas || []).map(r => [r.id, r.motivo]));
+    await aplicarResultado(
+      db,
+      lote.filter(item => !motivos.has(item.encuesta?.id)),
+      lote.filter(item => motivos.has(item.encuesta?.id)).map(item => ({ item, motivo: motivos.get(item.encuesta.id) }))
     );
   }
-});
+}

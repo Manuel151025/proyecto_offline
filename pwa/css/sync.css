@@ -16,7 +16,7 @@
 .connection-dot.online { background: #4CAF50; box-shadow: 0 0 0 3px rgba(76,175,80,0.2); }
 .connection-dot.offline { background: #F44336; box-shadow: 0 0 0 3px rgba(244,67,54,0.2); }
 
-.sync-counts { display: flex; gap: 12px; }
+.sync-counts { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
 .count-card {
   flex: 1;
   background: var(--surface);
@@ -56,3 +56,21 @@
 .sync-item-name { font-size: 0.9rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sync-item-meta { font-size: 0.75rem; color: var(--on-surface-secondary); margin-top: 2px; }
 
+
+/* ---- Rechazados ----
+   Terminales: el servidor no los acepta y no se reintentan. Se muestran con
+   su motivo y un acceso directo para corregir la persona. */
+.count-rechazado .count-number { color: var(--error); }
+.sync-item-motivo {
+  margin-top: 4px;
+  font-size: 0.78rem;
+  color: var(--error);
+  line-height: 1.35;
+}
+.sync-item-corregir {
+  display: inline-block;
+  margin-top: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--primary);
+}

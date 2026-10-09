@@ -3,7 +3,7 @@ import { render as renderLista } from './screens/lista-personas.js';
 import { render as renderFormulario } from './screens/formulario-encuesta.js';
 import { render as renderSync } from './screens/estado-sincronizacion.js';
 import { render as renderLogin } from './screens/login.js';
-import { getMunicipios, saveMunicipios } from './db.js';
+import { getMunicipios, saveMunicipios, getSyncCounts } from './db.js';
 import { fetchMunicipios, logout } from './api.js';
 import { syncNow } from './sync.js';
 import { showToast } from './utils.js';
@@ -35,17 +35,65 @@ async function loadMunicipios() {
   } catch (_) {}
 }
 
+/**
+ * Esperas entre reintentos cuando la sincronización automática falla.
+ *
+ * Antes no había reintento: si el intento justo después de reconectar fallaba
+ * (señal débil, DNS aún no listo), la cola esperaba al siguiente evento
+ * `online` o a que alguien abriera la app de nuevo.
+ */
+const ESPERAS_REINTENTO_MS = [30, 60, 120, 300, 900].map(s => s * 1000);
+/** Sincronización periódica mientras la app está abierta. */
+const PERIODO_MS = 5 * 60 * 1000;
+
+let fallosSeguidos = 0;
+let reintento = null;
+
 async function autoSync() {
-  if (!navigator.onLine) return;
+  clearTimeout(reintento);
+  reintento = null;
+  if (!navigator.onLine || !hasActiveSession()) return;
+
   try {
     const result = await syncNow();
+    fallosSeguidos = 0;
+    ocultarAvisoSesion();
     // También hay que repintar cuando solo se RECIBIÓ: la lista acaba de
     // ganar personas de otros dispositivos y sin refresco no se verían.
-    if (result.synced > 0 || result.recibidas > 0) {
-      showToast(result.message, 'success');
+    if (result.synced > 0 || result.recibidas > 0 || result.rechazadas > 0) {
+      showToast(result.message, result.rechazadas > 0 ? 'error' : 'success');
       refrescarPantallaActual();
     }
+  } catch (err) {
+    if (err.sesionInvalida) {
+      // Sin sesión válida reintentar no sirve: se avisa de forma visible y
+      // persistente. Antes el error se tragaba en silencio y el encuestador
+      // creía que todo se estaba enviando.
+      mostrarAvisoSesion();
+      return;
+    }
+    const espera = ESPERAS_REINTENTO_MS[Math.min(fallosSeguidos, ESPERAS_REINTENTO_MS.length - 1)];
+    fallosSeguidos++;
+    reintento = setTimeout(autoSync, espera);
+  }
+}
+
+async function mostrarAvisoSesion() {
+  const aviso = document.getElementById('aviso-sesion');
+  if (!aviso) return;
+  let pendientes = 0;
+  try {
+    const c = await getSyncCounts();
+    pendientes = c.pending + c.error;
   } catch (_) {}
+  document.getElementById('aviso-sesion-texto').textContent = pendientes > 0
+    ? `Tu sesión venció. Conéctate e inicia sesión para enviar ${pendientes} registro(s). No se borra nada.`
+    : 'Tu sesión venció. Inicia sesión con conexión para seguir sincronizando.';
+  aviso.classList.remove('hidden');
+}
+
+function ocultarAvisoSesion() {
+  document.getElementById('aviso-sesion')?.classList.add('hidden');
 }
 
 /**
@@ -65,8 +113,15 @@ function refrescarPantallaActual() {
 function setupOnlineSync() {
   window.addEventListener('online', () => {
     showToast('Conexión restaurada', 'info');
+    fallosSeguidos = 0;
     autoSync();
   });
+  // Al volver a la app (desde otra app o con la pantalla encendida de nuevo).
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') autoSync();
+  });
+  setInterval(() => { if (!reintento) autoSync(); }, PERIODO_MS);
+  document.getElementById('aviso-sesion-btn')?.addEventListener('click', () => cerrarSesion());
 }
 
 function registerSW() {
@@ -116,6 +171,7 @@ function updateChrome() {
   const isLogin = hash === '/login';
   document.querySelector('.app-header')?.classList.toggle('chrome-hidden', isLogin);
   document.querySelector('.bottom-nav')?.classList.toggle('chrome-hidden', isLogin);
+  if (isLogin) ocultarAvisoSesion();
 }
 
 async function init() {

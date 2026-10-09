@@ -41,3 +41,31 @@
 /* ---- App chrome (header/bottom-nav) visibility ---- */
 .chrome-hidden { display: none; }
 
+
+/* ---- Sesión vencida ----
+   Aviso fijo bajo la cabecera: no es informativo, impide sincronizar hasta
+   volver a entrar. Por eso no desaparece solo como un toast. */
+.aviso-sesion {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--warning-bg);
+  color: var(--warning);
+  border-bottom: 1px solid #EFD9B4;
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+.aviso-sesion span { flex: 1; }
+.aviso-sesion-btn {
+  flex-shrink: 0;
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid currentColor;
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--warning);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}

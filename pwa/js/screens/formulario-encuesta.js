@@ -3,8 +3,9 @@ import { navigate } from '../router.js';
 import { generateUUID, getDeviceId, nowMs, dateToMs, msToDateInput, showToast } from '../utils.js';
 import { registerBackgroundSync } from '../sync.js';
 import { getSession } from '../session.js';
+import { validarPersona, TIPOS_DOCUMENTO } from '../validacion.js';
 
-const TIPOS_DOC = ['CC', 'TI', 'RC', 'CE', 'PP', 'NIT', 'PE'];
+const TIPOS_DOC = TIPOS_DOCUMENTO;
 
 function currentEncuestadorId() {
   return getSession()?.encuestadorId || 1;
@@ -150,7 +151,7 @@ export async function render(container, params) {
 
   document.getElementById('encuesta-form').addEventListener('submit', async e => {
     e.preventDefault();
-    await handleSubmit(isEdit, persona);
+    await handleSubmit(isEdit, persona, municipios);
   });
 
   setupDepartamentoFilter(municipios, persona?.municipio_codigo ?? null);
@@ -185,7 +186,36 @@ function setupDepartamentoFilter(municipios, selectedCodigo) {
   }
 }
 
-async function handleSubmit(isEdit, existing) {
+/**
+ * Marca los campos con error y deja el mensaje debajo de cada uno.
+ * Devuelve true si hubo errores.
+ */
+function mostrarErrores(form, errores) {
+  form.querySelectorAll('.field-error').forEach(el => el.remove());
+  form.querySelectorAll('.input-error').forEach(el => {
+    el.classList.remove('input-error');
+    el.removeAttribute('aria-invalid');
+  });
+
+  const campos = Object.keys(errores);
+  for (const campo of campos) {
+    const input = document.getElementById(campo);
+    if (!input) continue;
+    input.classList.add('input-error');
+    input.setAttribute('aria-invalid', 'true');
+    const msg = document.createElement('p');
+    msg.className = 'field-error';
+    msg.textContent = errores[campo];
+    input.insertAdjacentElement('afterend', msg);
+  }
+  if (campos.length) {
+    document.getElementById(campos[0])?.focus();
+    showToast('Revisa los campos marcados', 'error');
+  }
+  return campos.length > 0;
+}
+
+async function handleSubmit(isEdit, existing, municipios = []) {
   const form = document.getElementById('encuesta-form');
   const btn = document.getElementById('btn-guardar');
 
@@ -193,30 +223,45 @@ async function handleSubmit(isEdit, existing) {
   const numero = existing?.numero_documento || form.numero_documento.value.trim();
   const nombres = form.nombres.value.trim();
   const apellidos = form.apellidos.value.trim();
+  const ts = nowMs();
 
-  if (!tipo || !numero || !nombres || !apellidos) {
-    showToast('Completa los campos obligatorios (*)', 'error');
-    return;
-  }
+  const borrador = {
+    tipo_documento: tipo,
+    numero_documento: numero,
+    nombres,
+    apellidos,
+    fecha_nacimiento: dateToMs(form.fecha_nacimiento.value) || null,
+    email: form.email.value.trim() || null,
+    estrato: form.estrato.value === '' ? null : Number(form.estrato.value),
+    municipio_codigo: form.municipio_codigo.value || null
+  };
+  // Mismas reglas que el servidor: lo que no pasaría allí no se guarda aquí,
+  // mientras el encuestador todavía está frente a la persona para corregirlo.
+  const errores = validarPersona(borrador, {
+    municipiosValidos: municipios.length ? new Set(municipios.map(m => m.codigo)) : null,
+    ahora: ts
+  });
+  // Al editar, el documento no se puede cambiar: no se bloquea por él.
+  if (isEdit) delete errores.numero_documento;
+  if (mostrarErrores(form, errores)) return;
 
   btn.disabled = true;
   btn.textContent = 'Guardando...';
 
   try {
-    const ts = nowMs();
     const persona = {
       tipo_documento: tipo,
       numero_documento: numero,
       nombres,
       apellidos,
-      fecha_nacimiento: dateToMs(form.fecha_nacimiento.value) || null,
+      fecha_nacimiento: borrador.fecha_nacimiento,
       telefono: form.telefono.value.trim() || null,
-      email: form.email.value.trim() || null,
+      email: borrador.email,
       direccion: form.direccion.value.trim() || null,
       vereda: form.vereda.value.trim() || null,
       eps: form.eps.value.trim() || null,
       ocupacion: form.ocupacion.value.trim() || null,
-      estrato: form.estrato.value ? parseInt(form.estrato.value) : null,
+      estrato: borrador.estrato,
       municipio_codigo: form.municipio_codigo.value || null,
       updated_at: ts,
       device_id: getDeviceId(),
@@ -238,7 +283,11 @@ async function handleSubmit(isEdit, existing) {
     await addSyncItem({ persona, encuesta, status: 'PENDING', created_at: ts });
     registerBackgroundSync();
 
-    showToast(isEdit ? 'Persona actualizada' : 'Persona registrada', 'success');
+    // Sin señal se dice explícitamente dónde quedó: es la duda que más
+    // inquieta en campo.
+    showToast(navigator.onLine
+      ? (isEdit ? 'Persona actualizada' : 'Persona registrada')
+      : 'Guardado en el teléfono. Se enviará cuando haya señal', 'success');
     navigate('/personas');
   } catch (err) {
     showToast('Error al guardar: ' + err.message, 'error');
