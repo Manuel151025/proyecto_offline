@@ -12,6 +12,7 @@ import com.minsalud.encuestas.data.local.entity.TipoDocumentoEntity
 import com.minsalud.encuestas.data.local.prefs.SessionManager
 import com.minsalud.encuestas.data.remote.api.ApiService
 import com.minsalud.encuestas.data.remote.dto.CambiosResponseDto
+import com.minsalud.encuestas.data.remote.dto.CursorDto
 import com.minsalud.encuestas.data.remote.dto.PersonaRemotaDto
 import com.minsalud.encuestas.data.remote.dto.RechazoDto
 import com.minsalud.encuestas.data.remote.dto.SyncRequestDto
@@ -59,7 +60,7 @@ class SyncRepositoryImplTest {
         // Por defecto el servidor no tiene nada nuevo. Las pruebas de subida no
         // deberían tener que saber que hay una descarga detrás.
         coEvery { sessionManager.marcaDescarga() } returns 0L
-        coEvery { apiService.getCambios(any(), any()) } returns respuestaCambios(emptyList())
+        coEvery { apiService.getCambios(any(), any(), any(), any()) } returns respuestaCambios(emptyList())
         coEvery { colaDao.getPendingPersonaKeysList() } returns emptyList()
 
         repository = SyncRepositoryImpl(colaDao, personaDao, encuestaDao, apiService, sessionManager)
@@ -125,9 +126,10 @@ class SyncRepositoryImplTest {
     private fun respuestaCambios(
         personas: List<PersonaRemotaDto>,
         marca: Long = 0L,
-        hayMas: Boolean = false
+        hayMas: Boolean = false,
+        cursor: CursorDto? = null
     ) = Response.success(
-        CambiosResponseDto(success = true, personas = personas, marca = marca, hayMas = hayMas)
+        CambiosResponseDto(success = true, personas = personas, marca = marca, hayMas = hayMas, cursor = cursor)
     )
 
     // --- Pruebas ---
@@ -247,7 +249,7 @@ class SyncRepositoryImplTest {
         coVerify(exactly = 0) { apiService.syncData(any()) }
         // Este es el fallo que motivó la descarga: un dispositivo sin nada que
         // subir se quedaba sin ver nunca el trabajo de los demás.
-        coVerify(exactly = 1) { apiService.getCambios(any(), any()) }
+        coVerify(exactly = 1) { apiService.getCambios(any(), any(), any(), any()) }
     }
 
     // --- Registros rechazados por el servidor ---
@@ -335,7 +337,7 @@ class SyncRepositoryImplTest {
     fun `guarda las personas que llegan del servidor`() = runTest {
         coEvery { colaDao.getPendientes() } returns emptyList()
         coEvery { personaDao.getPersona(any(), any()) } returns null
-        coEvery { apiService.getCambios(any(), any()) } returns
+        coEvery { apiService.getCambios(any(), any(), any(), any()) } returns
             respuestaCambios(listOf(remota("1098765432", 5_000L, 9_000L)), marca = 9_000L)
 
         repository.sincronizarPendientes()
@@ -350,7 +352,7 @@ class SyncRepositoryImplTest {
     fun `la marca de agua avanza para no volver a pedir lo mismo`() = runTest {
         coEvery { colaDao.getPendientes() } returns emptyList()
         coEvery { personaDao.getPersona(any(), any()) } returns null
-        coEvery { apiService.getCambios(any(), any()) } returns
+        coEvery { apiService.getCambios(any(), any(), any(), any()) } returns
             respuestaCambios(listOf(remota("1098765432", 5_000L, 9_000L)), marca = 9_000L)
 
         repository.sincronizarPendientes()
@@ -358,14 +360,57 @@ class SyncRepositoryImplTest {
         coVerify(exactly = 1) { sessionManager.setMarcaDescarga(9_000L) }
     }
 
+    /**
+     * Pide desde la marca guardada menos el solape de 2 minutos: un envío que
+     * el servidor confirmó tarde con un sello anterior no se queda atrás.
+     */
     @Test
-    fun `pide desde la marca guardada, no desde cero`() = runTest {
+    fun `pide desde la marca guardada con dos minutos de solape`() = runTest {
         coEvery { colaDao.getPendientes() } returns emptyList()
-        coEvery { sessionManager.marcaDescarga() } returns 7_777L
+        coEvery { sessionManager.marcaDescarga() } returns 1_000_000L
 
         repository.sincronizarPendientes()
 
-        coVerify(exactly = 1) { apiService.getCambios(7_777L, any()) }
+        coVerify(exactly = 1) { apiService.getCambios(880_000L, any(), null, null) }
+    }
+
+    /** El fallo crítico del análisis: una página que corta un lote con el mismo sello. */
+    @Test
+    fun `la pagina siguiente continua con el cursor compuesto`() = runTest {
+        coEvery { colaDao.getPendientes() } returns emptyList()
+        coEvery { personaDao.getPersona(any(), any()) } returns null
+        coEvery { apiService.getCambios(0L, any(), null, null) } returns respuestaCambios(
+            listOf(remota("111111", 1_000L, 500L), remota("222222", 1_000L, 500L)),
+            marca = 500L, hayMas = true, cursor = CursorDto(500L, "CC", "222222")
+        )
+        coEvery { apiService.getCambios(500L, any(), "CC", "222222") } returns respuestaCambios(
+            listOf(remota("333333", 1_000L, 500L)), marca = 500L, hayMas = false,
+            cursor = CursorDto(500L, "CC", "333333")
+        )
+
+        val resumen = repository.sincronizarPendientes()
+
+        // La tercera persona del mismo lote llega: antes se perdía.
+        coVerify(exactly = 3) { personaDao.upsert(any()) }
+        assertEquals(3, resumen.recibidos)
+    }
+
+    @Test
+    fun `el resumen cuenta enviados y rechazados`() = runTest {
+        prepararCola(3)
+        coEvery { apiService.syncData(any()) } returns Response.success(
+            SyncResponseDto(
+                success = true, message = null,
+                processedEncuestas = listOf("enc-1", "enc-3"),
+                rechazadas = listOf(RechazoDto("enc-2", "estrato fuera de rango"))
+            )
+        )
+
+        val resumen = repository.sincronizarPendientes()
+
+        assertEquals(2, resumen.enviados)
+        assertEquals(1, resumen.rechazados)
+        assertEquals("2 enviado(s) · 1 rechazado(s)", resumen.mensaje)
     }
 
     /**
@@ -378,7 +423,7 @@ class SyncRepositoryImplTest {
         coEvery { colaDao.getPendientes() } returns emptyList()
         coEvery { colaDao.getPendingPersonaKeysList() } returns listOf("CC|1098765432")
         coEvery { personaDao.getPersona(any(), any()) } returns persona("1098765432", updatedAt = 1_000L)
-        coEvery { apiService.getCambios(any(), any()) } returns
+        coEvery { apiService.getCambios(any(), any(), any(), any()) } returns
             respuestaCambios(listOf(remota("1098765432", 9_999_999L, 9_000L)), marca = 9_000L)
 
         repository.sincronizarPendientes()
@@ -390,7 +435,7 @@ class SyncRepositoryImplTest {
     fun `una version remota mas antigua no reemplaza a la local`() = runTest {
         coEvery { colaDao.getPendientes() } returns emptyList()
         coEvery { personaDao.getPersona(any(), any()) } returns persona("1098765432", updatedAt = 8_000L)
-        coEvery { apiService.getCambios(any(), any()) } returns
+        coEvery { apiService.getCambios(any(), any(), any(), any()) } returns
             respuestaCambios(listOf(remota("1098765432", 2_000L, 9_000L)), marca = 9_000L)
 
         repository.sincronizarPendientes()
@@ -402,15 +447,15 @@ class SyncRepositoryImplTest {
     fun `sigue paginando mientras el servidor diga que hay mas`() = runTest {
         coEvery { colaDao.getPendientes() } returns emptyList()
         coEvery { personaDao.getPersona(any(), any()) } returns null
-        coEvery { apiService.getCambios(0L, any()) } returns
+        coEvery { apiService.getCambios(0L, any(), null, null) } returns
             respuestaCambios(listOf(remota("111111", 1_000L, 100L)), marca = 100L, hayMas = true)
-        coEvery { apiService.getCambios(100L, any()) } returns
+        coEvery { apiService.getCambios(100L, any(), null, null) } returns
             respuestaCambios(listOf(remota("222222", 2_000L, 200L)), marca = 200L, hayMas = false)
 
         repository.sincronizarPendientes()
 
-        // Segunda página pedida desde la marca de la primera, y las dos personas guardadas.
-        coVerify(exactly = 1) { apiService.getCambios(100L, any()) }
+        // Un servidor sin cursor: la segunda página se pide desde la marca de la primera.
+        coVerify(exactly = 1) { apiService.getCambios(100L, any(), null, null) }
         coVerify(exactly = 2) { personaDao.upsert(any()) }
         coVerify(exactly = 1) { sessionManager.setMarcaDescarga(200L) }
     }
@@ -423,7 +468,7 @@ class SyncRepositoryImplTest {
     fun `un tipo de documento desconocido se salta sin romper la pagina`() = runTest {
         coEvery { colaDao.getPendientes() } returns emptyList()
         coEvery { personaDao.getPersona(any(), any()) } returns null
-        coEvery { apiService.getCambios(any(), any()) } returns respuestaCambios(
+        coEvery { apiService.getCambios(any(), any(), any(), any()) } returns respuestaCambios(
             listOf(
                 remota("111111", 1_000L, 100L, tipo = "MARCIANO"),
                 remota("222222", 2_000L, 200L)
@@ -450,6 +495,6 @@ class SyncRepositoryImplTest {
         val error = runCatching { repository.sincronizarPendientes() }.exceptionOrNull()
 
         assertTrue(error is DomainError.NetworkError)
-        coVerify(exactly = 1) { apiService.getCambios(any(), any()) }
+        coVerify(exactly = 1) { apiService.getCambios(any(), any(), any(), any()) }
     }
 }

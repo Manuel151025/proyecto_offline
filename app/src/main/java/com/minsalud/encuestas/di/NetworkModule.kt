@@ -1,7 +1,8 @@
-﻿package com.minsalud.encuestas.di
+package com.minsalud.encuestas.di
 
 import com.google.gson.GsonBuilder
 import com.minsalud.encuestas.BuildConfig
+import com.minsalud.encuestas.data.local.prefs.DispositivoManager
 import com.minsalud.encuestas.data.local.prefs.SessionManager
 import com.minsalud.encuestas.data.remote.api.ApiService
 import dagger.Module
@@ -47,18 +48,32 @@ object NetworkModule {
     @Provides
     @Singleton
     @AuthInterceptor
-    fun provideAuthInterceptor(sessionManager: SessionManager): Interceptor {
+    fun provideAuthInterceptor(
+        sessionManager: SessionManager,
+        dispositivo: DispositivoManager
+    ): Interceptor {
         return Interceptor { chain ->
             val original = chain.request()
+            val esLogin = original.url.encodedPath.endsWith("login.php")
             val token = sessionManager.token()
 
-            val request = if (token != null && !original.url.encodedPath.endsWith("login.php")) {
-                original.newBuilder().addHeader("Authorization", "Bearer $token").build()
-            } else {
-                original
+            // Cabeceras para el monitor de dispositivos del panel.
+            val builder = original.newBuilder()
+                .header("X-Device-Id", dispositivo.deviceId())
+                .header("X-Plataforma", "android")
+                .header("X-App-Version", BuildConfig.VERSION_NAME)
+            if (token != null && !esLogin) {
+                builder.header("Authorization", "Bearer $token")
             }
 
-            chain.proceed(request)
+            val response = chain.proceed(builder.build())
+
+            // Token vencido o revocado (por ejemplo, al cambiar la contraseña
+            // desde el panel): se avisa en la interfaz en vez de fallar en silencio.
+            if (response.code == 401 && !esLogin) {
+                sessionManager.marcarReautenticacion(true)
+            }
+            response
         }
     }
 

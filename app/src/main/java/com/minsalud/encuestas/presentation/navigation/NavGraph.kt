@@ -1,6 +1,8 @@
 package com.minsalud.encuestas.presentation.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.platform.LocalContext
+import com.minsalud.encuestas.worker.SyncWorkerScheduler
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
@@ -25,11 +27,14 @@ fun AppNavGraph(
         startDestination = startDestination
     ) {
         composable(Screen.Login.route) {
+            val context = LocalContext.current
             LoginScreen(
                 viewModel = hiltViewModel(),
                 onLoginSuccess = {
+                    // Con un token nuevo, lo que quedó pendiente sube ya.
+                    SyncWorkerScheduler.triggerImmediateSync(context)
                     navController.navigate(Screen.ListaPersonas.route) {
-                        popUpTo(Screen.Login.route) { inclusive = true }
+                        popUpTo(0) { inclusive = true }
                     }
                 }
             )
@@ -46,6 +51,8 @@ fun AppNavGraph(
                         popUpTo(0) { inclusive = true }
                     }
                 },
+                // Volver a entrar SIN cerrar la sesión: la cola y los datos se conservan.
+                onReautenticar = { navController.navigate(Screen.Login.route) },
                 onPersonaClick = { persona ->
                     navController.navigate(
                         Screen.FormularioEncuesta.edit(persona.tipoDocumento.name, persona.numeroDocumento)

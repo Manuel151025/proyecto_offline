@@ -14,11 +14,17 @@ import com.minsalud.encuestas.data.remote.dto.PersonaSyncDto
 import com.minsalud.encuestas.data.remote.dto.SyncRequestDto
 import com.minsalud.encuestas.domain.model.ColaSincronizacion
 import com.minsalud.encuestas.domain.model.DomainError
+import com.minsalud.encuestas.domain.model.EstadoCola
+import com.minsalud.encuestas.domain.model.RechazoPendiente
+import com.minsalud.encuestas.domain.model.ResumenSync
 import com.minsalud.encuestas.domain.repository.SyncRepository
 import com.minsalud.encuestas.domain.sync.DecisionMezcla
 import com.minsalud.encuestas.domain.sync.decidirMezcla
 import com.minsalud.encuestas.data.mapper.toEntity
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import java.io.IOException
 import javax.inject.Inject
 
@@ -51,6 +57,21 @@ class SyncRepositoryImpl @Inject constructor(
 
         /** Tope de páginas por sincronización, como cortafuegos. */
         const val MAX_PAGINAS = 10
+
+        /**
+         * Margen hacia atrás al empezar cada descarga. Dos envíos de otros
+         * celulares pueden confirmarse en el servidor en orden distinto al de
+         * sus sellos; sin solape, el que se confirmó tarde con sello anterior
+         * quedaría detrás de la marca. Recibir algo dos veces es inofensivo.
+         */
+        const val SOLAPE_MS = 120_000L
+
+        /**
+         * Una sola sincronización a la vez en todo el proceso: el trabajo
+         * periódico, el inmediato y el botón manual podían solaparse y enviar
+         * el mismo lote dos veces.
+         */
+        val candado = Mutex()
     }
 
     /** Elemento de la cola ya resuelto contra la base local, listo para enviar. */
@@ -66,6 +87,16 @@ class SyncRepositoryImpl @Inject constructor(
 
     override fun pendingPersonaKeys(): Flow<List<String>> = colaDao.getPendingPersonaKeys()
 
+    override fun estadoCola(): Flow<EstadoCola> =
+        combine(colaDao.conteoPorEstado(), colaDao.rechazados()) { conteos, rechazados ->
+            val porEstado = conteos.associate { it.estado to it.total }
+            EstadoCola(
+                pendientes = porEstado["PENDING"] ?: 0,
+                conError = porEstado["ERROR"] ?: 0,
+                rechazados = rechazados.map { RechazoPendiente(it.tipoDocumento, it.numeroDocumento, it.motivo) }
+            )
+        }
+
     /**
      * Sincronización completa: primero sube, después baja.
      *
@@ -79,23 +110,30 @@ class SyncRepositoryImpl @Inject constructor(
      * llegar aunque el propio se atasque. Si la subida tenía errores, se
      * relanzan al final para que el WorkManager reprograme.
      */
-    override suspend fun sincronizarPendientes() {
-        val falloDeSubida = runCatching { subirPendientes() }.exceptionOrNull()
+    override suspend fun sincronizarPendientes(): ResumenSync = candado.withLock {
+        var subida = Subida()
+        val falloDeSubida = runCatching { subida = subirPendientes() }.exceptionOrNull()
 
+        var recibidos = 0
         try {
-            descargarCambios()
+            recibidos = descargarCambios()
         } catch (e: Exception) {
             // Si la subida ya venía fallando, ese error es el informativo.
             if (falloDeSubida == null) throw traducir(e)
         }
 
         if (falloDeSubida != null) throw falloDeSubida
+        ResumenSync(enviados = subida.enviados, recibidos = recibidos, rechazados = subida.rechazados)
     }
 
+    private data class Subida(val enviados: Int = 0, val rechazados: Int = 0)
+
     /** Envía la cola de salida por lotes. */
-    private suspend fun subirPendientes() {
+    private suspend fun subirPendientes(): Subida {
         val pendientes = colaDao.getPendientes()
-        if (pendientes.isEmpty()) return
+        if (pendientes.isEmpty()) return Subida()
+        var enviados = 0
+        var rechazados = 0
 
         // 1. Resolver contra la base local. Los huérfanos se descartan aquí,
         //    sin gastar red: no tiene sentido enviarlos nunca.
@@ -144,7 +182,7 @@ class SyncRepositoryImpl @Inject constructor(
             )
         }
 
-        if (preparados.isEmpty()) return
+        if (preparados.isEmpty()) return Subida()
 
         var hayFalloDeRed = false
         var hayFalloFatal = false
@@ -183,8 +221,14 @@ class SyncRepositoryImpl @Inject constructor(
                     for (p in lote) {
                         val motivo = rechazadas[p.encuesta.id]
                         when {
-                            motivo != null -> colaDao.marcarRechazado(p.cola.idCola, motivo)
-                            p.encuesta.id in confirmadas -> colaDao.marcarEnviado(p.cola.idCola)
+                            motivo != null -> {
+                                colaDao.marcarRechazado(p.cola.idCola, motivo)
+                                rechazados++
+                            }
+                            p.encuesta.id in confirmadas -> {
+                                colaDao.marcarEnviado(p.cola.idCola)
+                                enviados++
+                            }
                             else -> {
                                 colaDao.incrementarIntento(p.cola.idCola, "El servidor no confirmó la encuesta")
                                 hayFalloDeRed = true
@@ -217,8 +261,11 @@ class SyncRepositoryImpl @Inject constructor(
             throw DomainError.NetworkError("Existen fallos de red por reintentar")
         }
         if (hayFalloFatal) {
-            throw DomainError.InvalidData("Existen errores 4xx que no se pudieron procesar")
+            throw DomainError.InvalidData(
+                "El servidor no aceptó el envío. Si tu sesión venció, inicia sesión de nuevo con conexión."
+            )
         }
+        return Subida(enviados, rechazados)
     }
 
     /**
@@ -229,34 +276,48 @@ class SyncRepositoryImpl @Inject constructor(
      * convierta la sincronización en un bucle infinito sobre datos móviles;
      * lo que falte llega en la siguiente sincronización.
      */
-    private suspend fun descargarCambios() {
-        var marca = sessionManager.marcaDescarga()
+    private suspend fun descargarCambios(): Int {
+        var desde = maxOf(0L, sessionManager.marcaDescarga() - SOLAPE_MS)
+        var tipo: String? = null
+        var numero: String? = null
+        var recibidos = 0
 
         repeat(MAX_PAGINAS) {
-            val response = apiService.getCambios(desde = marca, limite = TAMANO_PAGINA)
+            val response = apiService.getCambios(desde = desde, limite = TAMANO_PAGINA, tipo = tipo, numero = numero)
             if (!response.isSuccessful) {
                 throw DomainError.NetworkError("La descarga falló: HTTP ${response.code()}")
             }
-            val cuerpo = response.body() ?: return
-            if (cuerpo.personas.isEmpty()) return
+            val cuerpo = response.body() ?: return recibidos
+            if (cuerpo.personas.isEmpty()) return recibidos
 
-            mezclar(cuerpo.personas)
+            recibidos += mezclar(cuerpo.personas)
 
-            // La marca solo avanza si el servidor devolvió una mayor. Guardarla
-            // después de mezclar: si la app muere a mitad, se repite la página
-            // en vez de saltársela, y repetir es inofensivo.
-            if (cuerpo.marca > marca) {
-                marca = cuerpo.marca
-                sessionManager.setMarcaDescarga(marca)
+            // Siguiente página: justo después de la última persona entregada.
+            // Un servidor anterior al cursor solo devuelve la marca.
+            val cursor = cuerpo.cursor
+            if (cursor != null) {
+                desde = cursor.sello
+                tipo = cursor.tipo
+                numero = cursor.numero
+            } else {
+                desde = cuerpo.marca
+                tipo = null
+                numero = null
             }
 
-            if (!cuerpo.hayMas) return
+            // La marca guardada solo avanza; se guarda después de mezclar: si la
+            // app muere a mitad, se repite la página en vez de saltársela.
+            if (desde > sessionManager.marcaDescarga()) sessionManager.setMarcaDescarga(desde)
+
+            if (!cuerpo.hayMas) return recibidos
         }
+        return recibidos
     }
 
-    /** Aplica la regla de mezcla a cada persona recibida. */
-    private suspend fun mezclar(remotas: List<PersonaRemotaDto>) {
+    /** Aplica la regla de mezcla a cada persona recibida. Devuelve cuántas se guardaron. */
+    private suspend fun mezclar(remotas: List<PersonaRemotaDto>): Int {
         val conPendientes = colaDao.getPendingPersonaKeysList().toSet()
+        var guardadas = 0
 
         for (remota in remotas) {
             // Un tipo desconocido se salta en vez de tumbar la descarga: perder
@@ -273,6 +334,7 @@ class SyncRepositoryImpl @Inject constructor(
                 updatedAtRemoto = remota.updatedAt
             )
             if (decision == DecisionMezcla.CONSERVAR) continue
+            guardadas++
 
             personaDao.upsert(
                 PersonaEntity(
@@ -296,6 +358,7 @@ class SyncRepositoryImpl @Inject constructor(
                 )
             )
         }
+        return guardadas
     }
 
     /** Convierte lo que lance la descarga en el error de dominio que toque. */

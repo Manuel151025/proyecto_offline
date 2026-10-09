@@ -39,6 +39,9 @@ class ListaPersonasViewModel @Inject constructor(
     )
     val uiState: StateFlow<ListaPersonasUiState> = _uiState.asStateFlow()
 
+    /** true si el servidor rechazó el token: hay que volver a entrar con red. */
+    val requiereReautenticacion: StateFlow<Boolean> get() = sessionManager.requiereReautenticacion
+
     init {
         cargarPersonas()
     }

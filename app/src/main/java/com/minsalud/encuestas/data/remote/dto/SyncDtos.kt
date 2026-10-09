@@ -1,4 +1,4 @@
-﻿package com.minsalud.encuestas.data.remote.dto
+package com.minsalud.encuestas.data.remote.dto
 
 import com.google.gson.annotations.SerializedName
 
@@ -81,7 +81,20 @@ data class CambiosResponseDto(
     @SerializedName("success") val success: Boolean,
     @SerializedName("personas") val personas: List<PersonaRemotaDto>,
     @SerializedName("marca") val marca: Long,
-    @SerializedName("hay_mas") val hayMas: Boolean
+    @SerializedName("hay_mas") val hayMas: Boolean,
+    /** Nulo con servidores anteriores al cursor compuesto. */
+    @SerializedName("cursor") val cursor: CursorDto? = null
+)
+
+/**
+ * Posición exacta tras la última persona entregada. Con solo el sello, una
+ * página que cortaba un lote sellado en el mismo milisegundo dejaba el resto
+ * sin descargar nunca.
+ */
+data class CursorDto(
+    @SerializedName("sello") val sello: Long,
+    @SerializedName("tipo") val tipo: String?,
+    @SerializedName("numero") val numero: String?
 )
 
 /** Persona tal como la devuelve el servidor, con su sello incluido. */

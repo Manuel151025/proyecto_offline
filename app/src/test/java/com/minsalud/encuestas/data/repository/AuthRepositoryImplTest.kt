@@ -1,6 +1,8 @@
 package com.minsalud.encuestas.data.repository
 
 import com.minsalud.encuestas.core.Result
+import com.minsalud.encuestas.data.local.prefs.AlmacenCredenciales
+import com.minsalud.encuestas.data.local.prefs.CredencialGuardada
 import com.minsalud.encuestas.data.local.prefs.SessionManager
 import com.minsalud.encuestas.data.remote.api.ApiService
 import com.minsalud.encuestas.data.remote.dto.EncuestadorDto
@@ -13,6 +15,7 @@ import kotlinx.coroutines.test.runTest
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.ResponseBody.Companion.toResponseBody
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -30,12 +33,21 @@ class AuthRepositoryImplTest {
     private lateinit var apiService: ApiService
     private lateinit var sessionManager: SessionManager
     private lateinit var repository: AuthRepositoryImpl
+    private lateinit var credenciales: CredencialesEnMemoria
+
+    /** Almacén falso: lo que importa es qué se guarda, no SharedPreferences. */
+    private class CredencialesEnMemoria : AlmacenCredenciales {
+        val guardadas = mutableMapOf<String, CredencialGuardada>()
+        override fun guardar(credencial: CredencialGuardada) { guardadas[credencial.documento] = credencial }
+        override fun buscar(documento: String) = guardadas[documento]
+    }
 
     @Before
     fun setUp() {
         apiService = mockk()
         sessionManager = mockk(relaxed = true)
-        repository = AuthRepositoryImpl(apiService, sessionManager)
+        credenciales = CredencialesEnMemoria()
+        repository = AuthRepositoryImpl(apiService, sessionManager, credenciales)
     }
 
     private fun respuestaOk(token: String? = "token-abc123", expiraEn: Long = 9_999L) =
@@ -114,6 +126,48 @@ class AuthRepositoryImplTest {
         val resultado = repository.login("9999999999", "Demo2026Salud")
 
         assertTrue(resultado is Result.Error)
+    }
+
+    /**
+     * El fallo que motivó el cambio: el respaldo sin conexión era una lista
+     * escrita en el código con solo la cuenta demo. Una cuenta real creada en
+     * el panel no podía volver a entrar sin señal.
+     */
+    @Test
+    fun `una cuenta real entra sin conexion despues de un login en linea`() = runTest {
+        coEvery { apiService.login(any()) } returns Response.success(
+            LoginResponseDto(true, null, "tok", 9_999L, EncuestadorDto(42, "Yesenia Palacios", "1077123456"))
+        )
+        repository.login("1077123456", "ClaveDeCampo2026")
+
+        coEvery { apiService.login(any()) } throws IOException("sin red")
+        val resultado = repository.login("1077123456", "ClaveDeCampo2026")
+
+        assertTrue(resultado is Result.Success)
+        assertEquals(42, (resultado as Result.Success).data.id)
+        assertEquals("Yesenia Palacios", resultado.data.nombre)
+    }
+
+    @Test
+    fun `sin conexion una cuenta real rechaza la clave equivocada`() = runTest {
+        coEvery { apiService.login(any()) } returns Response.success(
+            LoginResponseDto(true, null, "tok", 9_999L, EncuestadorDto(42, "Yesenia Palacios", "1077123456"))
+        )
+        repository.login("1077123456", "ClaveDeCampo2026")
+        coEvery { apiService.login(any()) } throws IOException("sin red")
+
+        assertTrue(repository.login("1077123456", "otra-clave") is Result.Error)
+    }
+
+    @Test
+    fun `la credencial guardada no contiene la contrasena`() = runTest {
+        coEvery { apiService.login(any()) } returns respuestaOk()
+
+        repository.login("1000000001", "Demo2026Salud")
+
+        val guardada = credenciales.guardadas.getValue("1000000001")
+        assertFalse(guardada.hash.contains("Demo2026Salud"))
+        assertEquals(64, guardada.hash.length) // 256 bits en hexadecimal
     }
 
     @Test

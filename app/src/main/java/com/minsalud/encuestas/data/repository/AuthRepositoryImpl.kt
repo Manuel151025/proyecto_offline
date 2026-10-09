@@ -1,6 +1,10 @@
 package com.minsalud.encuestas.data.repository
 
+import com.minsalud.encuestas.BuildConfig
 import com.minsalud.encuestas.core.Result
+import com.minsalud.encuestas.data.local.prefs.AlmacenCredenciales
+import com.minsalud.encuestas.data.local.prefs.CredencialGuardada
+import com.minsalud.encuestas.data.local.prefs.HashCredencial
 import com.minsalud.encuestas.data.local.prefs.SessionManager
 import com.minsalud.encuestas.data.remote.api.ApiService
 import com.minsalud.encuestas.data.remote.dto.LoginRequestDto
@@ -8,37 +12,26 @@ import com.minsalud.encuestas.domain.model.DomainError
 import com.minsalud.encuestas.domain.model.Encuestador
 import com.minsalud.encuestas.domain.repository.AuthRepository
 import java.io.IOException
-import java.security.MessageDigest
 import javax.inject.Inject
 
 /**
  * Autenticación híbrida (offline-first):
  *
- *  - Con red: valida contra el servidor y guarda el token que exige
- *    /api/personas/sync.php. Es la única vía para obtener un token nuevo.
- *  - Sin red: cae al respaldo local sembrado en el dispositivo, conservando
- *    el token emitido la última vez que hubo conexión. Así el encuestador
- *    entra en campo y la cola se envía al recuperar la señal.
+ *  - Con red: valida contra el servidor, guarda el token que exige
+ *    /api/personas/sync.php y deja una credencial con hash PBKDF2 para entrar
+ *    después sin conexión. Es la única vía para obtener un token nuevo.
+ *  - Sin red: valida contra esa credencial guardada, conservando el token
+ *    emitido la última vez que hubo conexión.
  *
- * Las contraseñas del respaldo local se comparan por hash SHA-256; nunca se
- * guarda la contraseña en claro.
+ * Antes el respaldo sin conexión era una lista escrita en el código con solo la
+ * cuenta demo: un encuestador real que cerraba sesión sin señal no podía volver
+ * a entrar. La cuenta demo queda solo en compilaciones de depuración.
  */
 class AuthRepositoryImpl @Inject constructor(
     private val apiService: ApiService,
-    private val sessionManager: SessionManager
+    private val sessionManager: SessionManager,
+    private val credenciales: AlmacenCredenciales
 ) : AuthRepository {
-
-    private data class Cuenta(
-        val id: Int,
-        val nombre: String,
-        val documento: String,
-        val passHash: String
-    )
-
-    // Cuenta de prueba (docente): 1000000001 / Demo2026Salud
-    private val cuentas = listOf(
-        Cuenta(1, "Docente Demo", "1000000001", sha256("Demo2026Salud"))
-    )
 
     override suspend fun login(numeroDocumento: String, password: String): Result<Encuestador> {
         val doc = numeroDocumento.trim()
@@ -52,6 +45,16 @@ class AuthRepositoryImpl @Inject constructor(
 
             if (response.isSuccessful && body?.success == true && body.encuestador != null) {
                 body.token?.let { sessionManager.saveToken(it, body.expiraEn ?: 0L) }
+                val sal = HashCredencial.nuevaSal()
+                credenciales.guardar(
+                    CredencialGuardada(
+                        documento = doc,
+                        idEncuestador = body.encuestador.id,
+                        nombre = body.encuestador.nombre,
+                        sal = sal,
+                        hash = HashCredencial.calcular(password, sal)
+                    )
+                )
                 Result.Success(
                     Encuestador(
                         id = body.encuestador.id,
@@ -76,8 +79,7 @@ class AuthRepositoryImpl @Inject constructor(
      * Revoca el token en el servidor y borra la sesión local.
      *
      * La revocación es en el mejor esfuerzo: si no hay red, la sesión local se
-     * cierra igual. Dejar al encuestador dentro de la app porque no había señal
-     * sería peor que no revocar; el token caducará solo por vigencia.
+     * cierra igual. La credencial para el login sin conexión se conserva.
      */
     override suspend fun logout() {
         try {
@@ -90,16 +92,30 @@ class AuthRepositoryImpl @Inject constructor(
     }
 
     private fun loginLocal(documento: String, password: String): Result<Encuestador> {
-        val cuenta = cuentas.find { it.documento == documento }
-        return if (cuenta != null && cuenta.passHash == sha256(password)) {
-            Result.Success(Encuestador(cuenta.id, cuenta.nombre, cuenta.documento))
-        } else {
-            Result.Error(DomainError.InvalidData("Documento o contraseña incorrectos"))
+        val guardada = credenciales.buscar(documento)
+        if (guardada != null) {
+            return if (HashCredencial.coincide(password, guardada)) {
+                Result.Success(Encuestador(guardada.idEncuestador, guardada.nombre, guardada.documento))
+            } else {
+                Result.Error(DomainError.InvalidData("Documento o contraseña incorrectos"))
+            }
         }
+
+        if (BuildConfig.DEBUG && documento == DEMO_DOCUMENTO && password == DEMO_PASSWORD) {
+            return Result.Success(Encuestador(1, "Docente Demo", DEMO_DOCUMENTO))
+        }
+
+        return Result.Error(
+            DomainError.InvalidData(
+                "Este teléfono no tiene datos guardados para ese documento. " +
+                    "Conéctate e inicia sesión una vez; después podrás entrar sin conexión."
+            )
+        )
     }
 
-    private fun sha256(text: String): String =
-        MessageDigest.getInstance("SHA-256")
-            .digest(text.toByteArray())
-            .joinToString("") { "%02x".format(it) }
+    private companion object {
+        // Cuenta de prueba (docente), solo en depuración.
+        const val DEMO_DOCUMENTO = "1000000001"
+        const val DEMO_PASSWORD = "Demo2026Salud"
+    }
 }

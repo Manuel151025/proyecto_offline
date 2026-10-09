@@ -42,9 +42,11 @@ object SyncWorkerScheduler {
             )
             .build()
 
+        // APPEND_OR_REPLACE y no REPLACE: guardar otra persona mientras se
+        // envía la cola cancelaba el envío en curso. Ahora se encola detrás.
         WorkManager.getInstance(context).enqueueUniqueWork(
             "immediate_sync",
-            ExistingWorkPolicy.REPLACE,
+            ExistingWorkPolicy.APPEND_OR_REPLACE,
             syncRequest
         )
     }
