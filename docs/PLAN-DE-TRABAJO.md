@@ -7,6 +7,30 @@ Cada tarea tiene un identificador, el qué, el dónde, cómo se comprueba que qu
 
 ---
 
+## Estado de ejecución (8 de octubre de 2026)
+
+Todo el trabajo está en la rama `feat/plan-de-trabajo`, con un commit por bloque.
+
+**Verificación al cerrar:**
+- 52 pruebas de integración PHP con MySQL;
+- 73 pruebas unitarias de Android, más el lint y el ensamblado;
+- 46 pruebas de la PWA;
+- PHPStan nivel 8 sin errores;
+- verificación de la paleta y de los recursos de la PWA.
+
+| Fase | Estado | Notas |
+|---|---|---|
+| F0 | 🟡 | F0.1 y F0.2 hechas: `main` ya contenía la rama desplegada (PR #36), así que **D1 queda resuelta como `main`**. F0.3–F0.5 (desplegar, retirar `ADMIN_PASSWORD`, copia de la base) requieren acceso a Dokploy |
+| F1 | ✅ | Todo. Los experimentos del análisis son ahora pruebas en `tests/php` |
+| F2 | 🟡 | Todo el código. F2.20 (pruebas en celulares reales) queda en [PRUEBAS-DE-CAMPO.md](PRUEBAS-DE-CAMPO.md). F2.19 no hacía falta: el reporte sí estaba expuesto |
+| F3 | 🟡 | F3.3 hecha (tokens como fuente única). F3.1–F3.2 requieren que lances `/design`; F3.4–F3.7 vienen después |
+| F4 | ✅ | Todo, incluida la CSP. El segundo factor (F4.8) se evaluó y no se implementó: ver [PENDIENTES](PENDIENTES.md#7--identidad-única-para-panel-y-aplicación) |
+| F5 | 🟡 | F5.1, F5.4 y F5.6 (salud y monitor) hechas. F5.5: prueba de migraciones escrita y compilada, falta un dispositivo para ejecutarla. F5.2 pospuesta con motivo en [PENDIENTES](PENDIENTES.md#4--cifrado-de-datos-en-el-teléfono). F5.3: ramas limpiadas; las actualizaciones de Dependabot quedan por revisar |
+
+**Fallos nuevos encontrados durante la ejecución:**
+- **PWA:** comparaba los rechazos del servidor con el id de la cola y no con el de la encuesta. Ningún rechazo se reconocía nunca: se daba por enviado.
+- **Android:** `EliminarPersonaUseCase` no encola el borrado. Hoy no tiene pantalla; queda anotado en [PENDIENTES](PENDIENTES.md#6--android-no-puede-borrar-personas).
+
 ## Decisiones pendientes
 
 Bloquean tareas concretas. Cada una trae la opción recomendada, que es la que asume este plan.

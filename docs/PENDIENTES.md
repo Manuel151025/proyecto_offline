@@ -1,8 +1,8 @@
 # Pendientes y hoja de ruta
 
-Estado honesto del proyecto: qué falta, por qué no está, y qué pasa si no se hace.
+Estado honesto del proyecto: qué falta, por qué no está y qué pasa si no se hace.
 
-**Última revisión:** 11 de agosto de 2026
+**Última revisión:** 8 de octubre de 2026, tras ejecutar el [plan de trabajo](PLAN-DE-TRABAJO.md).
 
 ---
 
@@ -11,161 +11,107 @@ Estado honesto del proyecto: qué falta, por qué no está, y qué pasa si no se
 | Área | Estado |
 |---|---|
 | Recolección offline (Android + PWA) | ✅ Completo |
-| Sincronización bidireccional | ✅ Completo |
-| Resolución de conflictos | ✅ Completo |
-| Autenticación y roles | ✅ Completo |
-| Panel de administración | ✅ Completo |
-| Integración continua | ✅ Completo |
-| Pruebas automatizadas | 🟡 105, sin cubrir PHP ni interfaz |
-| Descarga de encuestas | ⏳ Solo se descargan personas |
-| Uso del rol en los clientes | ⏳ Se recibe, no se usa |
+| Sincronización bidireccional | ✅ Corregida: la descarga ya no pierde registros y la PWA ya no se atasca con más de 500 pendientes |
+| Validación en el servidor | ✅ Completa, compartida con el panel |
+| Autenticación, roles y sesión vencida | ✅ Completo en los dos clientes |
+| Panel de administración | ✅ Completo: ficha, edición, filtros, auditoría, monitor, sesiones |
+| Privacidad | 🟡 Alcance por municipio y copias de seguridad cerradas; falta cifrado en el teléfono |
+| Pruebas automatizadas | ✅ 52 de integración PHP con MySQL, 73 Android, 46 PWA |
+| Pruebas en dispositivo real | ⏳ Guía lista en [PRUEBAS-DE-CAMPO.md](PRUEBAS-DE-CAMPO.md), sin ejecutar |
+| Rediseño visual | ⏳ Brief listo; falta lanzar Claude Design |
+| Despliegue | ⏳ Todo en la rama `feat/plan-de-trabajo`, sin mergear |
 
 ---
 
-## 1 · Sin pruebas automatizadas para PHP
+## 1 · Desplegar lo hecho
 
-**Qué falta.** No hay PHPUnit. La API se verifica con `php -l`, **PHPStan nivel 8** y guardas de regresión basadas en `grep` dentro de CI.
+**Qué falta.** Mergear `feat/plan-de-trabajo` en `main`, verificar producción y retirar `ADMIN_PASSWORD` del entorno de Dokploy (producción ya tiene cuenta de administrador).
 
-**Por qué importa.** Toda la lógica de resolución de conflictos del servidor —Last-Write-Wins, validación por fila, marca de agua— no tiene prueba unitaria. Las guardas de CI comprueban que el código *existe*, no que *funciona*.
+**Orden obligatorio.** Primero el servidor, después los clientes. Los clientes nuevos usan el cursor compuesto y lo envían como parámetros extra, que un servidor viejo ignora, así que el orden inverso no rompe nada; pero solo el servidor nuevo deja de perder registros.
 
-**Mitigación actual.** Cada cambio de esta parte se verificó manualmente contra una base MySQL local, reproduciendo el escenario completo. Está documentado en los mensajes de commit.
+**Antes de desplegar:** copia de la base (`mysqldump`). Las tablas nuevas (`sync_rechazos`, `dispositivos`, `auditoria_admin`, `encuestador_municipios`) se crean solas en la primera petición, como `server_updated_at`.
 
-**Coste de arreglarlo.** Medio. Añadir PHPUnit y una base de pruebas en CI son unas horas; escribir las pruebas de `sync.php` y `cambios.php`, algo más.
+**Prioridad: alta.** Producción corre hoy la versión del panel con los fallos corregidos aquí.
 
-**Prioridad: alta.** Es la brecha más grande de la cobertura.
+## 2 · Rediseño visual
 
----
+**Qué falta.** Ejecutar `/design` con [BRIEF-REDISENO.md](BRIEF-REDISENO.md), elegir dirección e implementarla (fase F3 del plan).
 
-## 2 · Sin pruebas instrumentadas de interfaz
+**Ya preparado.** La paleta vive en [`design/tokens.json`](../design/tokens.json) y `node scripts/tokens.mjs` la propaga a la PWA, el panel y Android. El CI falla si alguna diverge.
 
-**Qué falta.** No existe `app/src/androidTest`. Las 68 pruebas de Android son unitarias en JVM.
+**Prioridad: media.** No bloquea nada funcional.
 
-**Consecuencia.** No se verifican automáticamente:
-- Las migraciones de Room contra un dispositivo real (aunque el esquema exportado sí se valida en cada compilación)
-- La navegación entre pantallas Compose
-- El comportamiento real del `SyncWorker` bajo WorkManager
+## 3 · Pruebas en celulares reales
 
-**Prioridad: media.** El dominio y los datos, que es donde se pierde información, sí están cubiertos.
+**Qué falta.** Ejecutar [PRUEBAS-DE-CAMPO.md](PRUEBAS-DE-CAMPO.md) en al menos un Android de gama baja (idealmente Xiaomi, por su ahorro de batería agresivo) y en la PWA en Chrome.
 
----
+**Por qué importa.** WorkManager, la sincronización en segundo plano de la PWA y el ahorro de batería no se pueden comprobar en JVM ni en el servidor. La prueba de migraciones de Room (`MigracionesRoomTest`) está escrita y compila, pero necesita un dispositivo: `./gradlew connectedDebugAndroidTest`.
 
-## 3 · El historial de encuestas no se descarga
+**Prioridad: alta** antes del uso en campo.
 
-**Qué falta.** `cambios.php` entrega **personas**. La tabla `encuestas` —el registro de trazabilidad— solo existe completa en el servidor.
+## 4 · Cifrado de datos en el teléfono
 
-**Consecuencia.** Un encuestador que recibe una persona registrada por otro dispositivo ve sus datos, pero no cuándo ni quién la encuestó.
+**Situación.** Evaluado y pospuesto a propósito. Ya está hecho:
+- la copia de seguridad está desactivada y excluye sesión, credenciales y base;
+- cada encuestador puede quedar limitado a sus municipios;
+- el login sin conexión guarda PBKDF2 con sal, nunca la contraseña.
 
-**Qué haría falta.** Un endpoint equivalente con su propia marca de agua, más el almacenamiento en Room e IndexedDB. La tabla `encuestas` no tiene hoy columna de sello del servidor: haría falta añadirla (con automigración, como `server_updated_at`).
+**Lo que falta.** Cifrar la base Room (SQLCipher) y el token (Android Keystore).
 
-**Prioridad: media.** Es la HU-32.
+**Por qué no se hizo ya.** Migrar una base Room existente a SQLCipher exige exportar y reimportar los datos en el teléfono del encuestador, incluidos los registros sin enviar. Un fallo ahí destruye trabajo de campo, y no hay forma de probarlo sin dispositivos reales (punto 3). La librería `security-crypto` de AndroidX está obsoleta.
 
----
+**Prioridad: media.** Hacerlo después de las pruebas de campo, con la migración probada en un dispositivo.
 
-## 4 · Los clientes reciben el rol pero no lo usan
+## 5 · El historial de encuestas no llega a los celulares
 
-**Qué falta.** `login.php` devuelve `rol` y `requerirAutenticacion` lo resuelve, pero ni la PWA ni Android hacen nada con él.
-
-**Consecuencia.** Un administrador tiene que ir al panel web para cualquier tarea de administración.
-
-**Decisión tomada.** Se eligió deliberadamente que el administrador entre por el panel, para acotar el alcance. El campo se dejó disponible para cuando se quiera cambiar.
-
-**Prioridad: baja.** Es la HU-33.
-
----
-
-## 5 · Identidad única para panel y aplicación
-
-**Situación.** Las mismas credenciales sirven para el panel y para la aplicación de campo: es **una sola identidad**, no dos.
-
-**Riesgo.** Si el dispositivo de un administrador se pierde, sus credenciales sirven también para el panel.
-
-**Alternativa.** Credenciales separadas, o segundo factor solo para el panel.
-
-**Prioridad: baja**, pero es un cambio **barato ahora y molesto más adelante**, cuando haya cuentas creadas.
-
----
-
-## 6 · El bloqueo del panel se puede provocar
-
-**Situación.** El contador anti fuerza bruta del panel es global, porque el panel no pide usuario en modo arranque.
-
-**Riesgo.** Alguien que conozca la URL puede mantenerlo bloqueado a base de intentos fallidos.
-
-**Por qué se aceptó.** Es preferible a permitir fuerza bruta ilimitada sobre un panel que puede borrar datos. El bloqueo caduca solo a los 15 minutos y los intentos quedan en `error_log`.
-
-**Escape.** Con acceso al servidor:
-
-```sql
-DELETE FROM intentos_login WHERE documento = '#admin';
-```
-
-**Mejora posible.** Ahora que el panel pide documento, el contador podría ser por cuenta salvo en modo arranque. Reduce el problema a la ventana inicial.
+**Qué falta.** `cambios.php` entrega personas, no encuestas. El panel ya muestra el historial completo en la ficha de cada persona, pero un encuestador en campo no ve quién encuestó antes a alguien. Es la HU-32.
 
 **Prioridad: baja.**
 
----
+## 6 · Android no puede borrar personas
 
-## 7 · Reporte no accesible desde el dispositivo
+**Hallazgo nuevo.** `EliminarPersonaUseCase` existe pero ninguna pantalla lo usa. Además, si se usara, marcaría la persona como borrada sin meterla en la cola, así que el borrado nunca llegaría al servidor. Antes de exponerlo hay que añadir el elemento a la cola, como hace `GuardarRegistroCompletoUseCase`.
 
-**Situación.** `GenerarReporteUseCase` existe y está inyectado en `SyncViewModel`, pero **ninguna pantalla lo expone**.
+**Prioridad: baja.** La PWA y el panel sí pueden borrar.
 
-**Consecuencia.** Código muerto que aparenta una funcionalidad inexistente.
+## 7 · Identidad única para panel y aplicación
 
-**Dos salidas válidas:** exponerlo en una pantalla, o retirarlo. Dejarlo así es lo peor de ambas.
+**Situación.** Las mismas credenciales sirven para el panel y la app. Si se pierde el celular de un administrador, sus credenciales abren también el panel.
 
-**Prioridad: baja.** Es la HU-34.
+**Mitigación actual.** El panel revalida la sesión en cada petición, caduca tras una hora sin actividad, registra cada acción en la auditoría y permite cerrar las sesiones de un celular desde Cuentas.
 
----
+**Mejora posible.** Segundo factor solo para el panel.
 
-## 8 · Sin observabilidad más allá del log
+**Prioridad: baja.**
 
-**Qué falta.** No hay métricas ni alertas. Diagnosticar exige entrar al servidor a leer `error_log`.
+## 8 · Datos históricos sin identificador de dispositivo
 
-**Consecuencia.** Un aumento de rechazos, de fallos de autenticación o de errores 500 pasa inadvertido hasta que alguien lo reporta.
+**Situación.** Hasta esta versión, Android enviaba `DEVICE_ID_LOCAL` fijo. Esos registros no se pueden atribuir a un teléfono concreto; el monitor los muestra como un único dispositivo. Desde esta versión cada instalación tiene su UUID.
 
-**Mínimo útil.** Un endpoint de salud (`/api/health.php`) que verifique la conexión a la base, más un contador de errores por día en el panel.
+**Prioridad: informativa.** No tiene arreglo retroactivo.
 
-**Prioridad: media** si el sistema pasa a uso real con varios encuestadores.
-
----
-
-## 9 · La paleta vive duplicada
-
-**Situación.** Los colores institucionales están declarados en `pwa/css/base.css` y en `presentation/theme/Theme.kt`. Deben mantenerse en espejo **a mano**.
-
-**Riesgo.** Divergencia silenciosa entre plataformas.
-
-**Mitigación posible.** Generar ambos desde un JSON común en tiempo de compilación.
-
-**Prioridad: baja.** Son dos archivos y el README lo advierte.
-
----
-
-## 10 · Deuda operativa
+## 9 · Deuda operativa
 
 | Punto | Estado |
 |---|---|
-| Cerrar PRs obsoletas de Dependabot (#14, #15, #16, #18, #19) | Pendiente |
-| PRs de acciones válidas (#13, #17, #20, #21) | Por revisar |
-| Retirar `ADMIN_PASSWORD` del entorno tras crear el primer admin | Pendiente del despliegue |
-| Limpiar registros históricos inválidos en producción | Ya es posible desde el panel |
+| Actualizaciones de Dependabot (Retrofit 3, Hilt, Compose, acciones v7) | Por revisar una a una. Retrofit 3 es un cambio mayor |
+| Retirar `ADMIN_PASSWORD` del entorno | Pendiente del despliegue (punto 1) |
+| Pruebas instrumentadas en CI | Exigen un emulador en el runner; hoy solo se compilan |
 
 ---
 
 ## Lo que **no** está pendiente
 
-Conviene decirlo, porque en una revisión superficial pueden parecer ausencias:
-
 | Aparente ausencia | Realidad |
 |---|---|
-| No hay migraciones manuales que ejecutar | Deliberado: `api/esquema.php` las aplica solo, porque el despliegue no tiene consola de base de datos |
-| La PWA no usa framework | Deliberado: sin *build step* ni dependencias en ejecución, el Service Worker cachea archivos reales |
-| No hay refresh tokens | Deliberado: la vigencia larga es lo que permite trabajar 30 días sin conectividad |
+| No hay migraciones manuales que ejecutar | Deliberado: `api/esquema.php` crea columnas y tablas solo, porque el despliegue no tiene consola de base de datos |
+| La PWA no usa framework | Deliberado: sin *build step* ni dependencias en ejecución, el service worker cachea archivos reales |
+| No hay refresh tokens | Deliberado: la vigencia larga permite trabajar 30 días sin conectividad. Al vencer, los dos clientes avisan y conservan la cola |
 | El borrado no elimina filas | Deliberado: un `DELETE` real impediría que los dispositivos se enteraran del borrado |
-| No hay índice `(deleted_at, updated_at)` en MySQL | Deliberado: el servidor accede a `personas` solo por clave primaria |
+| El reporte CSV de Android | Existe y se usa desde la pantalla de sincronización |
 
 ---
 
 ## Documentos relacionados
 
-- [Arquitectura](ARQUITECTURA.md) · [Historias de usuario](HISTORIAS-DE-USUARIO.md) · [API](API.md)
+- [Plan de trabajo](PLAN-DE-TRABAJO.md) · [Arquitectura](ARQUITECTURA.md) · [Historias de usuario](HISTORIAS-DE-USUARIO.md) · [API](API.md) · [Pruebas de campo](PRUEBAS-DE-CAMPO.md)

@@ -68,6 +68,12 @@ android {
         unitTests.isReturnDefaultValues = true
     }
 
+    // Los esquemas exportados de Room sirven a la prueba de migraciones, que
+    // reconstruye cada versión antigua de la base en un dispositivo real.
+    sourceSets {
+        getByName("androidTest").assets.srcDir("$projectDir/schemas")
+    }
+
     testCoverage {
         jacocoVersion = "0.8.11"
     }
@@ -131,6 +137,7 @@ dependencies {
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.7.3")
     testImplementation("com.squareup.retrofit2:retrofit:2.9.0")
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
+    androidTestImplementation("androidx.room:room-testing:$roomVersion")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.6.1")
     androidTestImplementation(platform("androidx.compose:compose-bom:2024.12.01"))
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
