@@ -61,6 +61,95 @@ function asegurarServerUpdatedAt(PDO $pdo): void
 }
 
 /**
+ * Crea las tablas del monitor de sincronización si faltan.
+ *
+ * - `sync_rechazos`: cada registro que sync.php descarta, con su motivo. Antes
+ *   el rechazo solo viajaba en la respuesta al celular y nadie en la oficina
+ *   podía saber que un encuestador tenía registros atascados.
+ * - `dispositivos`: un renglón por celular con su última sincronización, para
+ *   detectar equipos que llevan días sin enviar nada.
+ *
+ * Debe llamarse FUERA de cualquier transacción: CREATE TABLE hace commit
+ * implícito en MySQL.
+ */
+function asegurarTablasSincronizacion(PDO $pdo): void
+{
+    static $verificado = false;
+    if ($verificado) {
+        return;
+    }
+
+    $pdo->exec(
+        'CREATE TABLE IF NOT EXISTS sync_rechazos (
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            id_encuesta VARCHAR(50) NULL,
+            tipo_documento VARCHAR(10) NULL,
+            numero_documento VARCHAR(40) NULL,
+            motivo VARCHAR(255) NOT NULL,
+            device_id VARCHAR(50) NULL,
+            id_encuestador INT NULL,
+            creado_en BIGINT NOT NULL,
+            INDEX idx_rechazos_fecha (creado_en)
+        )'
+    );
+    $pdo->exec(
+        'CREATE TABLE IF NOT EXISTS dispositivos (
+            device_id VARCHAR(50) PRIMARY KEY,
+            id_encuestador INT NULL,
+            plataforma VARCHAR(20) NULL,
+            version_app VARCHAR(20) NULL,
+            ultima_subida BIGINT NULL,
+            ultima_descarga BIGINT NULL,
+            ultima_actividad BIGINT NOT NULL,
+            INDEX idx_dispositivos_actividad (ultima_actividad)
+        )'
+    );
+
+    $verificado = true;
+}
+
+/**
+ * Registra que un celular se comunicó con el servidor.
+ *
+ * El identificador llega en la cabecera X-Device-Id; si falta (clientes
+ * anteriores a esta versión), se usa el que traiga el propio envío. Un fallo
+ * aquí nunca debe tumbar la sincronización: es información de monitoreo.
+ *
+ * @param 'subida'|'descarga' $tipo
+ */
+function registrarDispositivo(PDO $pdo, int $idEncuestador, string $tipo, ?string $deviceIdRespaldo = null): void
+{
+    $deviceId = trim((string)($_SERVER['HTTP_X_DEVICE_ID'] ?? ''));
+    if ($deviceId === '') {
+        $deviceId = trim((string)$deviceIdRespaldo);
+    }
+    if ($deviceId === '') {
+        return;
+    }
+
+    $plataforma = mb_substr(trim((string)($_SERVER['HTTP_X_PLATAFORMA'] ?? '')), 0, 20) ?: null;
+    $version = mb_substr(trim((string)($_SERVER['HTTP_X_APP_VERSION'] ?? '')), 0, 20) ?: null;
+    $ahora = (int)round(microtime(true) * 1000);
+    $columna = $tipo === 'subida' ? 'ultima_subida' : 'ultima_descarga';
+
+    try {
+        asegurarTablasSincronizacion($pdo);
+        $pdo->prepare(
+            "INSERT INTO dispositivos (device_id, id_encuestador, plataforma, version_app, $columna, ultima_actividad)
+             VALUES (?, ?, ?, ?, ?, ?)
+             ON DUPLICATE KEY UPDATE
+                id_encuestador = VALUES(id_encuestador),
+                plataforma = COALESCE(VALUES(plataforma), plataforma),
+                version_app = COALESCE(VALUES(version_app), version_app),
+                $columna = VALUES($columna),
+                ultima_actividad = VALUES(ultima_actividad)"
+        )->execute([mb_substr($deviceId, 0, 50), $idEncuestador, $plataforma, $version, $ahora, $ahora]);
+    } catch (PDOException $e) {
+        error_log('[dispositivos] ' . $e->getMessage());
+    }
+}
+
+/**
  * Añade la columna `rol` a encuestadores si falta.
  *
  * Antes había dos sistemas de autenticación sin relación: los encuestadores

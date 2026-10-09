@@ -57,7 +57,7 @@ function aplicarCors(string $metodos = 'GET, POST, OPTIONS'): void
     }
 
     header("Access-Control-Allow-Methods: $metodos");
-    header('Access-Control-Allow-Headers: Content-Type, Authorization');
+    header('Access-Control-Allow-Headers: Content-Type, Authorization, X-Device-Id, X-App-Version, X-Plataforma');
     header('Access-Control-Max-Age: 86400');
 
     if (($_SERVER['REQUEST_METHOD'] ?? '') === 'OPTIONS') {

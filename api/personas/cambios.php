@@ -35,7 +35,7 @@ if ($_SERVER['REQUEST_METHOD'] !== 'GET') {
 }
 
 // Leer datos ajenos exige token, igual que escribirlos.
-requerirAutenticacion($pdo);
+$sesion = requerirAutenticacion($pdo);
 
 /** Tope por petición: el cliente pagina con la marca que le devolvemos. */
 const MAX_POR_PAGINA = 500;
@@ -46,9 +46,35 @@ $desde = max(0, $desde);
 $limite = filter_input(INPUT_GET, 'limite', FILTER_VALIDATE_INT) ?: 200;
 $limite = max(1, min(MAX_POR_PAGINA, $limite));
 
+/*
+ * CURSOR COMPUESTO: (server_updated_at, tipo_documento, numero_documento).
+ *
+ * sync.php sella todo un lote con el mismo milisegundo. Con solo el sello como
+ * marca, `> marca` saltaba el resto de un grupo cuando una página lo cortaba
+ * por la mitad: esas personas no llegaban nunca a los demás celulares. Se
+ * demostró con 3 personas de un mismo lote descargadas en páginas de 2.
+ *
+ * Con el documento como desempate, el orden es total y cada página empieza
+ * exactamente donde terminó la anterior. Los clientes que solo envían `desde`
+ * (versiones anteriores ya instaladas) siguen funcionando como antes.
+ */
+$tipoCursor = trim((string)filter_input(INPUT_GET, 'tipo'));
+$numeroCursor = trim((string)filter_input(INPUT_GET, 'numero'));
+$conCursor = $tipoCursor !== '' && $numeroCursor !== '';
+
 asegurarServerUpdatedAt($pdo);
 
 try {
+    if ($conCursor) {
+        $where = 'server_updated_at > ?
+                  OR (server_updated_at = ? AND (tipo_documento > ?
+                      OR (tipo_documento = ? AND numero_documento > ?)))';
+        $params = [$desde, $desde, $tipoCursor, $tipoCursor, $numeroCursor];
+    } else {
+        $where = 'server_updated_at > ?';
+        $params = [$desde];
+    }
+
     // LIMIT no admite parámetro con EMULATE_PREPARES desactivado; al forzarlo
     // a entero por filter_input no hay riesgo de inyección.
     $stmt = $pdo->prepare(
@@ -56,11 +82,11 @@ try {
                 telefono, email, direccion, vereda, eps, ocupacion, estrato,
                 municipio_codigo, updated_at, device_id, deleted_at, server_updated_at
          FROM personas
-         WHERE server_updated_at IS NOT NULL AND server_updated_at > ?
-         ORDER BY server_updated_at ASC
+         WHERE server_updated_at IS NOT NULL AND ($where)
+         ORDER BY server_updated_at ASC, tipo_documento ASC, numero_documento ASC
          LIMIT $limite"
     );
-    $stmt->execute([$desde]);
+    $stmt->execute($params);
     $filas = $stmt->fetchAll();
 
     // Los enteros vuelven como cadena por PDO; el cliente compara números.
@@ -89,12 +115,19 @@ try {
 
     // La nueva marca de agua es la del último registro entregado. Si no vino
     // nada, se devuelve la que el cliente ya tenía para que no retroceda.
-    $marca = $personas === [] ? $desde : end($personas)['server_updated_at'];
+    $ultima = $personas === [] ? null : end($personas);
+    $marca = $ultima === null ? $desde : $ultima['server_updated_at'];
+
+    registrarDispositivo($pdo, $sesion['id_encuestador'], 'descarga');
 
     echo json_encode([
         'success'  => true,
         'personas' => $personas,
         'marca'    => $marca,
+        // Cursor completo para pedir la página siguiente: desde=sello&tipo=&numero=
+        'cursor'   => $ultima === null
+            ? ($conCursor ? ['sello' => $desde, 'tipo' => $tipoCursor, 'numero' => $numeroCursor] : null)
+            : ['sello' => $marca, 'tipo' => $ultima['tipo_documento'], 'numero' => $ultima['numero_documento']],
         // Con la página llena es probable que queden más: el cliente vuelve a
         // pedir con la marca nueva hasta que esto sea falso.
         'hay_mas'  => count($personas) >= $limite,

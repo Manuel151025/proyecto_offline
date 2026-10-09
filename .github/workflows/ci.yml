@@ -104,8 +104,20 @@ jobs:
           retention-days: 7
 
   php:
-    name: API · análisis estático PHP
+    name: API · análisis estático y pruebas de integración
     runs-on: ubuntu-latest
+    # MySQL real para las pruebas: la lógica que importa (Last-Write-Wins,
+    # cursor de descarga, claves foráneas) vive en las consultas.
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: root
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -proot"
+          --health-interval=5s --health-timeout=5s --health-retries=20
     steps:
       - uses: actions/checkout@v5
 
@@ -113,7 +125,7 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: '8.2'
-          extensions: pdo, pdo_mysql, mbstring
+          extensions: pdo, pdo_mysql, mbstring, curl
 
       - name: Validar sintaxis de todos los archivos PHP
         run: |
@@ -133,6 +145,16 @@ jobs:
       # El nivel 8 no es arbitrario: es el más alto que el código pasa limpio.
       - name: Analizar con PHPStan (nivel 8)
         run: vendor/bin/phpstan analyse --no-progress --error-format=github
+
+      # Levantan el servidor embebido contra una base desechable y prueban la
+      # API y el panel de punta a punta: sincronización, cursor de descarga,
+      # validación, sesión del panel, CSV y cuentas.
+      - name: Pruebas de integración (PHPUnit + MySQL)
+        env:
+          PRUEBAS_DB_HOST: 127.0.0.1
+          PRUEBAS_DB_USER: root
+          PRUEBAS_DB_PASS: root
+        run: vendor/bin/phpunit --testdox
 
       # Solo llamadas reales a header(); los comentarios pueden mencionar el patrón.
       - name: Verificar que no quede CORS permisivo
