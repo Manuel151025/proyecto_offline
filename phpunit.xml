@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Pruebas de integración de la API y del panel.
+
+  Necesitan un MySQL accesible (en CI, el servicio del job; en local, XAMPP).
+  Crean y destruyen su propia base (PRUEBAS_DB_NAME, por defecto
+  colo_pruebas): nunca tocan la base real.
+-->
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
+         bootstrap="tests/php/bootstrap.php"
+         colors="true"
+         cacheDirectory=".phpunit.cache">
+    <testsuites>
+        <testsuite name="integracion">
+            <directory>tests/php</directory>
+        </testsuite>
+    </testsuites>
+</phpunit>

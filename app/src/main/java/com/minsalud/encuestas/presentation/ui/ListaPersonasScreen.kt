@@ -37,11 +37,13 @@ fun ListaPersonasScreen(
     onNavigateToFormulario: () -> Unit,
     onNavigateToSync: () -> Unit,
     onLogout: () -> Unit,
+    onReautenticar: () -> Unit,
     onPersonaClick: (Persona) -> Unit,
     isDark: Boolean,
     onToggleTheme: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val requiereReautenticacion by viewModel.requiereReautenticacion.collectAsState()
 
     Scaffold(
         topBar = {
@@ -87,10 +89,12 @@ fun ListaPersonasScreen(
             )
         }
     ) { padding ->
+      Column(modifier = Modifier.padding(padding).fillMaxSize()) {
+        if (requiereReautenticacion) AvisoSesionVencida(onIniciarSesion = onReautenticar)
         Box(
             modifier = Modifier
-                .padding(padding)
-                .fillMaxSize()
+                .weight(1f)
+                .fillMaxWidth()
                 .background(MaterialTheme.colorScheme.background)
         ) {
             when {
@@ -120,6 +124,7 @@ fun ListaPersonasScreen(
                 }
             }
         }
+      }
     }
 }
 

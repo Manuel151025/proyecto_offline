@@ -13,6 +13,7 @@ API REST en PHP 8 sin framework. Todas las respuestas son JSON salvo el panel de
 | `POST` | [`/personas/sync.php`](#post-personassyncphp) | Bearer | **Subir** encuestas |
 | `GET` | [`/personas/cambios.php`](#get-personascambiosphp) | Bearer | **Bajar** cambios |
 | `GET` | [`/municipios/index.php`](#get-municipiosindexphp) | — | Catálogo DANE |
+| `GET` | [`/health.php`](#get-healthphp) | — | Salud de la API y la base |
 | `GET/POST` | [`/admin/index.php`](#panel-de-administración) | Sesión PHP | Panel web |
 
 ---
@@ -52,6 +53,18 @@ Formato uniforme:
 | `500` | Error de servidor — el detalle va al log, nunca al cliente |
 
 > Los mensajes de excepción **nunca** llegan al cliente: revelarían host, usuario de base de datos y rutas internas.
+
+### Cabeceras del dispositivo
+
+Los clientes envían en `sync.php` y `cambios.php`:
+
+| Cabecera | Ejemplo | Uso |
+|---|---|---|
+| `X-Device-Id` | `android_5f1c…` / `pwa_9a2e…` | Identifica el celular en el monitor del panel |
+| `X-Plataforma` | `android` · `pwa` | |
+| `X-App-Version` | `1.0` · `2.0.0` | Para saber qué versión corre en campo |
+
+Son opcionales: sin ellas el servidor responde igual, solo que el monitor no puede mostrar ese celular.
 
 ### CORS
 
@@ -183,6 +196,11 @@ Sube un lote de personas y encuestas. Resuelve conflictos por **Last-Write-Wins*
 3. **LWW:** si la persona ya existe y el `updated_at` entrante no es mayor, se ignora sin error.
 4. Máximo **500 registros** por arreglo (`413` si se excede).
 5. Tipos admitidos: `CC · TI · RC · CE · PP · NIT · PE`. Documento de 6 a 20 caracteres, solo `[A-Za-z0-9-]`.
+6. **Validación por fila** (rechazo con motivo, nunca `500`): nombres y apellidos sin dígitos; estrato de 1 a 6; correo con formato válido; fecha de nacimiento entre 1900 y hoy; `municipio_codigo` existente. Antes, un municipio desconocido violaba la clave foránea y tumbaba el lote entero.
+7. **Relojes adelantados:** `updated_at` y `fecha_encuesta` se recortan a la hora del servidor + 5 minutos. Sin esto, un teléfono con la fecha mal puesta escribía registros que ninguna corrección posterior podía superar.
+8. Cada rechazo se guarda en `sync_rechazos` y el celular queda registrado en `dispositivos`, para el monitor del panel.
+
+Las reglas viven en [`api/personas/validacion.php`](../api/personas/validacion.php), compartido con la edición desde el panel.
 
 ---
 
@@ -194,13 +212,19 @@ Descarga incremental de personas.
 
 | Nombre | Tipo | Defecto | Descripción |
 |---|---|---|---|
-| `desde` | entero | `0` | Marca de agua del cliente: mayor `server_updated_at` ya recibido |
+| `desde` | entero | `0` | Sello del cursor: `server_updated_at` de la última persona recibida |
+| `tipo` | texto | — | Tipo de documento de la última persona recibida (desempate) |
+| `numero` | texto | — | Número de documento de la última persona recibida (desempate) |
 | `limite` | entero | `200` | Máximo por página (tope 500) |
 
 ```http
-GET /api/personas/cambios.php?desde=1786387933257&limite=200
+GET /api/personas/cambios.php?desde=1786387933257&tipo=CC&numero=1098765432&limite=200
 Authorization: Bearer <token>
 ```
+
+**Cursor compuesto.** El orden es `(server_updated_at, tipo_documento, numero_documento)`. `sync.php` sella todo un lote con el mismo milisegundo; con solo el sello como marca, una página que cortaba ese grupo dejaba el resto **sin descargar nunca** (se demostró con 3 personas en páginas de 2). Sin `tipo` y `numero` el comportamiento es el anterior, para los clientes ya instalados.
+
+**Alcance por encuestador.** Si la cuenta tiene municipios asignados en el panel, solo recibe las personas de esos municipios y las que ella misma registró o actualizó. Sin asignación recibe todo. Los administradores siempre reciben todo.
 
 **Respuesta `200`**
 
@@ -209,6 +233,7 @@ Authorization: Bearer <token>
   "success": true,
   "personas": [ { "…": "…", "server_updated_at": 1786469459500 } ],
   "marca": 1786469459500,
+  "cursor": { "sello": 1786469459500, "tipo": "CC", "numero": "1098765432" },
   "hay_mas": false
 }
 ```
@@ -217,6 +242,7 @@ Authorization: Bearer <token>
 |---|---|
 | `personas` | Filas cambiadas, ordenadas por `server_updated_at` ascendente. **Incluye las borradas**, con `deleted_at` informado. |
 | `marca` | Nueva marca de agua. Si no vino nada, se devuelve la que el cliente ya tenía, para que no retroceda. |
+| `cursor` | Posición exacta para pedir la página siguiente (`desde`, `tipo`, `numero`). |
 | `hay_mas` | La página venía llena: probablemente quedan más. |
 
 **Por qué se filtra por `server_updated_at` y no por `updated_at`**
@@ -230,9 +256,20 @@ Un borrado es un cambio que los demás dispositivos deben conocer. Omitirlas har
 **Uso correcto en el cliente**
 
 1. Subir primero, bajar después.
-2. Paginar mientras `hay_mas` sea verdadero (con tope, como cortafuegos).
-3. Guardar la marca **después** de mezclar: si la aplicación muere a mitad, se repite la página en vez de saltársela.
-4. **Nunca sobrescribir un registro con cambios locales sin enviar.**
+2. Paginar con el `cursor` mientras `hay_mas` sea verdadero (con tope, como cortafuegos).
+3. Empezar cada sincronización **2 minutos antes** de la marca guardada: dos envíos pueden confirmarse en el servidor en orden distinto al de sus sellos. Recibir algo dos veces es inofensivo.
+4. Guardar la marca **después** de mezclar: si la aplicación muere a mitad, se repite la página en vez de saltársela.
+5. **Nunca sobrescribir un registro con cambios locales sin enviar.**
+
+---
+
+## `GET /health.php`
+
+Para monitoreo externo. `200` si la API responde y la base acepta consultas; `503` si no. No revela detalles internos.
+
+```json
+{ "success": true, "api": "ok", "base_de_datos": "ok", "hora_servidor": 1786469459500 }
+```
 
 ---
 
@@ -254,26 +291,42 @@ Catálogo DIVIPOLA/DANE. Sin autenticación: es información pública y los clie
 
 Documento + contraseña de una cuenta con rol `admin` **activa**. Mientras no exista ninguna, se acepta `ADMIN_PASSWORD` solo para crear la primera; después deja de aceptarse sola.
 
-Mismo límite de intentos que la API: 5 fallos → 15 minutos. Estando bloqueado, **incluso la contraseña correcta se rechaza**.
+Mismo límite de intentos que la API: 5 fallos → 15 minutos. Estando bloqueado, **incluso la contraseña correcta se rechaza**. El documento debe cumplir el mismo formato que en `login.php` (letras, dígitos y guiones, hasta 20).
+
+La sesión se **revalida en cada petición**: se cierra si la cuenta deja de ser administradora activa, si su contraseña cambió desde que entró, tras una hora sin actividad, y (en modo arranque) en cuanto existe un administrador. Las páginas se sirven con `Cache-Control: no-store`.
+
+Las fechas se muestran y los días se agrupan en hora de Colombia (`America/Bogota`).
 
 ### Secciones
 
 | Ruta | Contenido |
 |---|---|
-| `?seccion=resumen` | Totales, encuestas por día, personas por municipio, encuestas por encuestador |
-| `?seccion=personas` | Listado con búsqueda y paginación |
+| `?seccion=resumen` | Totales, encuestas por día (14 días, los vacíos en cero), personas por municipio, encuestas por encuestador |
+| `?seccion=personas&q=&p=` | Listado con búsqueda (nombre completo o documento) y paginación |
 | `?seccion=personas&borradas=1` | Papelera, con restauración |
-| `?seccion=encuestadores` | Cuentas: crear, editar, rol, activar |
-| `?exportar=personas` | Descarga CSV con BOM UTF-8 |
+| `?seccion=cuentas` | Cuentas: crear, editar, rol, activar. `?seccion=encuestadores` sigue funcionando |
+| `?seccion=personas&departamento=&municipio=&encuestador=&desde=&hasta=` | Filtros (las fechas, en hora de Colombia) |
+| `?seccion=persona&tipo=&numero=` | Ficha: todos los campos, historial de encuestas y cambios hechos desde el panel. Con `&editar_persona=1`, formulario de edición |
+| `?seccion=cuentas&editar=<id>` | Edición de una cuenta, con sus sesiones en celulares, desbloqueo y municipios asignados |
+| `?seccion=sincronizacion` | Monitor: celulares, rechazos y equipos sin sincronizar hace más de 3 días |
+| `?seccion=auditoria` | Registro de acciones de los administradores |
+| `?exportar=personas` | CSV con BOM UTF-8, con la **misma búsqueda y filtros** que la tabla; las celdas que Excel ejecutaría como fórmula van precedidas de `'` |
 
 ### Acciones (POST)
+
+Toda acción responde con una redirección `303` y un aviso de un solo uso guardado en la sesión, así que recargar no repite el envío.
 
 | `action` | Efecto |
 |---|---|
 | `login` / `logout` | Sesión del panel |
-| `save` | Crear o editar cuenta. Rechaza quitar el rol o desactivar al **único** admin activo. |
-| `borrar_persona` | Borrado suave; sella ambas marcas; registra `admin:<nombre>` |
+| `save` | Crear o editar cuenta. Rechaza quitar el rol o desactivar al **único** admin activo. Cambiar la contraseña o desactivar la cuenta **revoca sus tokens de API**. |
+| `borrar_persona` | Borrado suave; sella ambas marcas; registra `admin:<nombre>`. El aviso ofrece deshacer. |
 | `restaurar_persona` | Deshace el borrado; sella igual, o no se propagaría |
+| `editar_persona` | Edita una persona con las mismas reglas que `sync.php`; sella ambas marcas para que llegue a los celulares |
+| `cerrar_sesiones` | Revoca los tokens de API de una cuenta (sus celulares deben volver a entrar) |
+| `desbloquear_cuenta` | Borra los intentos fallidos de una cuenta |
+
+Todas las acciones quedan en la tabla `auditoria_admin`, con antes y después cuando aplica. La contraseña nunca se registra. El panel envía `Content-Security-Policy` y solo carga recursos propios.
 
 ---
 

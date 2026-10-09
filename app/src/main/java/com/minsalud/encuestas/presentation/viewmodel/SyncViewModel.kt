@@ -1,12 +1,16 @@
-﻿package com.minsalud.encuestas.presentation.viewmodel
+package com.minsalud.encuestas.presentation.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.minsalud.encuestas.core.Result
+import com.minsalud.encuestas.domain.model.EstadoCola
+import com.minsalud.encuestas.domain.repository.SyncRepository
 import com.minsalud.encuestas.domain.usecase.GenerarReporteUseCase
 import com.minsalud.encuestas.domain.usecase.SincronizarPendientesUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
@@ -22,8 +26,13 @@ data class SyncUiState(
 @HiltViewModel
 class SyncViewModel @Inject constructor(
     private val sincronizarPendientesUseCase: SincronizarPendientesUseCase,
-    private val generarReporteUseCase: GenerarReporteUseCase
+    private val generarReporteUseCase: GenerarReporteUseCase,
+    syncRepository: SyncRepository
 ) : ViewModel() {
+
+    /** Pendientes, con error y rechazados (con su motivo), siempre al día. */
+    val estadoCola: StateFlow<EstadoCola> = syncRepository.estadoCola()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), EstadoCola())
 
     private val _uiState = MutableStateFlow(SyncUiState())
     val uiState: StateFlow<SyncUiState> = _uiState.asStateFlow()
@@ -35,10 +44,8 @@ class SyncViewModel @Inject constructor(
             val result = sincronizarPendientesUseCase()
             when (result) {
                 is Result.Success -> {
-                    _uiState.value = _uiState.value.copy(
-                        isSyncing = false,
-                        message = "Sincronización manual encolada o completada"
-                    )
+                    // Lo que pasó de verdad, no "encolada o completada".
+                    _uiState.value = _uiState.value.copy(isSyncing = false, message = result.data.mensaje)
                 }
                 is Result.Error -> {
                     _uiState.value = _uiState.value.copy(

@@ -46,3 +46,6 @@ scaffold.ps1
 
 # Dependencias de desarrollo de PHP (PHPStan). No se despliegan.
 /vendor/
+
+# Caché de PHPUnit
+.phpunit.cache/

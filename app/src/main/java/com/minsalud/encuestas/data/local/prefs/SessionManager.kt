@@ -2,6 +2,9 @@ package com.minsalud.encuestas.data.local.prefs
 
 import android.content.Context
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -16,6 +19,23 @@ class SessionManager @Inject constructor(
     private val prefs = context.getSharedPreferences("coloffline_session", Context.MODE_PRIVATE)
 
     fun isLoggedIn(): Boolean = prefs.getBoolean(KEY_LOGGED, false)
+
+    private val _requiereReautenticacion = MutableStateFlow(prefs.getBoolean(KEY_REAUTH, false))
+
+    /**
+     * true cuando el servidor rechazó el token (vencido o revocado).
+     *
+     * No se cierra la sesión: el encuestador puede seguir registrando sin
+     * conexión. Pero la cola no subirá hasta que vuelva a entrar con red, y
+     * antes eso pasaba en silencio: el envío fallaba cada 15 minutos sin que
+     * nadie se enterara.
+     */
+    val requiereReautenticacion: StateFlow<Boolean> = _requiereReautenticacion.asStateFlow()
+
+    fun marcarReautenticacion(requerida: Boolean) {
+        prefs.edit().putBoolean(KEY_REAUTH, requerida).apply()
+        _requiereReautenticacion.value = requerida
+    }
     fun encuestadorId(): Int = prefs.getInt(KEY_ID, 1)
     fun nombre(): String = prefs.getString(KEY_NOMBRE, "") ?: ""
     fun documento(): String = prefs.getString(KEY_DOC, "") ?: ""
@@ -46,7 +66,9 @@ class SessionManager @Inject constructor(
         prefs.edit()
             .putString(KEY_TOKEN, token)
             .putLong(KEY_TOKEN_EXP, expiraEn)
+            .putBoolean(KEY_REAUTH, false)
             .apply()
+        _requiereReautenticacion.value = false
     }
 
     /**
@@ -68,6 +90,7 @@ class SessionManager @Inject constructor(
         // No borramos la preferencia de tema al cerrar sesión.
         val theme = themeMode()
         prefs.edit().clear().putInt(KEY_THEME, theme).apply()
+        _requiereReautenticacion.value = false
     }
 
     // Tema: 0 = seguir sistema, 1 = claro, 2 = oscuro
@@ -85,5 +108,6 @@ class SessionManager @Inject constructor(
         const val KEY_TOKEN = "api_token"
         const val KEY_TOKEN_EXP = "api_token_expira_en"
         const val KEY_MARCA_DESCARGA = "marca_descarga"
+        const val KEY_REAUTH = "requiere_reautenticacion"
     }
 }

@@ -1,4 +1,15 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Copia de seguridad (Android 11 y anteriores). Se excluye todo:
+  - coloffline_session: token de API con 30 días de vigencia.
+  - coloffline_credenciales: hash para el login sin conexión.
+  - coloffline_dispositivo: restaurarlo en otro teléfono clonaría el identificador.
+  - encuestas_db: datos personales de salud de toda la población encuestada.
+  Antes se excluía "encuestas_prefs.xml", un archivo que no existe, y todo lo
+  anterior acababa en la copia de Google.
+-->
 <full-backup-content>
-    <exclude domain="sharedpref" fqdn="encuestas_prefs.xml"/>
+    <exclude domain="sharedpref" path="."/>
+    <exclude domain="database" path="."/>
+    <exclude domain="file" path="."/>
 </full-backup-content>

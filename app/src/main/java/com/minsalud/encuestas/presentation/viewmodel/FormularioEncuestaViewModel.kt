@@ -5,6 +5,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.minsalud.encuestas.core.Result
+import com.minsalud.encuestas.data.local.prefs.DispositivoManager
 import com.minsalud.encuestas.data.local.prefs.SessionManager
 import com.minsalud.encuestas.domain.model.*
 import com.minsalud.encuestas.domain.usecase.GuardarRegistroCompletoUseCase
@@ -61,6 +62,7 @@ class FormularioEncuestaViewModel @Inject constructor(
     private val obtenerPersonaUseCase: ObtenerPersonaUseCase,
     private val seedMunicipiosUseCase: SeedMunicipiosUseCase,
     private val sessionManager: SessionManager,
+    private val dispositivo: DispositivoManager,
     @ApplicationContext private val appContext: Context,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
@@ -252,7 +254,9 @@ class FormularioEncuestaViewModel @Inject constructor(
                 estrato = estratoInt,
                 municipioCodigo = state.municipioCodigo,
                 updatedAt = 0L,
-                deviceId = "DEVICE_ID_LOCAL",
+                // Antes era "DEVICE_ID_LOCAL" fijo: el servidor veía todos los
+                // Android como un único dispositivo.
+                deviceId = dispositivo.deviceId(),
                 deletedAt = null
             )
 
@@ -263,7 +267,7 @@ class FormularioEncuestaViewModel @Inject constructor(
                 idEncuestador = sessionManager.encuestadorId(),
                 fechaEncuesta = 0L,
                 fechaSincronizacion = null,
-                deviceId = "DEVICE_ID_LOCAL",
+                deviceId = dispositivo.deviceId(),
                 accion = if (state.isEdit) AccionEncuesta.ACTUALIZACION else AccionEncuesta.CREACION
             )
 

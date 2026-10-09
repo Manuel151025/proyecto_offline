@@ -107,3 +107,16 @@
 
 .btn-full { width: 100%; }
 
+
+/* ---- Errores por campo ----
+   El mensaje va debajo del campo que falla, no en un toast genérico: el
+   encuestador tiene que saber QUÉ corregir sin adivinar. */
+.form-field .input-error,
+.form-field input.input-error,
+.form-field select.input-error { border-color: var(--error); }
+.field-error {
+  margin-top: 4px;
+  font-size: 0.78rem;
+  color: var(--error);
+  line-height: 1.35;
+}

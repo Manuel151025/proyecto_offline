@@ -1,6 +1,6 @@
 import {
   getRetriableSync, updateSyncItems, markPersonasSynced, marcarRechazados,
-  getMarcaDescarga, setMarcaDescarga, mezclarPersonasDescargadas
+  getMarcaDescarga, setMarcaDescarga, mezclarPersonasDescargadas, limpiarEnviados
 } from './db.js';
 import { syncData, descargarCambios } from './api.js';
 
@@ -8,6 +8,25 @@ let syncing = false;
 
 /** Tope de páginas por sincronización, para no bloquear la app en el primer arranque. */
 const MAX_PAGINAS = 10;
+
+/**
+ * Registros por envío.
+ *
+ * Antes se mandaba TODA la cola en una sola petición. El servidor admite 500
+ * como máximo: un encuestador que pasaba semanas sin señal acumulaba más,
+ * recibía 413 y reintentaba el mismo envío imposible para siempre.
+ */
+export const TAMANO_LOTE = 100;
+
+/**
+ * Margen hacia atrás al empezar cada descarga.
+ *
+ * Dos sincronizaciones de otros celulares pueden confirmarse en el servidor en
+ * orden distinto al de sus sellos; sin este solape, la que se confirmó tarde
+ * con un sello anterior quedaría detrás de la marca y no bajaría nunca. Volver
+ * a recibir unos registros es inofensivo: la mezcla es idempotente.
+ */
+export const SOLAPE_MS = 2 * 60 * 1000;
 
 /**
  * Reparte lo enviado entre aceptado y rechazado según responda el servidor.
@@ -24,10 +43,16 @@ export function repartirRespuesta(pendientes, respuesta) {
   const rechazos = respuesta?.rechazadas || [];
   const idsRechazados = new Set(rechazos.map(r => r.id));
 
-  const aceptados = pendientes.filter(i => !idsRechazados.has(i.id));
+  const aceptados = pendientes.filter(i => !idsRechazados.has(i.encuesta?.id ?? i.id));
 
   return {
-    rechazos,
+    // El servidor identifica por id de ENCUESTA; la cola, por su propio id.
+    rechazos: rechazos
+      .map(r => {
+        const item = pendientes.find(i => (i.encuesta?.id ?? i.id) === r.id);
+        return item ? { id: item.id, motivo: r.motivo } : null;
+      })
+      .filter(Boolean),
     idsAceptados: aceptados.map(i => i.id),
     // Solo se limpia la marca de pendiente de las personas que sí subieron.
     clavesAceptadas: aceptados.map(
@@ -36,90 +61,113 @@ export function repartirRespuesta(pendientes, respuesta) {
   };
 }
 
+/** Divide una lista en trozos de `tamano`. */
+export function enLotes(lista, tamano = TAMANO_LOTE) {
+  const lotes = [];
+  for (let i = 0; i < lista.length; i += tamano) lotes.push(lista.slice(i, i + tamano));
+  return lotes;
+}
+
 /**
  * Sincronización completa: primero sube lo pendiente, después baja lo ajeno.
  *
  * El orden no es casual. Subiendo primero, los cambios locales llegan al
- * servidor antes de pedirle nada, así que lo que baja ya los tiene en cuenta;
- * al revés, se descargaría una versión anterior de un registro que estaba a
- * punto de enviarse y habría que resolver un conflicto evitable.
+ * servidor antes de pedirle nada, así que lo que baja ya los tiene en cuenta.
+ *
+ * @param {{onProgreso?: (p: {enviados:number, total:number}) => void}} [opciones]
  */
-export async function syncNow() {
-  if (syncing) return { synced: 0, message: 'Sincronización en curso' };
+export async function syncNow({ onProgreso } = {}) {
+  if (syncing) return { synced: 0, recibidas: 0, rechazadas: 0, message: 'Sincronización en curso' };
   syncing = true;
 
-  // Lo que está EN VUELO. Se vacía en cuanto el servidor responde, porque el
-  // catch de abajo lo marca como ERROR: si siguiera lleno, un fallo en la
-  // descarga posterior degradaría a ERROR registros que ya subieron bien y se
-  // reenviarían enteros en la siguiente sincronización.
-  let enVuelo = [];
-  let enviados = 0;
-  let rechazadas = 0;
   try {
-    // --- 1. SUBIR ---
-    const pending = await getRetriableSync();
+    const subida = await subirPendientes(onProgreso);
 
-    if (pending.length > 0) {
-      const personas = pending.map(i => {
-        const { _pendingSync, ...clean } = i.persona;
-        return clean;
-      });
-      const encuestas = pending.map(i => i.encuesta);
-      enVuelo = pending.map(i => i.id);
+    // Sin red o sin sesión, la descarga fallaría igual: se informa el error de subida.
+    if (subida.error && (subida.error.sinConexion || subida.error.sesionInvalida)) throw subida.error;
 
-      const respuesta = await syncData({ personas, encuestas });
-
-      // El servidor puede aceptar unos y descartar otros. Antes se daba por
-      // enviado todo el lote; ahora se separa, porque un registro rechazado
-      // que se reintenta en cada sincronización bloquea la cola para siempre.
-      const { rechazos, idsAceptados, clavesAceptadas } =
-        repartirRespuesta(pending, respuesta);
-
-      await updateSyncItems(idsAceptados, 'SENT');
-      await marcarRechazados(rechazos);
-      await markPersonasSynced(clavesAceptadas);
-
-      enviados = idsAceptados.length;
-      rechazadas = rechazos.length;
-      enVuelo = []; // Ya tienen estado definitivo: el catch no debe tocarlos.
-    }
-
-    // --- 2. BAJAR ---
     const recibidas = await descargarTodo();
+    limpiarEnviados().catch(() => {});
+
+    // Un lote que el servidor no aceptó (5xx, 413) se reintentará; se avisa
+    // después de haber descargado lo ajeno, que no depende de él.
+    if (subida.error) throw subida.error;
 
     return {
-      synced: enviados,
+      synced: subida.enviados,
       recibidas,
-      rechazadas,
-      message: construirMensaje(enviados, recibidas, rechazadas)
+      rechazadas: subida.rechazadas,
+      message: construirMensaje(subida.enviados, recibidas, subida.rechazadas)
     };
-  } catch (err) {
-    // Solo se marcan como ERROR los que seguían en vuelo; getRetriableSync los
-    // volverá a tomar en el siguiente intento.
-    if (enVuelo.length) await updateSyncItems(enVuelo, 'ERROR');
-    throw err;
   } finally {
     syncing = false;
   }
 }
 
 /**
- * Descarga por páginas hasta agotar los cambios pendientes.
+ * Sube la cola por lotes. Un lote fallido queda en ERROR (se reintentará) y
+ * no impide intentar los siguientes, salvo que falte red o sesión: entonces
+ * no tiene sentido seguir.
+ */
+async function subirPendientes(onProgreso) {
+  const pendientes = await getRetriableSync();
+  let enviados = 0;
+  let rechazadas = 0;
+  let error = null;
+  let procesados = 0;
+
+  for (const lote of enLotes(pendientes)) {
+    onProgreso?.({ enviados: procesados, total: pendientes.length });
+    try {
+      const respuesta = await syncData({
+        personas: lote.map(i => {
+          const { _pendingSync, ...limpia } = i.persona;
+          return limpia;
+        }),
+        encuestas: lote.map(i => i.encuesta)
+      });
+
+      const { rechazos, idsAceptados, clavesAceptadas } = repartirRespuesta(lote, respuesta);
+      await updateSyncItems(idsAceptados, 'SENT');
+      await marcarRechazados(rechazos);
+      await markPersonasSynced(clavesAceptadas);
+
+      enviados += idsAceptados.length;
+      rechazadas += rechazos.length;
+    } catch (err) {
+      await updateSyncItems(lote.map(i => i.id), 'ERROR');
+      error ??= err;
+      if (err.sinConexion || err.sesionInvalida) break;
+    }
+    procesados += lote.length;
+  }
+
+  if (pendientes.length) onProgreso?.({ enviados: procesados, total: pendientes.length });
+  return { enviados, rechazadas, error };
+}
+
+/**
+ * Descarga por páginas con el cursor compuesto (sello, tipo, número).
  *
- * La marca de agua solo avanza cuando la página se guardó de verdad: si algo
- * falla a mitad, la siguiente sincronización repite desde donde quedó en vez
- * de saltarse registros.
+ * La primera página empieza un poco antes de la marca guardada (SOLAPE_MS);
+ * las siguientes continúan exactamente donde terminó la anterior. La marca
+ * solo avanza cuando la página se guardó de verdad.
  */
 async function descargarTodo() {
+  const marcaGuardada = getMarcaDescarga();
+  let cursor = { sello: Math.max(0, marcaGuardada - SOLAPE_MS) };
   let total = 0;
 
   for (let pagina = 0; pagina < MAX_PAGINAS; pagina++) {
-    const datos = await descargarCambios(getMarcaDescarga());
+    const datos = await descargarCambios(cursor);
     if (!datos.personas || datos.personas.length === 0) break;
 
     const r = await mezclarPersonasDescargadas(datos.personas);
-    setMarcaDescarga(datos.marca);
     total += r.nuevas + r.actualizadas;
+
+    // Un servidor anterior a esta versión no devuelve `cursor`.
+    cursor = datos.cursor || { sello: datos.marca };
+    if (cursor.sello > getMarcaDescarga()) setMarcaDescarga(cursor.sello);
 
     if (!datos.hay_mas) break;
   }
@@ -137,6 +185,10 @@ function construirMensaje(enviados, recibidas, rechazadas) {
   return partes.length ? partes.join(' · ') : 'Todo al día';
 }
 
+/**
+ * Pide al navegador una sincronización en segundo plano (Chrome y Edge en
+ * Android). El service worker la ejecuta aunque la app esté cerrada.
+ */
 export function registerBackgroundSync() {
   if ('serviceWorker' in navigator && 'SyncManager' in window) {
     navigator.serviceWorker.ready

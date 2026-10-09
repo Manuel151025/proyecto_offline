@@ -25,6 +25,7 @@ fun EstadoSincronizacionScreen(
     onNavigateBack: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    val cola by viewModel.estadoCola.collectAsState()
     val context = LocalContext.current
 
     Scaffold(
@@ -69,6 +70,12 @@ fun EstadoSincronizacionScreen(
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Spacer(Modifier.height(12.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                    Contador("Pendientes", cola.pendientes, Modifier.weight(1f))
+                    Contador("Con error", cola.conError, Modifier.weight(1f))
+                    Contador("Rechazados", cola.rechazados.size, Modifier.weight(1f))
+                }
+                Spacer(Modifier.height(12.dp))
                 Button(
                     onClick = { viewModel.onSincronizarManual() },
                     enabled = !uiState.isSyncing,
@@ -83,6 +90,26 @@ fun EstadoSincronizacionScreen(
                         )
                     } else {
                         Text("Forzar sincronización manual")
+                    }
+                }
+            }
+
+            // --- Rechazados: terminales, con su motivo ---
+            if (cola.rechazados.isNotEmpty()) {
+                SectionCard(title = "Rechazados por el servidor") {
+                    Text(
+                        "No se volverán a enviar. Corrige la persona y guárdala de nuevo.",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    cola.rechazados.take(20).forEach { r ->
+                        Spacer(Modifier.height(10.dp))
+                        Text("${r.tipoDocumento} ${r.numeroDocumento}", fontWeight = FontWeight.SemiBold)
+                        Text(
+                            r.motivo.ifBlank { "Sin motivo informado" },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error
+                        )
                     }
                 }
             }
@@ -134,6 +161,20 @@ fun EstadoSincronizacionScreen(
                     }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun Contador(etiqueta: String, valor: Int, modifier: Modifier = Modifier) {
+    Surface(
+        color = MaterialTheme.colorScheme.surfaceVariant,
+        shape = RoundedCornerShape(12.dp),
+        modifier = modifier
+    ) {
+        Column(Modifier.padding(vertical = 10.dp, horizontal = 8.dp)) {
+            Text("$valor", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+            Text(etiqueta, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     }
 }

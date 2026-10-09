@@ -1,4 +1,4 @@
-﻿package com.minsalud.encuestas.di
+package com.minsalud.encuestas.di
 
 import com.minsalud.encuestas.data.repository.*
 import com.minsalud.encuestas.data.util.TimeProviderImpl
@@ -15,6 +15,12 @@ import javax.inject.Singleton
 @Module
 @InstallIn(SingletonComponent::class)
 abstract class RepositoryModule {
+
+    @Binds
+    @Singleton
+    abstract fun bindAlmacenCredenciales(
+        impl: com.minsalud.encuestas.data.local.prefs.CredencialesLocales
+    ): com.minsalud.encuestas.data.local.prefs.AlmacenCredenciales
 
     @Binds
     @Singleton

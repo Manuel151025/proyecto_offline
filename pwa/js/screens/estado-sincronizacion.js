@@ -28,6 +28,10 @@ export async function render(container) {
             <div class="count-number" id="count-error">—</div>
             <div class="count-label">Con error</div>
           </div>
+          <div class="count-card count-rechazado">
+            <div class="count-number" id="count-rechazado">—</div>
+            <div class="count-label">Rechazados</div>
+          </div>
         </div>
 
         <button class="btn btn-primary btn-full btn-sync" id="btn-sync">
@@ -48,7 +52,11 @@ export async function render(container) {
     btn.disabled = true;
     btn.textContent = 'Sincronizando...';
     try {
-      const result = await syncNow();
+      const result = await syncNow({
+        onProgreso: ({ enviados, total }) => {
+          if (total > 0) btn.textContent = `Enviando ${Math.min(enviados, total)} de ${total}…`;
+        }
+      });
       showToast(result.message || 'Sincronización completada', 'success');
     } catch (err) {
       if (err.sesionInvalida) {
@@ -81,6 +89,8 @@ async function refreshScreen() {
   if (pending) pending.textContent = counts.pending;
   if (sent) sent.textContent = counts.sent;
   if (error) error.textContent = counts.error;
+  const rechazado = document.getElementById('count-rechazado');
+  if (rechazado) rechazado.textContent = counts.rechazadas;
 
   const items = await getAllSyncItems();
   const histEl = document.getElementById('sync-history');
@@ -93,22 +103,34 @@ async function refreshScreen() {
     return;
   }
 
-  const sorted = [...items].reverse().slice(0, 30);
-  histEl.innerHTML = sorted.map(item => {
+  // Los rechazados van primero: son los únicos que piden algo al encuestador.
+  const rechazados = items.filter(i => i.status === 'RECHAZADO').reverse();
+  const resto = items.filter(i => i.status !== 'RECHAZADO').reverse().slice(0, 30);
+  histEl.innerHTML = [...rechazados, ...resto].map(item => {
     const statusClass = {
       PENDING: 'status-pending',
       SENT: 'status-sent',
-      ERROR: 'status-error'
+      ERROR: 'status-error',
+      RECHAZADO: 'status-error'
     }[item.status] || '';
-    const statusLabel = { PENDING: 'Pendiente', SENT: 'Enviado', ERROR: 'Error' }[item.status] || item.status;
+    const statusLabel = { PENDING: 'Pendiente', SENT: 'Enviado', ERROR: 'Error', RECHAZADO: 'Rechazado' }[item.status] || item.status;
     const p = item.persona;
     const name = p ? `${p.nombres || ''} ${p.apellidos || ''}`.trim() : '—';
     const accion = item.encuesta?.accion || '—';
+    // El motivo lo da el servidor; sin él, un rechazo es un registro que
+    // desaparece sin que nadie sepa por qué.
+    const motivo = item.status === 'RECHAZADO' && item.error
+      ? `<div class="sync-item-motivo">${escHtml(item.error)}</div>`
+      : '';
+    const corregir = item.status === 'RECHAZADO' && p && !p.deleted_at
+      ? `<a class="sync-item-corregir" href="#/editar/${encodeURIComponent(p.tipo_documento)}/${encodeURIComponent(p.numero_documento)}">Corregir</a>`
+      : '';
     return `
       <div class="sync-item">
         <div class="sync-item-info">
           <div class="sync-item-name">${escHtml(name)}</div>
           <div class="sync-item-meta">${escHtml(accion)} · ${formatDateTime(item.created_at)}</div>
+          ${motivo}${corregir}
         </div>
         <span class="badge ${statusClass}">${statusLabel}</span>
       </div>

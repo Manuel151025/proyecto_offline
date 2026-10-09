@@ -57,3 +57,12 @@ vendor/
 composer.json
 composer.lock
 phpstan.neon
+
+# Pruebas de integración: nunca deben quedar publicadas en el docroot.
+tests/
+phpunit.xml
+.phpunit.cache/
+
+# Fuente de diseño y scripts de desarrollo: no se usan en ejecución.
+design/
+scripts/

@@ -17,116 +17,7 @@ $sesion = requerirAutenticacion($pdo);
 
 const MAX_LOTE = 500;
 
-/**
- * Un registro concreto del lote no es válido.
- *
- * Antes, cada validación llamaba a responderError, que hace exit: una sola
- * fila mala devolvía 400 y tumbaba el envío entero, hasta 500 registros. Peor
- * aún, el cliente reintentaba ese mismo lote indefinidamente, así que un
- * registro irreparable dejaba la cola de un encuestador bloqueada para
- * siempre. Ahora se lanza esto, se descarta la fila y el resto del lote sigue.
- *
- * Un payload MAL FORMADO (sin los arreglos esperados) sigue siendo 400: eso es
- * un fallo del cliente, no un dato de campo defectuoso.
- */
-class DatoInvalido extends RuntimeException
-{
-}
-
-/** Exige un texto no vacío y lo recorta a la longitud de la columna. */
-/** @param array<string, mixed> $fila */
-function textoRequerido(array $fila, string $clave, int $max): string
-{
-    $valor = trim((string)($fila[$clave] ?? ''));
-    if ($valor === '') {
-        throw new DatoInvalido("Campo obligatorio faltante o vacío: $clave");
-    }
-    return mb_substr($valor, 0, $max);
-}
-
-/** Texto opcional: null si viene vacío o ausente. */
-/** @param array<string, mixed> $fila */
-function textoOpcional(array $fila, string $clave, int $max): ?string
-{
-    $valor = trim((string)($fila[$clave] ?? ''));
-    return $valor === '' ? null : mb_substr($valor, 0, $max);
-}
-
-/** Entero obligatorio (timestamps en milisegundos). */
-/** @param array<string, mixed> $fila */
-function enteroRequerido(array $fila, string $clave): int
-{
-    $valor = $fila[$clave] ?? null;
-    if (!is_numeric($valor)) {
-        throw new DatoInvalido("Campo numérico obligatorio inválido: $clave");
-    }
-    return (int)$valor;
-}
-
-/** Entero opcional: null si viene ausente o no numérico. */
-/** @param array<string, mixed> $fila */
-function enteroOpcional(array $fila, string $clave): ?int
-{
-    $valor = $fila[$clave] ?? null;
-    return is_numeric($valor) ? (int)$valor : null;
-}
-
-/**
- * Tipos de documento admitidos.
- *
- * Es la lista que ofrece el formulario de la PWA y, desde que Android descarga
- * datos ajenos, también la de su enum TipoDocumento. Las tres deben coincidir:
- * un tipo que un cliente no reconozca hace que se salte ese registro.
- */
-const TIPOS_DOCUMENTO = ['CC', 'TI', 'RC', 'CE', 'PP', 'NIT', 'PE'];
-
-/** Longitud mínima del documento; la misma que ya exigen los clientes. */
-const MIN_LONGITUD_DOCUMENTO = 6;
-
-/**
- * Valida el documento, que es la CLAVE PRIMARIA de personas.
- *
- * Los clientes ya comprueban esto, pero la validación del cliente no es
- * validación: cualquiera con un token y curl puede saltársela. En producción
- * apareció una persona con documento "hola", prueba de que se podía.
- *
- * No se exige que sean solo dígitos a propósito: los pasaportes y algunas
- * cédulas de extranjería llevan letras, y rechazarlos dejaría fuera a personas
- * reales. Se comprueba la longitud y que no haya caracteres imposibles en un
- * identificador.
- *
- * @param array<string, mixed> $fila
- */
-function documentoValidado(array $fila): string
-{
-    $tipo = strtoupper(trim((string)($fila['tipo_documento'] ?? '')));
-    if (!in_array($tipo, TIPOS_DOCUMENTO, true)) {
-        throw new DatoInvalido("Tipo de documento no admitido: '$tipo'");
-    }
-
-    $numero = trim((string)($fila['numero_documento'] ?? ''));
-    if (mb_strlen($numero) < MIN_LONGITUD_DOCUMENTO) {
-        throw new DatoInvalido('El número de documento debe tener al menos ' . MIN_LONGITUD_DOCUMENTO . ' caracteres');
-    }
-    if (mb_strlen($numero) > 20) {
-        throw new DatoInvalido('El número de documento no puede superar 20 caracteres');
-    }
-    if (!preg_match('/^[A-Za-z0-9\-]+$/', $numero)) {
-        throw new DatoInvalido('El número de documento solo admite letras, dígitos y guiones');
-    }
-
-    return $numero;
-}
-
-/** @param array<string, mixed> $fila */
-function tipoDocumentoValidado(array $fila): string
-{
-    $tipo = strtoupper(trim((string)($fila['tipo_documento'] ?? '')));
-    if (!in_array($tipo, TIPOS_DOCUMENTO, true)) {
-        throw new DatoInvalido("Tipo de documento no admitido: '$tipo'");
-    }
-    return $tipo;
-}
+require_once __DIR__ . '/validacion.php';
 
 $data = json_decode(leerCuerpo(), true);
 
@@ -157,6 +48,14 @@ function claveCruda(array $fila): string
 /** Encuestas rechazadas: id => motivo. Se devuelven al cliente. */
 $rechazadas = [];
 
+/** Documento de cada encuesta rechazada, para guardarlo en sync_rechazos. */
+$documentoRechazo = [];
+
+$stmtMunicipios = $pdo->query('SELECT codigo FROM municipios');
+$codigosMunicipio = $stmtMunicipios === false
+    ? []
+    : array_flip(array_map('strval', $stmtMunicipios->fetchAll(PDO::FETCH_COLUMN)));
+
 /** Personas descartadas: clave cruda => motivo. */
 $personasRechazadas = [];
 
@@ -173,17 +72,17 @@ foreach ($data['personas'] as $p) {
             // en que el cliente lo haya hecho.
             'tipo_documento'   => tipoDocumentoValidado($p),
             'numero_documento' => documentoValidado($p),
-            'nombres'          => textoRequerido($p, 'nombres', 100),
-            'apellidos'        => textoRequerido($p, 'apellidos', 100),
-            'fecha_nacimiento' => enteroOpcional($p, 'fecha_nacimiento'),
+            'nombres'          => nombreValidado($p, 'nombres'),
+            'apellidos'        => nombreValidado($p, 'apellidos'),
+            'fecha_nacimiento' => fechaNacimientoValidada($p),
             'telefono'         => textoOpcional($p, 'telefono', 20),
-            'email'            => textoOpcional($p, 'email', 100),
+            'email'            => emailValidado($p),
             'direccion'        => textoOpcional($p, 'direccion', 150),
             'vereda'           => textoOpcional($p, 'vereda', 100),
             'eps'              => textoOpcional($p, 'eps', 50),
             'ocupacion'        => textoOpcional($p, 'ocupacion', 100),
-            'estrato'          => enteroOpcional($p, 'estrato'),
-            'municipio_codigo' => textoOpcional($p, 'municipio_codigo', 10),
+            'estrato'          => estratoValidado($p),
+            'municipio_codigo' => municipioValidado($p, $codigosMunicipio),
             'updated_at'       => enteroRequerido($p, 'updated_at'),
             'device_id'        => textoRequerido($p, 'device_id', 50),
             'deleted_at'       => enteroOpcional($p, 'deleted_at'),
@@ -210,6 +109,7 @@ foreach ($data['encuestas'] as $e) {
     // Si su persona se descartó, la encuesta no puede entrar: la clave foránea
     // apunta a una fila que no existirá.
     $clave = claveCruda($e);
+    $documentoRechazo[$idEncuesta] = explode('|', $clave, 2);
     if (isset($personasRechazadas[$clave])) {
         $rechazadas[$idEncuesta] = 'Persona inválida: ' . $personasRechazadas[$clave];
         continue;
@@ -237,6 +137,16 @@ foreach ($data['encuestas'] as $e) {
 // Antes de la transacción: un ALTER TABLE hace commit implícito y partiría
 // el lote a la mitad si se ejecutara dentro.
 asegurarServerUpdatedAt($pdo);
+asegurarTablasSincronizacion($pdo);
+
+/**
+ * Margen para relojes de dispositivo adelantados.
+ *
+ * Last-Write-Wins compara el `updated_at` del dispositivo. Un teléfono con la
+ * fecha un año adelantada escribía registros que ninguna corrección posterior
+ * podía superar. Se recorta a la hora del servidor más este margen.
+ */
+const MARGEN_RELOJ_MS = 5 * 60 * 1000;
 
 $processedEncuestas = [];
 $pdo->beginTransaction();
@@ -264,8 +174,13 @@ try {
     // forma monótona, mientras que `updated_at` depende del reloj de cada
     // dispositivo y podría ir hacia atrás.
     $selloServidor = (int)round(microtime(true) * 1000);
+    $limiteReloj = $selloServidor + MARGEN_RELOJ_MS;
 
     foreach ($personas as $p) {
+        if ($p['updated_at'] > $limiteReloj) {
+            error_log("[sync] updated_at futuro recortado ({$p['updated_at']}) de {$p['device_id']}");
+            $p['updated_at'] = $limiteReloj;
+        }
         $stmtPersonaCheck->execute([$p['tipo_documento'], $p['numero_documento']]);
         $existing = $stmtPersonaCheck->fetch();
 
@@ -307,12 +222,34 @@ try {
     foreach ($encuestas as $e) {
         $stmtEncuestaInsert->execute([
             $e['id'], $e['tipo_documento'], $e['numero_documento'], $e['id_encuestador'],
-            $e['fecha_encuesta'], $e['device_id'], $e['accion'], $now
+            min($e['fecha_encuesta'], $limiteReloj), $e['device_id'], $e['accion'], $now
         ]);
         $processedEncuestas[] = $e['id'];
     }
 
     $pdo->commit();
+
+    // Fuera de la transacción: el monitoreo nunca debe deshacer un envío.
+    if ($rechazadas !== []) {
+        try {
+            $stmtRechazo = $pdo->prepare(
+                'INSERT INTO sync_rechazos
+                    (id_encuesta, tipo_documento, numero_documento, motivo, device_id, id_encuestador, creado_en)
+                 VALUES (?, ?, ?, ?, ?, ?, ?)'
+            );
+            $deviceRechazo = trim((string)($_SERVER['HTTP_X_DEVICE_ID'] ?? '')) ?: null;
+            foreach ($rechazadas as $id => $motivo) {
+                [$tipoR, $numeroR] = $documentoRechazo[$id] ?? ['', ''];
+                $stmtRechazo->execute([
+                    mb_substr((string)$id, 0, 50), mb_substr($tipoR, 0, 10) ?: null, mb_substr($numeroR, 0, 40) ?: null,
+                    mb_substr($motivo, 0, 255), $deviceRechazo, $sesion['id_encuestador'], $now,
+                ]);
+            }
+        } catch (PDOException $ex) {
+            error_log('[sync] no se pudieron guardar los rechazos: ' . $ex->getMessage());
+        }
+    }
+    registrarDispositivo($pdo, $sesion['id_encuestador'], 'subida', $encuestas[0]['device_id'] ?? null);
 
     // Las rechazadas se informan una a una para que el cliente las marque como
     // terminales y deje de reintentarlas. Si solo se devolviera el conteo, el

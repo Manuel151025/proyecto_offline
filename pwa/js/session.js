@@ -1,20 +1,51 @@
+import { guardarKV, borrarKV } from './db.js';
+import { getDeviceId } from './utils.js';
+
 const SESSION_KEY = 'pwa_session';
 
+/**
+ * Dónde vive la sesión.
+ *
+ * Con «Recordar sesión» activo, en localStorage: sobrevive a cerrar la app.
+ * Sin él, en sessionStorage: se borra al cerrar la pestaña. Antes la casilla
+ * se mostraba pero no hacía nada.
+ */
+function almacen(remember) {
+  return remember === false && globalThis.sessionStorage ? globalThis.sessionStorage : localStorage;
+}
+
+/** Los almacenes disponibles (en pruebas de Node solo existe el simulado). */
+function almacenes() {
+  return [globalThis.localStorage, globalThis.sessionStorage].filter(Boolean);
+}
+
 export function getSession() {
-  try {
-    const raw = localStorage.getItem(SESSION_KEY);
-    return raw ? JSON.parse(raw) : null;
-  } catch (_) {
-    return null;
+  for (const store of almacenes()) {
+    try {
+      const raw = store.getItem(SESSION_KEY);
+      if (raw) return JSON.parse(raw);
+    } catch (_) {
+      // Almacenamiento bloqueado o JSON corrupto: se prueba el siguiente.
+    }
   }
+  return null;
 }
 
 export function setSession(session) {
-  localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+  almacenes().forEach(s => s.removeItem(SESSION_KEY));
+  almacen(session.remember).setItem(SESSION_KEY, JSON.stringify(session));
+  // El service worker no puede leer localStorage: necesita el token en
+  // IndexedDB para subir la cola cuando la app está cerrada.
+  if (session.remember !== false && session.token) {
+    guardarKV('sesion', { token: session.token, expiraEn: session.expiraEn ?? null, deviceId: getDeviceId() }).catch(() => {});
+  } else {
+    borrarKV('sesion').catch(() => {});
+  }
 }
 
 export function clearSession() {
-  localStorage.removeItem(SESSION_KEY);
+  almacenes().forEach(s => s.removeItem(SESSION_KEY));
+  borrarKV('sesion').catch(() => {});
 }
 
 export function hasActiveSession() {

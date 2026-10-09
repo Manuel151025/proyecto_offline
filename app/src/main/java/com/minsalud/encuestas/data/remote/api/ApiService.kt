@@ -1,4 +1,4 @@
-﻿package com.minsalud.encuestas.data.remote.api
+package com.minsalud.encuestas.data.remote.api
 
 import com.minsalud.encuestas.data.remote.dto.LoginRequestDto
 import com.minsalud.encuestas.data.remote.dto.LoginResponseDto
@@ -23,11 +23,16 @@ interface ApiService {
     @POST("api/personas/sync.php")
     suspend fun syncData(@Body payload: SyncRequestDto): Response<SyncResponseDto>
 
-    /** Descarga incremental: personas cambiadas tras la marca `desde`. */
+    /**
+     * Descarga incremental con cursor compuesto (sello, tipo, número).
+     * `tipo` y `numero` nulos piden todo lo posterior al sello.
+     */
     @GET("api/personas/cambios.php")
     suspend fun getCambios(
         @Query("desde") desde: Long,
-        @Query("limite") limite: Int = 200
+        @Query("limite") limite: Int = 200,
+        @Query("tipo") tipo: String? = null,
+        @Query("numero") numero: String? = null
     ): Response<CambiosResponseDto>
 
     @GET("api/municipios/index.php")

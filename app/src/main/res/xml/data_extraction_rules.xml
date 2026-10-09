@@ -1,6 +1,14 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 12+: ni copia en la nube ni transferencia a otro teléfono (ver backup_rules.xml). -->
 <data-extraction-rules>
     <cloud-backup>
-        <exclude domain="sharedpref" fqdn="encuestas_prefs.xml"/>
+        <exclude domain="sharedpref" path="."/>
+        <exclude domain="database" path="."/>
+        <exclude domain="file" path="."/>
     </cloud-backup>
+    <device-transfer>
+        <exclude domain="sharedpref" path="."/>
+        <exclude domain="database" path="."/>
+        <exclude domain="file" path="."/>
+    </device-transfer>
 </data-extraction-rules>

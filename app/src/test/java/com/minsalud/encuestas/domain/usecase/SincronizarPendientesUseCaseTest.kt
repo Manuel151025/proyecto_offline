@@ -29,7 +29,7 @@ class SincronizarPendientesUseCaseTest {
 
     @Test
     fun `sincroniza y reporta exito cuando no hay fallos`() = runTest {
-        coEvery { syncRepository.sincronizarPendientes() } returns Unit
+        coEvery { syncRepository.sincronizarPendientes() } returns com.minsalud.encuestas.domain.model.ResumenSync()
 
         val resultado = useCase()
 

@@ -1,6 +1,57 @@
 import { getToken } from './session.js';
+import { getDeviceId } from './utils.js';
 
 const BASE_URL = '../api';
+
+/** Versión de la app que el servidor registra en el monitor de dispositivos. */
+export const APP_VERSION = '2.0.0';
+
+/** Cabeceras que identifican a este celular ante el servidor. */
+function cabecerasDispositivo() {
+  return {
+    'X-Device-Id': getDeviceId(),
+    'X-Plataforma': 'pwa',
+    'X-App-Version': APP_VERSION
+  };
+}
+
+/**
+ * fetch que distingue "no hubo red" de "el servidor respondió con error".
+ *
+ * Sin red, fetch lanza TypeError; con la app controlada por el service worker,
+ * llega un 503 fabricado por él. Ambos casos se marcan con `sinConexion` para
+ * que la sincronización deje de intentar el resto de lotes en vez de
+ * marcarlos todos como fallidos uno a uno.
+ */
+async function pedir(url, opciones) {
+  let res;
+  try {
+    res = await fetch(url, opciones);
+  } catch (_) {
+    throw Object.assign(new Error('Sin conexión al servidor'), { sinConexion: true });
+  }
+  if (res.status === 503) {
+    throw Object.assign(new Error('Sin conexión al servidor'), { sinConexion: true });
+  }
+  return res;
+}
+
+async function errorDeSesion(res) {
+  const data = await res.json().catch(() => ({}));
+  return Object.assign(
+    new Error(data.message || 'Tu sesión expiró. Inicia sesión de nuevo.'),
+    { sesionInvalida: true }
+  );
+}
+
+function sinToken() {
+  // Se marca para que quien llame pueda mandar al login en vez de dejar al
+  // usuario leyendo un mensaje que no le dice cómo salir del atasco.
+  return Object.assign(
+    new Error('Tu sesión no permite sincronizar. Vuelve a iniciar sesión con conexión.'),
+    { sesionInvalida: true }
+  );
+}
 
 export async function login(numero_documento, password) {
   const controller = new AbortController();
@@ -44,33 +95,29 @@ export async function logout() {
 }
 
 /**
- * Descarga las personas que cambiaron en el servidor desde `desde`.
+ * Descarga las personas que cambiaron en el servidor después del cursor.
  *
- * `desde` es la marca de agua del dispositivo: la mayor `server_updated_at`
- * que ya tiene guardada. Pedir solo lo posterior evita traer la tabla entera
- * en cada sincronización.
+ * El cursor es (sello, tipo, número). Con solo el sello, una página que
+ * cortaba un lote sellado en el mismo milisegundo dejaba el resto del lote
+ * sin descargar nunca.
+ *
+ * @param {{sello:number, tipo?:string, numero?:string}} cursor
  */
-export async function descargarCambios(desde = 0, limite = 200) {
+export async function descargarCambios(cursor = { sello: 0 }, limite = 200) {
   const token = getToken();
-  if (!token) {
-    throw Object.assign(
-      new Error('Tu sesión no permite sincronizar. Vuelve a iniciar sesión con conexión.'),
-      { sesionInvalida: true }
-    );
+  if (!token) throw sinToken();
+
+  const consulta = new URLSearchParams({ desde: String(cursor.sello || 0), limite: String(limite) });
+  if (cursor.tipo && cursor.numero) {
+    consulta.set('tipo', cursor.tipo);
+    consulta.set('numero', cursor.numero);
   }
 
-  const res = await fetch(
-    `${BASE_URL}/personas/cambios.php?desde=${encodeURIComponent(desde)}&limite=${limite}`,
-    { headers: { 'Authorization': `Bearer ${token}` } }
-  );
+  const res = await pedir(`${BASE_URL}/personas/cambios.php?${consulta}`, {
+    headers: { 'Authorization': `Bearer ${token}`, ...cabecerasDispositivo() }
+  });
 
-  if (res.status === 401 || res.status === 403) {
-    const data = await res.json().catch(() => ({}));
-    throw Object.assign(
-      new Error(data.message || 'Tu sesión expiró. Inicia sesión de nuevo.'),
-      { sesionInvalida: true }
-    );
-  }
+  if (res.status === 401 || res.status === 403) throw await errorDeSesion(res);
   if (!res.ok) throw new Error(`Error HTTP ${res.status}`);
 
   const data = await res.json();
@@ -86,31 +133,19 @@ export async function fetchMunicipios() {
 
 export async function syncData(payload) {
   const token = getToken();
-  if (!token) {
-    // Se marca para que quien llame pueda mandar al login en vez de dejar al
-    // usuario leyendo un mensaje que no le dice cómo salir del atasco.
-    throw Object.assign(
-      new Error('Tu sesión no permite sincronizar. Vuelve a iniciar sesión con conexión.'),
-      { sesionInvalida: true }
-    );
-  }
+  if (!token) throw sinToken();
 
-  const res = await fetch(`${BASE_URL}/personas/sync.php`, {
+  const res = await pedir(`${BASE_URL}/personas/sync.php`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`
+      'Authorization': `Bearer ${token}`,
+      ...cabecerasDispositivo()
     },
     body: JSON.stringify(payload)
   });
 
-  if (res.status === 401 || res.status === 403) {
-    const data = await res.json().catch(() => ({}));
-    throw Object.assign(
-      new Error(data.message || 'Tu sesión expiró. Inicia sesión de nuevo.'),
-      { sesionInvalida: true }
-    );
-  }
+  if (res.status === 401 || res.status === 403) throw await errorDeSesion(res);
   if (!res.ok) throw new Error(`Error HTTP ${res.status}`);
 
   const data = await res.json();
