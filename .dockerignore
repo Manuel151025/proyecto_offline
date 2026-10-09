@@ -62,3 +62,7 @@ phpstan.neon
 tests/
 phpunit.xml
 .phpunit.cache/
+
+# Fuente de diseño y scripts de desarrollo: no se usan en ejecución.
+design/
+scripts/

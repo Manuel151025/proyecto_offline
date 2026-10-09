@@ -334,6 +334,11 @@ jobs:
       - name: Verificar caché del service worker y manifest
         run: node scripts/check-pwa-assets.mjs
 
+      # La paleta vive en design/tokens.json. Si alguien cambia un color a mano
+      # en la PWA, el panel o Android, las tres superficies divergen en silencio.
+      - name: Verificar que la paleta coincida con design/tokens.json
+        run: node scripts/tokens.mjs --verificar
+
       # El huso se fija a propósito: el fallo que motivó estas pruebas (la fecha
       # de nacimiento corriéndose un día) solo se manifestaba con desfase
       # negativo respecto a UTC, y Colombia es donde corre la app.
