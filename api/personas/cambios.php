@@ -65,6 +65,21 @@ $conCursor = $tipoCursor !== '' && $numeroCursor !== '';
 asegurarServerUpdatedAt($pdo);
 
 try {
+    // Alcance del encuestador (si tiene municipios asignados). Los
+    // administradores siempre ven todo.
+    $alcance = '';
+    $paramsAlcance = [];
+    $asignados = $sesion['rol'] === 'admin' ? [] : municipiosAsignados($pdo, $sesion['id_encuestador']);
+    if ($asignados !== []) {
+        $marcas = implode(', ', array_fill(0, count($asignados), '?'));
+        $alcance = " AND (municipio_codigo IN ($marcas)
+                     OR EXISTS (SELECT 1 FROM encuestas en
+                                 WHERE en.tipo_documento = personas.tipo_documento
+                                   AND en.numero_documento = personas.numero_documento
+                                   AND en.id_encuestador = ?))";
+        $paramsAlcance = array_merge($asignados, [$sesion['id_encuestador']]);
+    }
+
     if ($conCursor) {
         $where = 'server_updated_at > ?
                   OR (server_updated_at = ? AND (tipo_documento > ?
@@ -82,11 +97,11 @@ try {
                 telefono, email, direccion, vereda, eps, ocupacion, estrato,
                 municipio_codigo, updated_at, device_id, deleted_at, server_updated_at
          FROM personas
-         WHERE server_updated_at IS NOT NULL AND ($where)
+         WHERE server_updated_at IS NOT NULL AND ($where)$alcance
          ORDER BY server_updated_at ASC, tipo_documento ASC, numero_documento ASC
          LIMIT $limite"
     );
-    $stmt->execute($params);
+    $stmt->execute(array_merge($params, $paramsAlcance));
     $filas = $stmt->fetchAll();
 
     // Los enteros vuelven como cadena por PDO; el cliente compara números.

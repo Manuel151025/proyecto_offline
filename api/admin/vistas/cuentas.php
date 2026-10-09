@@ -27,6 +27,7 @@
                 <th scope="col">Estado</th>
                 <th scope="col" class="num">Encuestas</th>
                 <th scope="col" class="num">Celulares</th>
+                <th scope="col">Alcance</th>
                 <th scope="col">Última encuesta</th>
                 <th scope="col"><span class="sr-only">Acciones</span></th>
               </tr>
@@ -45,6 +46,8 @@
                   <td><span class="estado<?= $esActiva ? ' estado-activo' : '' ?>"><?= $esActiva ? 'Activa' : 'Inactiva' ?></span></td>
                   <td class="num"><?= numero((int)$c['encuestas']) ?></td>
                   <td class="num"><?= numero($sesionesPorCuenta[(int)$c['id']] ?? 0) ?></td>
+                  <td><?= $esAdmin ? '<span class="apagado">Todo</span>'
+                      : (isset($asignacionesPorCuenta[(int)$c['id']]) ? h(cantidad($asignacionesPorCuenta[(int)$c['id']], 'municipio', 'municipios')) : 'Todos') ?></td>
                   <td class="celda-fecha"><?= h(haceCuanto($c['ultima_actividad'])) ?></td>
                   <td class="acciones">
                     <a class="btn btn-fantasma btn-sm" href="<?= h(urlPanel(['seccion' => 'cuentas', 'editar' => (string)$c['id']])) ?>#form-cuenta"
@@ -111,6 +114,24 @@
             <span><strong>Administrador</strong><span>Además entra a este panel: ve y borra personas, y gestiona cuentas.</span></span>
           </label>
         </fieldset>
+
+        <div class="campo">
+          <label class="campo-etiqueta" for="cuenta-municipios">Municipios que descarga</label>
+          <select class="input selector-municipios" id="cuenta-municipios" name="municipios[]" multiple size="7" aria-describedby="ayuda-municipios">
+            <?php $grupo = null; foreach ($municipios as $m): ?>
+              <?php if ($m['departamento'] !== $grupo): ?>
+                <?= $grupo !== null ? '</optgroup>' : '' ?><optgroup label="<?= h($m['departamento']) ?>">
+                <?php $grupo = $m['departamento']; ?>
+              <?php endif; ?>
+              <option value="<?= h($m['codigo']) ?>"<?= in_array((string)$m['codigo'], $formCuenta['municipios'], true) ? ' selected' : '' ?>><?= h($m['nombre']) ?></option>
+            <?php endforeach; ?>
+            <?= $grupo !== null ? '</optgroup>' : '' ?>
+          </select>
+          <p class="campo-ayuda" id="ayuda-municipios">
+            Sin ninguno seleccionado, descarga todas las personas. Con municipios, solo las de esos
+            municipios y las que este encuestador haya registrado. Ctrl o Cmd para elegir varios.
+          </p>
+        </div>
 
         <div class="campo">
           <label class="casilla">

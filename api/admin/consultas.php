@@ -729,3 +729,37 @@ function resumenMonitor(PDO $pdo): array
         'dispositivos' => $uno('SELECT COUNT(*) FROM dispositivos', []),
     ];
 }
+
+// --- Municipios asignados ------------------------------------------------------
+
+/**
+ * Reemplaza los municipios asignados a una cuenta. Lista vacía = sin
+ * restricción (descarga todo).
+ *
+ * @param list<string> $codigos
+ */
+function guardarMunicipiosAsignados(PDO $pdo, int $idCuenta, array $codigos): void
+{
+    asegurarTablaAsignaciones($pdo);
+    $pdo->prepare('DELETE FROM encuestador_municipios WHERE id_encuestador = ?')->execute([$idCuenta]);
+    $insertar = $pdo->prepare('INSERT INTO encuestador_municipios (id_encuestador, municipio_codigo) VALUES (?, ?)');
+    foreach (array_unique($codigos) as $codigo) {
+        $insertar->execute([$idCuenta, $codigo]);
+    }
+}
+
+/**
+ * Cuántos municipios tiene asignados cada cuenta (las que no aparecen: todos).
+ *
+ * @return array<int, int>
+ */
+function contarAsignacionesPorCuenta(PDO $pdo): array
+{
+    asegurarTablaAsignaciones($pdo);
+    $stmt = $pdo->query('SELECT id_encuestador, COUNT(*) AS total FROM encuestador_municipios GROUP BY id_encuestador');
+    $conteo = [];
+    foreach ($stmt === false ? [] : $stmt->fetchAll() as $f) {
+        $conteo[(int)$f['id_encuestador']] = (int)$f['total'];
+    }
+    return $conteo;
+}

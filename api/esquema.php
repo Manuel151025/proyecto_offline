@@ -138,6 +138,43 @@ function asegurarTablaAuditoria(PDO $pdo): void
 }
 
 /**
+ * Crea la tabla de municipios asignados a cada cuenta si falta.
+ *
+ * Una cuenta SIN filas aquí descarga todas las personas (el comportamiento de
+ * siempre). Con filas, cada celular recibe solo las personas de esos
+ * municipios y las que su encuestador registró o actualizó: un teléfono
+ * perdido en campo ya no expone los datos de salud de todo el país.
+ */
+function asegurarTablaAsignaciones(PDO $pdo): void
+{
+    static $verificado = false;
+    if ($verificado) {
+        return;
+    }
+    $pdo->exec(
+        'CREATE TABLE IF NOT EXISTS encuestador_municipios (
+            id_encuestador INT NOT NULL,
+            municipio_codigo VARCHAR(10) NOT NULL,
+            PRIMARY KEY (id_encuestador, municipio_codigo)
+        )'
+    );
+    $verificado = true;
+}
+
+/**
+ * Municipios asignados a una cuenta. Vacío = sin restricción.
+ *
+ * @return list<string>
+ */
+function municipiosAsignados(PDO $pdo, int $idCuenta): array
+{
+    asegurarTablaAsignaciones($pdo);
+    $stmt = $pdo->prepare('SELECT municipio_codigo FROM encuestador_municipios WHERE id_encuestador = ? ORDER BY municipio_codigo');
+    $stmt->execute([$idCuenta]);
+    return array_values(array_map('strval', $stmt->fetchAll(PDO::FETCH_COLUMN)));
+}
+
+/**
  * Registra que un celular se comunicó con el servidor.
  *
  * El identificador llega en la cabecera X-Device-Id; si falta (clientes

@@ -448,7 +448,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $password = is_string($_POST['password'] ?? null) ? $_POST['password'] : '';
         $activo = isset($_POST['activo']) ? 1 : 0;
         $rol = textoPost('rol') === 'admin' ? 'admin' : 'encuestador';
-        $formCuenta = ['id' => $id, 'nombre' => $nombre, 'numero_documento' => $documento, 'rol' => $rol, 'activo' => $activo];
+        // Municipios que descargará esta cuenta. Ninguno = todos.
+        $municipiosSel = array_values(array_unique(array_filter(
+            array_map(fn ($c) => is_string($c) ? trim($c) : '', is_array($_POST['municipios'] ?? null) ? $_POST['municipios'] : []),
+            fn ($c) => $c !== ''
+        )));
+        $formCuenta = ['id' => $id, 'nombre' => $nombre, 'numero_documento' => $documento, 'rol' => $rol, 'activo' => $activo, 'municipios' => $municipiosSel];
+        $codigosValidos = array_flip(array_map('strval', array_column(listarMunicipios($pdo), 'codigo')));
 
         $cuentaActual = ($id !== '' && ctype_digit($id)) ? buscarCuentaPorId($pdo, (int)$id) : null;
 
@@ -465,6 +471,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } elseif (!preg_match(PATRON_DOCUMENTO_CUENTA, $documento)) {
             $errorCuenta = 'El documento solo admite letras, dígitos y guiones, hasta 20 caracteres, '
                          . 'sin puntos ni espacios. Con otro formato la app no dejaría entrar.';
+        } elseif (array_diff($municipiosSel, array_keys($codigosValidos)) !== []) {
+            $errorCuenta = 'Hay municipios que no existen en la lista.';
         } elseif ($id === '' && $password === '') {
             $errorCuenta = 'La contraseña es obligatoria para cuentas nuevas.';
         } elseif ($password !== '' && mb_strlen($password) < MIN_LONGITUD_PASSWORD) {
@@ -508,9 +516,13 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     $stmt->execute([$nombre, $documento, $nuevoHash, $activo, $rol]);
                 }
 
+                $idGuardado = $cuentaActual === null ? (int)$pdo->lastInsertId() : (int)$id;
+                guardarMunicipiosAsignados($pdo, $idGuardado, $municipiosSel);
+
                 // Nunca la contraseña: solo si cambió.
                 auditar($pdo, $cuentaActual === null ? 'crear_cuenta' : 'editar_cuenta', "cuenta:$documento", [
                     'nombre' => $nombre, 'rol' => $rol, 'activo' => $activo, 'cambio_contrasena' => $nuevoHash !== null,
+                    'municipios' => count($municipiosSel),
                     'antes' => $cuentaActual === null ? null : [
                         'nombre' => $cuentaActual['nombre'], 'rol' => $cuentaActual['rol'], 'activo' => (int)$cuentaActual['activo'],
                     ],
@@ -604,6 +616,7 @@ if ($loggedIn && $formCuenta === null && $editarId !== '') {
             'numero_documento' => (string)($cuentaEditada['numero_documento'] ?? ''),
             'rol'              => (string)$cuentaEditada['rol'],
             'activo'           => (int)$cuentaEditada['activo'],
+            'municipios'       => municipiosAsignados($pdo, (int)$cuentaEditada['id']),
         ];
     }
 }
@@ -611,7 +624,7 @@ if ($errorCuenta !== null) {
     $seccion = 'cuentas';
 }
 // En modo arranque lo único que tiene sentido crear es el primer administrador.
-$formCuenta ??= ['id' => '', 'nombre' => '', 'numero_documento' => '', 'rol' => $modoArranque ? 'admin' : 'encuestador', 'activo' => 1];
+$formCuenta ??= ['id' => '', 'nombre' => '', 'numero_documento' => '', 'rol' => $modoArranque ? 'admin' : 'encuestador', 'activo' => 1, 'municipios' => []];
 $editando = $formCuenta['id'] !== '';
 
 $resumen = ['personas' => 0, 'borradas' => 0, 'encuestas' => 0, 'encuestadores' => 0, 'cuentas' => 0, 'dispositivos' => 0, 'ultima_sync' => null];
@@ -635,6 +648,7 @@ $personaFicha = null;
 $historial = [];
 $auditoriaPersona = [];
 $sesionesPorCuenta = [];
+$asignacionesPorCuenta = [];
 $sesionesCuenta = [];
 $bloqueoCuenta = 0;
 $dispositivos = [];
@@ -687,6 +701,8 @@ if ($loggedIn) {
     } else {
         $cuentas = consultarEncuestadores($pdo);
         $sesionesPorCuenta = contarSesionesPorCuenta($pdo);
+        $asignacionesPorCuenta = contarAsignacionesPorCuenta($pdo);
+        $municipios = listarMunicipios($pdo);
         if ($editando) {
             $sesionesCuenta = sesionesDeCuenta($pdo, (int)$formCuenta['id']);
             if ($formCuenta['numero_documento'] !== '' && preg_match(PATRON_DOCUMENTO_CUENTA, $formCuenta['numero_documento'])) {

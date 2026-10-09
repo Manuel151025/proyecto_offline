@@ -20,7 +20,7 @@ abstract class IntegracionTestCase extends TestCase
         foreach (['encuestas', 'personas', 'sesiones', 'intentos_login', 'encuestadores'] as $tabla) {
             $pdo->exec("TRUNCATE $tabla");
         }
-        foreach (['sync_rechazos', 'dispositivos', 'auditoria_admin'] as $tabla) {
+        foreach (['sync_rechazos', 'dispositivos', 'auditoria_admin', 'encuestador_municipios'] as $tabla) {
             $pdo->exec("DROP TABLE IF EXISTS $tabla");
         }
         $pdo->exec('SET FOREIGN_KEY_CHECKS=1');
