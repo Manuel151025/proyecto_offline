@@ -254,25 +254,32 @@ Catálogo DIVIPOLA/DANE. Sin autenticación: es información pública y los clie
 
 Documento + contraseña de una cuenta con rol `admin` **activa**. Mientras no exista ninguna, se acepta `ADMIN_PASSWORD` solo para crear la primera; después deja de aceptarse sola.
 
-Mismo límite de intentos que la API: 5 fallos → 15 minutos. Estando bloqueado, **incluso la contraseña correcta se rechaza**.
+Mismo límite de intentos que la API: 5 fallos → 15 minutos. Estando bloqueado, **incluso la contraseña correcta se rechaza**. El documento debe cumplir el mismo formato que en `login.php` (letras, dígitos y guiones, hasta 20).
+
+La sesión se **revalida en cada petición**: se cierra si la cuenta deja de ser administradora activa, si su contraseña cambió desde que entró, tras una hora sin actividad, y (en modo arranque) en cuanto existe un administrador. Las páginas se sirven con `Cache-Control: no-store`.
+
+Las fechas se muestran y los días se agrupan en hora de Colombia (`America/Bogota`).
 
 ### Secciones
 
 | Ruta | Contenido |
 |---|---|
-| `?seccion=resumen` | Totales, encuestas por día, personas por municipio, encuestas por encuestador |
-| `?seccion=personas` | Listado con búsqueda y paginación |
+| `?seccion=resumen` | Totales, encuestas por día (14 días, los vacíos en cero), personas por municipio, encuestas por encuestador |
+| `?seccion=personas&q=&p=` | Listado con búsqueda (nombre completo o documento) y paginación |
 | `?seccion=personas&borradas=1` | Papelera, con restauración |
-| `?seccion=encuestadores` | Cuentas: crear, editar, rol, activar |
-| `?exportar=personas` | Descarga CSV con BOM UTF-8 |
+| `?seccion=cuentas` | Cuentas: crear, editar, rol, activar. `?seccion=encuestadores` sigue funcionando |
+| `?seccion=cuentas&editar=<id>` | Formulario de edición de una cuenta |
+| `?exportar=personas` | Descarga CSV con BOM UTF-8; las celdas que Excel ejecutaría como fórmula van precedidas de `'` |
 
 ### Acciones (POST)
+
+Toda acción responde con una redirección `303` y un aviso de un solo uso guardado en la sesión, así que recargar no repite el envío.
 
 | `action` | Efecto |
 |---|---|
 | `login` / `logout` | Sesión del panel |
-| `save` | Crear o editar cuenta. Rechaza quitar el rol o desactivar al **único** admin activo. |
-| `borrar_persona` | Borrado suave; sella ambas marcas; registra `admin:<nombre>` |
+| `save` | Crear o editar cuenta. Rechaza quitar el rol o desactivar al **único** admin activo. Cambiar la contraseña o desactivar la cuenta **revoca sus tokens de API**. |
+| `borrar_persona` | Borrado suave; sella ambas marcas; registra `admin:<nombre>`. El aviso ofrece deshacer. |
 | `restaurar_persona` | Deshace el borrado; sella igual, o no se propagaría |
 
 ---
