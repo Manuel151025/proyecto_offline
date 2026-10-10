@@ -2,15 +2,24 @@
 
 Sistema de recolección de datos demográficos para el Ministerio de Salud, diseñado para funcionar en zonas rurales **sin conectividad**. Compuesto por una **app Android nativa**, una **PWA**, una **API REST en PHP** y un **panel de administración web**.
 
-🔗 **Producción:** https://encuestas.manuelcardenas.online/pwa/
+🔗 **Producción:** app de encuestas en https://encuestas.manuelcardenas.online/pwa/ · panel en https://encuestas.manuelcardenas.online/api/admin/
+
+<p align="center">
+  <img src="docs/capturas/app-inicio-sin-senal.png" alt="Inicio de la app sin conexión" width="240">
+  &nbsp;
+  <img src="docs/capturas/panel-resumen.png" alt="Resumen del panel de administración" width="520">
+</p>
 
 ## 📚 Documentación
 
 | Documento | Contenido |
 |---|---|
-| [**Arquitectura**](docs/ARQUITECTURA.md) | Diagramas de componentes, despliegue, modelo de datos y flujos · 8 decisiones de arquitectura documentadas |
-| [**Historias de usuario**](docs/HISTORIAS-DE-USUARIO.md) | 34 historias con criterios de aceptación y trazabilidad a código y pruebas |
-| [**API**](docs/API.md) | Referencia de endpoints, parámetros, respuestas y ejemplos |
+| [**Manual de uso**](docs/MANUAL.md) | Guía para encuestadores y administradores, con capturas |
+| [**Arquitectura**](docs/ARQUITECTURA.md) | Diagramas de componentes, despliegue, modelo de datos y flujos (registro, sincronización, validación, diseño) · 11 decisiones de arquitectura |
+| [**Historias de usuario**](docs/HISTORIAS-DE-USUARIO.md) | 35 historias con criterios de aceptación y trazabilidad a código y pruebas |
+| [**API**](docs/API.md) | Endpoints, parámetros, respuestas, reglas de validación y ejemplos |
+| [**Pruebas**](docs/PRUEBAS.md) | Inventario de las 230 pruebas automáticas y cómo correrlas |
+| [**Pruebas de campo**](docs/PRUEBAS-DE-CAMPO.md) | Lista de verificación en celulares reales |
 | [**Pendientes**](docs/PENDIENTES.md) | Qué falta, por qué, y qué pasa si no se hace |
 
 ## Descripción
@@ -26,8 +35,10 @@ Garantizar la recolección íntegra de datos sobre el terreno y prevenir la pér
 | **Clientes** | Android nativo (Kotlin · Compose · Room) · PWA (JavaScript sin framework · IndexedDB) |
 | **Backend** | PHP 8 sin framework · MySQL 8.4 |
 | **Sincronización** | Bidireccional, por lotes, con Outbox y Last-Write-Wins |
-| **Pruebas** | 105 automatizadas — 68 Android (JVM) + 37 PWA |
-| **CI** | 3 trabajos · PHPStan nivel 8 · Android Lint · guardas de regresión |
+| **Validación** | Las mismas reglas por campo en los dos clientes y el servidor, con filtro al escribir |
+| **Diseño** | «Cálida de territorio»: una paleta (`design/tokens.json`) y la fuente Figtree empaquetada en las tres superficies |
+| **Pruebas** | 230 automatizadas — 77 Android · 58 PWA · 88 API y panel · 7 de punta a punta en navegador real |
+| **CI** | 4 trabajos · PHPStan nivel 8 · Android Lint · guardas de regresión |
 | **Despliegue** | Dokploy sobre Docker Swarm · TLS con acme.sh |
 
 ## Arquitectura
@@ -51,7 +62,7 @@ graph LR
     AND ==>|"sube y baja<br/>Bearer"| API
     PWA ==>|"sube y baja<br/>Bearer"| API
     API --> DB
-    ADM --> DB
+    ADM -->|"sesión + CSRF"| API
 
     style API fill:#12467E,color:#fff
     style DB fill:#12467E,color:#fff
@@ -130,18 +141,40 @@ Al mezclar lo descargado, **los cambios locales sin enviar nunca se pisan**: tod
 | La lista de la PWA se pinta **de a 50** | Construir el HTML de miles de registros de golpe bloquea la interfaz en gama baja. Se amplía con `IntersectionObserver` al acercarse al final. |
 | Eventos de la lista **por delegación** | Dos listeners en total en vez de dos por tarjeta. |
 
+## Validación de los datos
+
+Lo que el servidor rechazaría no se puede guardar en el teléfono, porque cuando llega el rechazo el encuestador ya no está frente a la persona. Por eso hay tres capas con **las mismas reglas**:
+
+1. **Al escribir:** lo que no corresponde al campo no entra (letras en el documento o el teléfono, números en el nombre, más caracteres que el máximo). El teclado cambia según el tipo de documento.
+2. **Al guardar:** cada campo con error se marca con su motivo y no se guarda nada.
+3. **En el servidor:** se valida todo otra vez; una fila inválida se rechaza con su motivo sin tumbar el lote.
+
+| Campo | Regla |
+|---|---|
+| Documento | Solo dígitos según el tipo: CC 6–10 · TI y RC 10–11 · CE 6–10 · NIT 9–10 · PE 6–15. Solo el pasaporte (PP, 6–12) admite letras |
+| Nombres y apellidos | Obligatorios, 2 a 60: letras (con tildes y ñ), espacios, guion o apóstrofo |
+| Teléfono | 10 dígitos: celular `3…` o fijo `60…` |
+| Fecha de nacimiento | Entre 1900 y hoy |
+| Dirección · vereda · EPS · ocupación | Largo mínimo y máximo, caracteres permitidos y al menos una letra |
+| Estrato · correo · municipio | 1 a 6 · formato válido · debe existir en el catálogo |
+
+Las reglas viven en [`pwa/js/validacion.js`](pwa/js/validacion.js), [`Validaciones.kt`](app/src/main/java/com/minsalud/encuestas/domain/validation/Validaciones.kt) y [`api/personas/validacion.php`](api/personas/validacion.php). [`pwa/tests/paridad.test.mjs`](pwa/tests/paridad.test.mjs) lee las tres y falla si alguna diverge.
+
 ## Sistema de diseño
 
-Una sola paleta institucional para las dos plataformas, declarada en dos sitios que deben mantenerse en espejo:
+Dirección **«Cálida de territorio»**: azul institucional `#12467E`, fondo cálido `#F6F4EF`, tarjetas blancas con esquinas generosas y un acento terracota `#B4532A` reservado para la acción de registrar y el día de hoy en los gráficos. Tipografía **Figtree**, empaquetada (no se descarga de Google Fonts: la app se ve igual sin señal y no se filtra la IP de nadie).
 
-| Plataforma | Archivo |
+La paleta tiene **una sola fuente**, [`design/tokens.json`](design/tokens.json), y `node scripts/tokens.mjs` la escribe en las tres superficies:
+
+| Superficie | Archivo |
 |---|---|
-| PWA | [`pwa/css/base.css`](pwa/css/base.css) — custom properties `--primary`, `--surface`, … |
-| Android | [`presentation/theme/Theme.kt`](app/src/main/java/com/minsalud/encuestas/presentation/theme/Theme.kt) — `BrandPrimary`, `StatusSuccess`, … |
+| PWA | [`pwa/css/base.css`](pwa/css/base.css) — `--primary`, `--accent`, `--surface`, … (con modo oscuro) |
+| Panel | [`api/admin/admin.css`](api/admin/admin.css) — `--primary`, `--acento`, … |
+| Android | [`presentation/theme/Theme.kt`](app/src/main/java/com/minsalud/encuestas/presentation/theme/Theme.kt) — `BrandPrimary`, `BrandAccent`, … más tipografía y formas |
 
-Los nombres describen el **rol, no el color**. La versión anterior los llamaba `BrandGreen`; cuando la marca pasó a azul, cada pantalla que los importaba quedó mintiendo. Si cambia la marca, se tocan esos dos archivos y nada más.
+CI falla si alguno de los tres se edita a mano y deja de coincidir. Los nombres describen el **rol, no el color**: la versión anterior los llamaba `BrandGreen` y, cuando la marca pasó a azul, cada pantalla que los importaba quedó mintiendo.
 
-Todas las combinaciones de texto sobre fondo se verificaron por encima del mínimo **AA (4.5:1)** de WCAG.
+Todas las combinaciones de texto sobre fondo cumplen **WCAG AA** en modo claro y oscuro, y lo verifica una prueba ([`contraste.test.mjs`](pwa/tests/contraste.test.mjs)). El estado de cada registro lleva siempre icono y palabra: el color nunca es la única señal.
 
 ## Tecnologías Utilizadas (App Android)
 - **Kotlin & Coroutines/Flow**: Asincronía y reactividad.
@@ -223,33 +256,43 @@ Copiar `.env.example` a `.env` y completar:
 | `ALLOWED_ORIGINS` | Orígenes autorizados para CORS, separados por comas y sin barra final |
 
 ## Pruebas
+
+**230 pruebas automáticas, 0 fallos.** El inventario completo está en [docs/PRUEBAS.md](docs/PRUEBAS.md).
+
 ```bash
-./gradlew testDebugUnitTest       # 68 pruebas unitarias JVM
-node --test pwa/tests/*.test.mjs  # 37 pruebas de la PWA
-node scripts/check-pwa-assets.mjs # integridad del caché offline de la PWA
+./gradlew testDebugUnitTest lintDebug assembleDebug   # 77 Android + lint + APK
+TZ=America/Bogota node --test pwa/tests/*.test.mjs    # 58 PWA (paridad y contraste incluidos)
+vendor/bin/phpunit                                    # 88 API y panel, contra MySQL real
+node --test tests/e2e/e2e.test.mjs                    # 7 de punta a punta en Chrome/Edge
+vendor/bin/phpstan analyse                            # análisis estático, nivel 8
+node scripts/check-pwa-assets.mjs                     # la caché offline está completa
+node scripts/tokens.mjs --verificar                   # la paleta coincide en las tres superficies
 ```
 
-**Android** cubre autenticación (`AuthRepositoryImplTest`), sincronización por lotes (`SyncRepositoryImplTest`), reglas de negocio y persistencia (`GuardarRegistroCompletoUseCaseTest`, `EliminarPersonaUseCaseTest`), validaciones (`ValidacionesTest`, `GuardarPersonaUseCaseTest`), estado de la interfaz (`ListaPersonasViewModelTest`) y manejo de errores (`SincronizarPendientesUseCaseTest`).
+| Suite | Qué cubre |
+|---|---|
+| **Android** | Autenticación, sincronización por lotes, mezcla al descargar, guardado atómico con la cola, validaciones, estado de la interfaz |
+| **PWA** | Fechas en dos husos horarios, sesión, cliente HTTP, mezcla, reparto tras un envío parcial, validación y filtro de campos, **paridad de reglas** con el servidor y Android, **contraste WCAG** |
+| **API y panel** | Sincronización (token, cursor, Last-Write-Wins, rechazo por fila, reloj adelantado), descarga por municipios, panel completo (acceso, bloqueo, búsqueda, CSV, cuentas, auditoría, CSP) y cada regla de validación |
+| **Punta a punta** | Un navegador real crea cuentas en el panel, entra a la app, registra **sin señal**, recupera la señal y comprueba que el registro llegó al panel |
 
-**PWA** usa el runner nativo de Node, sin dependencias que instalar. Cubre la conversión de fechas, la vigencia del token, la regla de mezcla al descargar (`mezcla.test.mjs`) y el reparto entre aceptado y rechazado tras un envío parcial (`reparto.test.mjs`). Las pruebas de fecha se ejecutan en dos husos horarios (`America/Bogota` y `Asia/Tokyo`) porque el fallo que las motivó —la fecha de nacimiento corriéndose un día en cada edición— solo aparecía con desfase negativo respecto a UTC.
-
-`check-pwa-assets.mjs` verifica que todo archivo listado en `pwa/sw.js` exista y que los recursos de `index.html` estén cacheados. Sin esa comprobación, dividir o renombrar un archivo rompe la app **sin conexión** — un fallo invisible al probar en línea.
+Las pruebas de PHP y las de punta a punta crean y borran su propia base: nunca tocan la real. Las de fecha de la PWA se corren en `America/Bogota` y `Asia/Tokyo` porque el fallo que las motivó —la fecha de nacimiento corriéndose un día en cada edición— solo aparecía con desfase negativo respecto a UTC.
 
 ## Estilos de la PWA
 
-`styles.css` tenía 791 líneas. Se dividió en siete hojas por responsabilidad:
+Siete hojas por responsabilidad:
 
 | Archivo | Líneas | Contenido |
 |---|---:|---|
-| `base.css` | 56 | Tokens de diseño, reset, contenedor |
-| `layout.css` | 86 | Cabecera, contenido, navegación inferior |
-| `components.css` | 109 | Búsqueda, tarjetas, insignias, FAB, estado vacío |
-| `forms.css` | 106 | Pantalla de formulario y botones |
-| `sync.css` | 55 | Pantalla de sincronización |
-| `feedback.css` | 40 | Toasts, errores, visibilidad del chrome |
-| `login.css` | 339 | Pantalla de inicio de sesión |
+| `base.css` | 138 | Fuente, tokens de diseño (claro y oscuro), reset, contenedor |
+| `layout.css` | 129 | Cabecera, contenido, barra inferior con el botón de registrar |
+| `components.css` | 178 | Saludo, tarjeta del día, gráfico de la semana, búsqueda, tarjetas, estados, estado vacío |
+| `forms.css` | 121 | Formulario, ayudas y errores por campo, botones |
+| `sync.css` | 85 | Pantalla de envío de datos |
+| `feedback.css` | 73 | Avisos flotantes, aviso de sesión vencida, visibilidad de la cabecera |
+| `login.css` | 400 | Pantalla de inicio de sesión |
 
-⚠️ **El orden de los `<link>` en `index.html` es significativo.** Cuando dos reglas tienen la misma especificidad gana la última, así que los archivos se cortaron en rangos contiguos y concatenarlos en ese orden reproduce el `styles.css` original byte a byte. Reordenar los `<link>` cambia la apariencia.
+⚠️ **El orden de los `<link>` en `index.html` es significativo.** Cuando dos reglas tienen la misma especificidad gana la última; reordenarlos cambia la apariencia.
 
 Al tocar cualquier hoja hay que **subir la versión de `CACHE` en `pwa/sw.js`**: el `fetch` es cache-first y sin ese cambio los navegadores seguirían sirviendo la versión anterior.
 
@@ -257,8 +300,9 @@ Al tocar cualquier hoja hay que **subir la versión de `CACHE` en `pwa/sw.js`**:
 `.github/workflows/ci.yml` se ejecuta en cada push y pull request a `main`:
 
 - **android**: pruebas unitarias, **Android Lint**, cobertura con **JaCoCo** y `assembleDebug` sobre JDK 17, publicando el reporte.
-- **php**: sintaxis de todos los archivos de `api/` y **PHPStan nivel 8**, más las guardas de abajo.
-- **pwa**: pruebas con el runner de Node y verificación de la integridad del caché offline.
+- **php**: sintaxis de todos los archivos de `api/`, **PHPStan nivel 8** y las pruebas de **PHPUnit contra MySQL 8.4**, más las guardas de abajo.
+- **pwa**: pruebas con el runner de Node en dos husos horarios, integridad del caché offline y verificación de la paleta.
+- **e2e**: el recorrido completo en **Chrome real**, contra una base desechable; publica las capturas como artefacto.
 
 **Guardas de regresión.** CI no solo comprueba que las pruebas pasen: falla si vuelve a aparecer un fallo ya corregido. Cada una nació de un problema real.
 
@@ -275,24 +319,35 @@ Al tocar cualquier hoja hay que **subir la versión de `CACHE` en `pwa/sw.js`**:
 | `login.php` deja de validar el formato del documento | Se podría bloquear el panel desde fuera |
 | El panel deja de usar cuentas con rol | Ninguna acción administrativa tendría autor |
 | Se puede quitar el rol al último administrador | Uno se dejaría fuera sin forma de volver a entrar |
+| La paleta de la PWA, el panel o Android difiere de `design/tokens.json` | Las tres superficies divergían en silencio |
+| Las reglas de validación difieren entre PWA, servidor y Android (prueba de paridad) | El teléfono guardaría datos que el servidor rechaza días después |
 
 Además, **Dependabot** vigila las dependencias de Gradle, Composer y las acciones de GitHub.
 
 ## Estructura del Proyecto
 ```
 proyecto_offline/
-├── app/                  # Aplicación Android Nativa
+├── app/                  # Aplicación Android nativa
 │   ├── src/main/java/... # Clean Architecture (data, domain, presentation, di, worker)
+│   ├── src/main/res/font # Figtree
 │   └── src/test/java/... # Pruebas unitarias JVM
 ├── api/                  # Backend PHP (API REST)
+│   ├── admin/            # Panel de administración (vistas, estilos, SQL)
+│   ├── personas/         # sync.php · cambios.php · validacion.php
 │   ├── cors.php          # Política CORS centralizada (lista blanca)
 │   └── auth_token.php    # Emisión y validación de tokens
 ├── pwa/                  # Progressive Web App (offline-first)
-│   ├── css/              # 7 hojas por responsabilidad (ver nota abajo)
+│   ├── css/ fonts/       # 7 hojas por responsabilidad · Figtree
 │   ├── js/screens/       # Una pantalla por archivo
+│   ├── tests/            # node --test
 │   └── sw.js             # Service worker: caché offline
-├── database/             # Scripts SQL (esquema y migraciones)
-├── scripts/              # Verificaciones usadas por CI
+├── tests/
+│   ├── php/              # PHPUnit: integración + unitarias
+│   └── e2e/              # Punta a punta en navegador real
+├── design/tokens.json    # Paleta: fuente única
+├── database/             # Esquema y migraciones
+├── scripts/              # tokens.mjs · check-pwa-assets.mjs
+├── docs/                 # Documentación y capturas
 ├── .github/workflows/    # Integración continua
 └── README.md
 ```
@@ -331,11 +386,15 @@ El panel valida contra esta tabla, no contra una contraseña compartida, de modo
 
 No es posible quitarse el rol ni desactivarse siendo el único administrador activo: el panel lo rechaza, porque recuperarse de eso exigiría entrar a la base de datos a mano.
 
-## Estado Actual del Proyecto
-- **Android**: Scaffolding, Data, Domain, UseCases, Repositorios, ViewModels, UI Compose, WorkManager Sync completados.
-- **Backend/DB**: Completados Scripts DDL y Endpoints de resolución de conflictos.
-- **Calidad**: 105 pruebas automatizadas (68 Android + 37 PWA), PHPStan nivel 8, Android Lint, cobertura con JaCoCo y guardas de regresión en CI.
-- **Seguridad**: autenticación por token con revocación, cuentas por rol, límite de intentos en API y panel, CORS por lista blanca.
+## Estado actual del proyecto
+
+*Al 9 de octubre de 2026, desplegado en producción.*
+
+- **Clientes**: Android y PWA completos y offline-first, con validación estricta por campo y la dirección visual «Cálida de territorio».
+- **Backend**: sincronización bidireccional por lotes, rechazo por fila, descarga limitada por municipios, automigración de esquema.
+- **Panel**: resumen, personas (ficha, edición, filtros, CSV, papelera), cuentas, monitor de sincronización y auditoría; acceso rediseñado.
+- **Calidad**: 230 pruebas automatizadas (77 Android, 58 PWA, 88 API y panel, 7 de punta a punta), PHPStan nivel 8, Android Lint, cobertura con JaCoCo, contraste WCAG AA verificado y guardas de regresión en CI.
+- **Seguridad**: autenticación por token con revocación, cuentas por rol, límite de intentos en API y panel, CORS por lista blanca, CSP en el panel, auditoría de cada acción administrativa.
 
 El detalle de lo que falta y por qué está en [docs/PENDIENTES.md](docs/PENDIENTES.md).
 

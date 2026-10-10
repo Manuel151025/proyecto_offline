@@ -4,6 +4,8 @@ Para usar con Claude Design: ejecuta `/design` y pídele que use este archivo.
 
 **Fecha:** 8 de octubre de 2026 · **Fase del plan:** F3 ([plan de trabajo](PLAN-DE-TRABAJO.md))
 
+> **Ejecutado el 9 de octubre de 2026.** De las direcciones del lienzo se eligió la **B · «Cálida de territorio»**: azul institucional `#12467E`, fondo cálido `#F6F4EF`, acento terracota `#B4532A` solo para registrar y para el día de hoy, y la fuente Figtree empaquetada. Está aplicada en la PWA, el panel y Android; la paleta vive en [`design/tokens.json`](../design/tokens.json). Ver [ARQUITECTURA §5.8](ARQUITECTURA.md#58-sistema-de-diseño-una-paleta-tres-superficies).
+
 ---
 
 ## 1 · El producto

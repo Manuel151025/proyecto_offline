@@ -30,10 +30,16 @@ Marca cada fila. «Tiempo» es lo que tarda en aparecer el registro en el panel 
 | 7 | Más de 500 pendientes | Registrar en lote sin señal (o con datos de prueba) | Sube en lotes de 100, sin quedarse atascado | ☐ | ☐ | |
 | 8 | Sesión revocada | Desde el panel, Cuentas → «Cerrar sesiones en celulares» | Aviso de sesión vencida; tras entrar con red, la cola sube | ☐ | ☐ | |
 | 9 | Login sin conexión | Cerrar sesión con red, activar modo avión, volver a entrar | Entra con la cuenta real (no solo la demo) | ☐ | ☐ | |
-| 10 | Registro inválido | Registrar un documento de 3 dígitos | El formulario lo impide con un mensaje en el campo | ☐ | ☐ | — |
+| 10 | Registro inválido | Intentar escribir letras en el documento (CC) y en el teléfono, y números en el nombre | No entran; al guardar con un documento de 3 dígitos o una fecha futura, cada campo muestra su error | ☐ | ☐ | — |
+| 10b | Formato por tipo | Cambiar el tipo a PP y escribir letras; volver a CC | Con PP entran letras; al volver a CC se quitan y cambia la ayuda bajo el número | ☐ | ☐ | — |
+| 10c | Corregir un rechazado | Enviar un registro antiguo que no cumpla las reglas nuevas | Aparece en *Rechazados* con su motivo; **Corregir** abre la persona; al guardar se envía | ☐ | ☐ | |
 | 11 | Descarga de otro celular | Registrar en el teléfono A y sincronizar el B | La persona aparece en el B | ☐ | ☐ | |
 | 12 | Borrado desde el panel | Borrar en el panel y sincronizar | Desaparece del celular | ☐ | ☐ | |
 | 13 | Migración de la base (solo Android) | Instalar la versión nueva sobre la anterior con datos sin enviar | Los datos siguen ahí y suben | ☐ | n/a | — |
+
+## Antes de salir: lo que ya está probado solo
+
+Las [pruebas de punta a punta](PRUEBAS.md#punta-a-punta-testse2e) ya recorren en un navegador real los escenarios 1, 2 y 10 de la PWA (registrar sin señal, recuperar la señal y verlo en el panel). Esta guía cubre lo que solo un teléfono revela.
 
 ## Pruebas automáticas con dispositivo
 

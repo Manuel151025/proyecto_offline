@@ -22,13 +22,15 @@ Catálogo funcional del sistema. Cada historia incluye criterios de aceptación 
 
 | Épica | Historias | ✅ | 🟡 | ⏳ |
 |---|---:|---:|---:|---:|
-| E1 · Acceso y sesión | 5 | 4 | 1 | 0 |
+| E1 · Acceso y sesión | 5 | 5 | 0 | 0 |
 | E2 · Recolección de datos | 6 | 5 | 1 | 0 |
-| E3 · Sincronización | 7 | 6 | 1 | 0 |
-| E4 · Administración | 7 | 0 | 7 | 0 |
-| E5 · Calidad y operación | 5 | 3 | 2 | 0 |
-| E6 · Futuro | 4 | 0 | 0 | 4 |
-| **Total** | **34** | **18** | **12** | **4** |
+| E3 · Sincronización | 8 | 7 | 1 | 0 |
+| E4 · Administración | 7 | 6 | 1 | 0 |
+| E5 · Calidad y operación | 5 | 5 | 0 | 0 |
+| E6 · Futuro | 4 | 0 | 1 | 3 |
+| **Total** | **35** | **28** | **4** | **3** |
+
+*Revisado el 9 de octubre de 2026.* Las pruebas que se citan están descritas en [PRUEBAS.md](PRUEBAS.md); «E2E n» es la prueba número *n* de punta a punta.
 
 ---
 
@@ -112,7 +114,7 @@ Catálogo funcional del sistema. Cada historia incluye criterios de aceptación 
 
 ---
 
-## HU-05 · Acceso por rol 🟡
+## HU-05 · Acceso por rol ✅
 
 > **Como** administrador
 > **quiero** entrar al panel con mi propia cuenta
@@ -128,6 +130,7 @@ Catálogo funcional del sistema. Cada historia incluye criterios de aceptación 
 6. La respuesta del login de la API incluye el rol.
 
 **Implementación** · [`api/admin/index.php`](../api/admin/index.php) · `buscarAdminPorDocumento` y `esUltimoAdminActivo` en [`consultas.php`](../api/admin/consultas.php)
+**Pruebas** · `PanelAdminTest`: `testUnEncuestadorNoEntraAlPanel`, `testNoSePuedeQuitarElRolAlUltimoAdminActivo`, `testEnArranqueSeEditaUnEncuestadorYElPrimerAdminCierraTodasLasSesiones` · E2E 1 y 3
 
 ---
 
@@ -159,18 +162,20 @@ Catálogo funcional del sistema. Cada historia incluye criterios de aceptación 
 
 **Criterios de aceptación**
 
-1. Nombres y apellidos son obligatorios.
-2. El número de documento tiene entre **6 y 20 caracteres** y solo admite letras, dígitos y guiones.
-3. Se admiten 7 tipos de documento: `CC · TI · RC · CE · PP · NIT · PE`.
+1. Se admiten 7 tipos de documento, cada uno con su formato: **solo dígitos** en CC (6–10), TI y RC (10–11), CE (6–10), NIT (9–10) y PE (6–15); el pasaporte (PP, 6–12) es el único que admite letras.
+2. Nombres y apellidos son obligatorios, de 2 a 60 caracteres, con letras (tildes y ñ incluidas), espacios, guion o apóstrofo.
+3. El teléfono, si se informa, tiene 10 dígitos: celular que empieza por 3 o fijo que empieza por 60.
 4. El correo, si se informa, tiene formato válido.
-5. **El servidor valida de nuevo todo.** La validación del cliente no protege nada: cualquiera con un token y `curl` se la salta.
+5. Dirección, vereda, EPS y ocupación, si se informan, tienen un largo mínimo y solo caracteres razonables.
+6. La fecha de nacimiento está entre 1900 y hoy; el selector de fecha no deja elegir días futuros. El estrato va de 1 a 6.
+7. **Lo que no corresponde a un campo no se puede escribir** (letras en el teléfono, números en el nombre, más caracteres que el máximo), y el teclado cambia según el tipo de documento.
+8. Al guardar, cada campo con error muestra su motivo debajo, y el error se borra en cuanto se corrige.
+9. **El servidor valida de nuevo todo**, con las mismas reglas. La validación del cliente no protege nada: cualquiera con un token y `curl` se la salta.
 
-**Motivación.** En producción llegó a existir una persona con documento `"hola"`, prueba de que la validación solo en cliente no basta.
+**Motivación.** En producción llegó a existir una persona con documento `"hola"`, y en una prueba en celular se guardó una cédula `sdscf1ds5ds1c` con el apellido `Velasquez.,s65`.
 
-**Nota.** No se exige que sean solo dígitos a propósito: pasaportes y algunas cédulas de extranjería llevan letras, y rechazarlas dejaría fuera a personas reales.
-
-**Implementación** · [`Validaciones.kt`](../app/src/main/java/com/minsalud/encuestas/domain/validation/Validaciones.kt) · `documentoValidado` en [`sync.php`](../api/personas/sync.php)
-**Pruebas** · `ValidacionesTest` · `GuardarPersonaUseCaseTest`
+**Implementación** · [`validacion.js`](../pwa/js/validacion.js) · [`Validaciones.kt`](../app/src/main/java/com/minsalud/encuestas/domain/validation/Validaciones.kt) · [`validacion.php`](../api/personas/validacion.php)
+**Pruebas** · `validacion.test.mjs` · `ValidacionesTest` (Android) · `ValidacionTest` (PHP) · `SincronizacionTest::testDatosInvalidosSeRechazanPorFila` · `paridad.test.mjs` · E2E 5
 
 ---
 
@@ -397,9 +402,9 @@ Catálogo funcional del sistema. Cada historia incluye criterios de aceptación 
 
 # E4 · Administración
 
-> Las historias de esta épica están implementadas y verificadas manualmente contra una base de datos local. No tienen pruebas automatizadas: el panel es PHP que mezcla vista y acción, y no hay suite de pruebas para PHP en el proyecto. Ver [PENDIENTES.md](PENDIENTES.md).
+> Las historias de esta épica están cubiertas por las pruebas de integración de `tests/php` (PHPUnit contra MySQL real y el servidor embebido) y por la prueba de punta a punta.
 
-## HU-20 · Ver el resumen general 🟡
+## HU-20 · Ver el resumen general ✅
 
 > **Como** administrador
 > **quiero** un panorama del avance
@@ -414,9 +419,11 @@ Catálogo funcional del sistema. Cada historia incluye criterios de aceptación 
 
 **Implementación** · [`api/admin/consultas.php`](../api/admin/consultas.php)
 
+**Pruebas** · `PanelAdminTest::testElResumenMuestraCatorceDiasYCuentaSoloEncuestadores` · `PanelFuncionesTest::testElResumenAvisaDeLosRechazosRecientes` · E2E 7
+
 ---
 
-## HU-21 · Consultar y buscar personas 🟡
+## HU-21 · Consultar y buscar personas ✅
 
 > **Como** administrador
 > **quiero** buscar entre todas las personas registradas
@@ -429,9 +436,11 @@ Catálogo funcional del sistema. Cada historia incluye criterios de aceptación 
 3. Se muestra el municipio resuelto a nombre, no el código.
 4. Las personas borradas no aparecen.
 
+**Pruebas** · `PanelAdminTest::testBuscaPorNombreCompletoYEscapaComodines` · `testUnaPaginaFueraDeRangoLlevaALaUltima` · `PanelFuncionesTest::testFiltrarPorMunicipioYEncuestador` · E2E 7
+
 ---
 
-## HU-22 · Exportar a CSV 🟡
+## HU-22 · Exportar a CSV ✅
 
 > **Como** administrador
 > **quiero** descargar los datos en CSV
@@ -443,9 +452,11 @@ Catálogo funcional del sistema. Cada historia incluye criterios de aceptación 
 2. Las fechas van legibles, no en milisegundos.
 3. Solo se exportan las personas activas.
 
+**Pruebas** · `PanelAdminTest::testElCsvNeutralizaFormulasYNoCorreLaFechaDeNacimiento` · `PanelFuncionesTest::testElCsvExportaSoloLoFiltrado`
+
 ---
 
-## HU-23 · Borrar una persona desde el panel 🟡
+## HU-23 · Borrar una persona desde el panel ✅
 
 > **Como** administrador
 > **quiero** retirar un registro inválido
@@ -461,9 +472,11 @@ Catálogo funcional del sistema. Cada historia incluye criterios de aceptación 
 
 **Motivación.** Quedaron en producción registros creados antes de que el servidor validara el documento. Ahora la propia validación impide reenviarlos, así que **ningún cliente puede borrarlos**.
 
+**Pruebas** · `PanelAdminTest::testBorrarDesdeElPanelSellaParaQueLleguenLosCelulares` · `testSinSesionNoSePuedeBorrar`
+
 ---
 
-## HU-24 · Ver y restaurar personas borradas 🟡
+## HU-24 · Ver y restaurar personas borradas ✅
 
 > **Como** administrador
 > **quiero** revisar lo borrado y poder deshacerlo
@@ -476,9 +489,11 @@ Catálogo funcional del sistema. Cada historia incluye criterios de aceptación 
 3. Restaurar pide confirmación y advierte que reaparecerá en los celulares.
 4. La restauración sella las dos marcas, igual que el borrado, o no se propagaría.
 
+**Pruebas** · `PanelAdminTest::testBorrarVuelveALaBusquedaYPermiteDeshacer`
+
 ---
 
-## HU-25 · Gestionar cuentas 🟡
+## HU-25 · Gestionar cuentas ✅
 
 > **Como** administrador
 > **quiero** crear y editar cuentas
@@ -491,6 +506,8 @@ Catálogo funcional del sistema. Cada historia incluye criterios de aceptación 
 3. Editar sin escribir contraseña la deja intacta.
 4. Una cuenta se puede desactivar sin borrarla.
 5. Un documento duplicado da un mensaje claro, no un error genérico.
+
+**Pruebas** · `PanelAdminTest::testUnDocumentoConPuntosSeRechazaYElFormularioConservaLoEscrito` · `testCambiarLaClaveRevocaLosTokensDelCelular` · `PanelFuncionesTest::testCerrarLasSesionesDeUnCelular` · `testDesbloquearUnaCuentaBloqueada` · `AlcanceTest::testElPanelGuardaLosMunicipiosDeUnaCuenta` · E2E 1 y 2
 
 ---
 
@@ -555,7 +572,7 @@ Catálogo funcional del sistema. Cada historia incluye criterios de aceptación 
 
 **Criterios de aceptación**
 
-1. Tres trabajos en cada *push* y *pull request*: **android**, **php**, **pwa**.
+1. Cuatro trabajos en cada *push* y *pull request*: **android**, **php**, **pwa** y **e2e** (navegador real).
 2. Android: pruebas unitarias, lint, cobertura y `assembleDebug` sobre JDK 17.
 3. PHP: sintaxis de todos los archivos y **PHPStan nivel 8**.
 4. PWA: pruebas con el runner nativo de Node y verificación del caché.
@@ -568,10 +585,14 @@ Catálogo funcional del sistema. Cada historia incluye criterios de aceptación 
 
 ## HU-30 · Cobertura de pruebas ✅
 
-**Estado actual:** **105 pruebas automatizadas** — 68 en Android (JVM) y 37 en la PWA.
+**Estado actual:** **230 pruebas automatizadas** — 77 en Android (JVM), 58 en la PWA, 88 de la API y el panel (57 de integración con MySQL real y 31 unitarias) y 7 de punta a punta en un navegador real. Inventario completo en [PRUEBAS.md](PRUEBAS.md).
 
 | Suite | Qué cubre |
 |---|---|
+| `tests/e2e` | Panel → app → registro sin señal → envío al volver la señal → panel |
+| `tests/php` | API de sincronización, descarga, panel completo y reglas de validación |
+| `paridad.test.mjs` | Que las reglas de validación sean idénticas en PWA, servidor y Android |
+| `contraste.test.mjs` | Contraste WCAG AA de toda la paleta, en claro y oscuro |
 | `SyncRepositoryImplTest` | Lotes, confirmación parcial, rechazos terminales, descarga, paginación, fallos de red |
 | `DecisionMezclaTest` | Regla de mezcla, incluido el caso que evita perder trabajo de campo |
 | `AuthRepositoryImplTest` | Inicio y cierre de sesión |
@@ -584,7 +605,7 @@ Catálogo funcional del sistema. Cada historia incluye criterios de aceptación 
 
 ---
 
-## HU-31 · Accesibilidad y diseño consistente 🟡
+## HU-31 · Accesibilidad y diseño consistente ✅
 
 > **Como** encuestador con el sol de frente
 > **quiero** que el texto se lea
@@ -592,11 +613,16 @@ Catálogo funcional del sistema. Cada historia incluye criterios de aceptación 
 
 **Criterios de aceptación**
 
-1. Todas las combinaciones de texto sobre fondo superan el mínimo **AA (4.5:1)** de WCAG.
-2. Una sola paleta institucional para ambas plataformas.
+1. Todas las combinaciones de texto sobre fondo superan el mínimo **AA** de WCAG (4.5:1; 3:1 para elementos gráficos), en modo claro y oscuro.
+2. Una sola paleta institucional para la PWA, el panel y Android, declarada en `design/tokens.json`.
 3. Los nombres de color describen el **rol**, no el color (`BrandPrimary`, `StatusSuccess`).
+4. El estado de cada registro lleva **icono y palabra**: el color nunca es la única señal.
+5. Objetivos táctiles de 44 px o más y campos de 52 px de alto, pensados para usar de pie y con una mano.
+6. La fuente va empaquetada: la app se ve igual sin señal.
 
 **Motivación.** Los nombres anteriores eran `BrandGreen`; cuando la marca pasó a azul, cada pantalla que los importaba quedó mintiendo.
+
+**Pruebas** · `contraste.test.mjs` · `scripts/tokens.mjs --verificar` (CI)
 
 ---
 
@@ -624,19 +650,19 @@ La API ya devuelve el rol en el login; **ningún cliente lo usa todavía**.
 
 ---
 
-## HU-34 · Reporte exportable desde el dispositivo ⏳
+## HU-34 · Reporte exportable desde el dispositivo 🟡
 
 > **Como** encuestador
 > **quiero** exportar mi trabajo del día
 > **para** entregarlo sin depender del panel.
 
-`GenerarReporteUseCase` existe y está inyectado en `SyncViewModel`, pero no hay pantalla que lo exponga.
+Implementada en Android después de escribirse esta historia: la pantalla de sincronización genera el CSV con `GenerarReporteUseCase` y lo comparte. Sin prueba automatizada de interfaz; la PWA no lo tiene.
 
 ---
 
 ## HU-35 · Pruebas instrumentadas de interfaz ⏳
 
-No hay `androidTest`. Las 68 pruebas de Android son **unitarias en JVM**: cubren dominio, datos y ViewModels, pero ninguna verifica la interfaz Compose real ni las migraciones de Room contra un dispositivo.
+Las 77 pruebas de Android son **unitarias en JVM**: cubren dominio, datos y ViewModels. En `androidTest` solo está `MigracionesRoomTest`, que necesita un dispositivo; ninguna prueba verifica la interfaz Compose real. La PWA sí tiene prueba de interfaz de punta a punta (`tests/e2e`).
 
 ---
 
@@ -644,4 +670,5 @@ No hay `androidTest`. Las 68 pruebas de Android son **unitarias en JVM**: cubren
 
 - [Arquitectura](ARQUITECTURA.md) — diagramas y decisiones de diseño
 - [Referencia de la API](API.md)
+- [Pruebas](PRUEBAS.md)
 - [Pendientes y hoja de ruta](PENDIENTES.md)
