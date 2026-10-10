@@ -22,13 +22,13 @@ Catálogo funcional del sistema. Cada historia incluye criterios de aceptación 
 
 | Épica | Historias | ✅ | 🟡 | ⏳ |
 |---|---:|---:|---:|---:|
-| E1 · Acceso y sesión | 5 | 5 | 0 | 0 |
+| E1 · Acceso y sesión | 6 | 6 | 0 | 0 |
 | E2 · Recolección de datos | 6 | 6 | 0 | 0 |
 | E3 · Sincronización | 8 | 7 | 1 | 0 |
 | E4 · Administración | 7 | 6 | 1 | 0 |
 | E5 · Calidad y operación | 5 | 5 | 0 | 0 |
 | E6 · Futuro | 4 | 0 | 1 | 3 |
-| **Total** | **35** | **29** | **3** | **3** |
+| **Total** | **36** | **30** | **3** | **3** |
 
 *Revisado el 9 de octubre de 2026.* Las pruebas que se citan están descritas en [PRUEBAS.md](PRUEBAS.md); «E2E n» es la prueba número *n* de punta a punta.
 
@@ -131,6 +131,28 @@ Catálogo funcional del sistema. Cada historia incluye criterios de aceptación 
 
 **Implementación** · [`api/admin/index.php`](../api/admin/index.php) · `buscarAdminPorDocumento` y `esUltimoAdminActivo` en [`consultas.php`](../api/admin/consultas.php)
 **Pruebas** · `PanelAdminTest`: `testUnEncuestadorNoEntraAlPanel`, `testNoSePuedeQuitarElRolAlUltimoAdminActivo`, `testEnArranqueSeEditaUnEncuestadorYElPrimerAdminCierraTodasLasSesiones` · E2E 1 y 3
+
+---
+
+## HU-36 · Recuperar la contraseña ✅
+
+> **Como** encuestador o administrador
+> **quiero** cambiar mi contraseña si la olvido
+> **para** no depender de que alguien esté disponible para dármela.
+
+**Criterios de aceptación**
+
+1. Desde el login de la app (PWA y Android) y del panel hay un enlace **¿Olvidaste tu contraseña?**
+2. Con el documento, el servidor envía un **código de 6 dígitos** al correo de la cuenta; vence en 15 minutos.
+3. La respuesta es la misma exista o no la cuenta: no sirve para averiguar documentos registrados.
+4. Con el código y una contraseña nueva de al menos 10 caracteres se cambia la contraseña; el código sirve una sola vez y admite 5 intentos.
+5. Al cambiarla se cierran las sesiones de la cuenta en todos los celulares y llega un correo avisando del cambio.
+6. Hay límites: 5 pedidos de código por documento cada 15 minutos, y 5 códigos equivocados bloquean 15 minutos.
+7. El administrador registra el correo de cada cuenta y puede **enviar un correo de prueba** para comprobar la configuración. Sin correo, cambia la contraseña desde *Cuentas*.
+
+**Implementación** · [`recuperar.php`](../api/auth/recuperar.php) · [`restablecer.php`](../api/auth/restablecer.php) · [`correo.php`](../api/correo.php) · [`recuperar.js`](../pwa/js/screens/recuperar.js) · `RecuperarScreen.kt` · `RecuperarViewModel.kt`
+**Pruebas** · `RecuperacionTest` (PHP, 11, con servidor SMTP falso) · `AuthRepositoryImplTest` (Android) · E2E 8
+**Operación** · Configuración de Gmail paso a paso en [DESPLIEGUE.md](DESPLIEGUE.md#1--activar-olvidaste-tu-contraseña)
 
 ---
 
@@ -592,7 +614,7 @@ Catálogo funcional del sistema. Cada historia incluye criterios de aceptación 
 
 ## HU-30 · Cobertura de pruebas ✅
 
-**Estado actual:** **255 pruebas automatizadas** — 85 en Android (JVM), 72 en la PWA, 91 de la API y el panel (60 de integración con MySQL real y 31 unitarias) y 7 de punta a punta en un navegador real. Inventario completo en [PRUEBAS.md](PRUEBAS.md).
+**Estado actual:** **271 pruebas automatizadas** — 89 en Android (JVM), 72 en la PWA, 102 de la API y el panel (71 de integración con MySQL real y 31 unitarias) y 8 de punta a punta en un navegador real. Inventario completo en [PRUEBAS.md](PRUEBAS.md).
 
 | Suite | Qué cubre |
 |---|---|
@@ -669,7 +691,7 @@ Implementada en Android después de escribirse esta historia: la pantalla de sin
 
 ## HU-35 · Pruebas instrumentadas de interfaz ⏳
 
-Las 85 pruebas de Android son **unitarias en JVM**: cubren dominio, datos y ViewModels. En `androidTest` solo está `MigracionesRoomTest`, que necesita un dispositivo; ninguna prueba verifica la interfaz Compose real. La PWA sí tiene prueba de interfaz de punta a punta (`tests/e2e`).
+Las 89 pruebas de Android son **unitarias en JVM**: cubren dominio, datos y ViewModels. En `androidTest` solo está `MigracionesRoomTest`, que necesita un dispositivo; ninguna prueba verifica la interfaz Compose real. La PWA sí tiene prueba de interfaz de punta a punta (`tests/e2e`).
 
 ---
 

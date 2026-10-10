@@ -113,12 +113,12 @@ export class Pagina {
     });
   }
 
-  async tamano(ancho, alto, movil = ancho < 600) {
+  async tamano(ancho, alto, movil = ancho < 600, escala = 1) {
     this.ancho = ancho;
     this.alto = alto;
     await this.enviar('Emulation.clearDeviceMetricsOverride');
     await this.enviar('Emulation.setDeviceMetricsOverride', {
-      width: ancho, height: alto, deviceScaleFactor: 1, mobile: movil, screenWidth: ancho, screenHeight: alto
+      width: ancho, height: alto, deviceScaleFactor: escala, mobile: movil, screenWidth: ancho, screenHeight: alto
     });
   }
 

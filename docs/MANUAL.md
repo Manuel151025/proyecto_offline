@@ -109,7 +109,23 @@ Toca **Enviar** en la barra de abajo para ver:
 
 <br clear="right">
 
-### 6. Problemas frecuentes
+### 6. ¿Olvidaste tu contraseña?
+
+<img src="capturas/app-recuperar-codigo.png" alt="Pantalla para escribir el código y la contraseña nueva" width="300" align="right">
+
+Necesitas **señal** y que tu cuenta tenga un **correo** registrado (lo pone el administrador).
+
+1. En la pantalla de entrada toca **¿Olvidaste tu contraseña?**
+2. Escribe tu número de documento → **Enviarme un código**.
+3. Abre tu correo: llega «Tu código de ColOffline: 123456». Si no está, revisa **Spam**.
+4. Escribe el código y dos veces tu contraseña nueva (mínimo 10 caracteres) → **Cambiar contraseña**.
+5. **Ir a iniciar sesión** y entra con la nueva.
+
+El código vence en 15 minutos. Si no llega en unos minutos o tu cuenta no tiene correo, pídele a tu administrador que te asigne una contraseña nueva. Al cambiarla se cierra la sesión en tus otros celulares; lo que tengas sin enviar no se pierde.
+
+<br clear="right">
+
+### 7. Problemas frecuentes
 
 | Veo | Qué hacer |
 |---|---|
@@ -117,6 +133,7 @@ Toca **Enviar** en la barra de abajo para ver:
 | Un registro en **Rechazados** | Toca **Corregir**, arregla el campo que indica el motivo y guarda. Si el error es el número de documento (no se puede editar), borra la persona y regístrala de nuevo |
 | La app se ve vieja después de una actualización | Ciérrala del todo y ábrela otra vez |
 | No puedo entrar sin señal | La primera vez en ese teléfono hay que hacerlo con señal |
+| Olvidé la contraseña | Sección 6: código por correo, o pídela al administrador |
 
 ---
 
@@ -130,7 +147,7 @@ Entra con **tu documento y tu contraseña** de una cuenta con rol *Administrador
 
 **Primera vez (sin ningún administrador):** el panel pide la *contraseña de arranque* (`ADMIN_PASSWORD`). Úsala solo para crear tu cuenta en **Cuentas**; en cuanto existe, deja de servir.
 
-La sesión se cierra tras una hora sin uso.
+La sesión se cierra tras una hora sin uso. Si olvidaste tu contraseña, **¿Olvidaste tu contraseña?** te lleva al mismo proceso de la app (código por correo).
 
 ### 2. Resumen
 
@@ -155,6 +172,8 @@ Totales de personas, encuestas, encuestadores y dispositivos; encuestas por día
 - **Municipios que descarga:** limita qué personas recibe ese encuestador en su teléfono. Sin ninguno, recibe todas.
 - **Cuenta activa:** desmarcarla impide entrar y sincronizar, sin borrar nada.
 - Al editar una cuenta: **cerrar sesiones en celulares** (por ejemplo, si se perdió un teléfono) y **desbloquear** si se bloqueó por intentos.
+- **Correo (opcional):** a donde llega el código de «¿Olvidaste tu contraseña?». Sin correo, cuando alguien olvide su contraseña, edítale la cuenta y escribe una nueva.
+- Arriba de la lista verás si la **recuperación por correo** está activada. **Enviar correo de prueba** te manda un correo a ti para comprobarlo. Cómo activarla: [DESPLIEGUE.md](DESPLIEGUE.md#1--activar-olvidaste-tu-contraseña).
 - El panel no deja quitar el rol ni desactivar al **único** administrador activo.
 
 ### 5. Sincronización

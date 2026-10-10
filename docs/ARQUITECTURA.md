@@ -222,6 +222,7 @@ erDiagram
     MUNICIPIOS ||--o{ ENCUESTADOR_MUNICIPIOS : "asignado a"
     ENCUESTADORES ||--o{ DISPOSITIVOS : "usa"
     ENCUESTADORES ||--o{ AUDITORIA_ADMIN : "hace"
+    ENCUESTADORES ||--o{ RECUPERACIONES : "pide"
 
     MUNICIPIOS {
         varchar codigo PK "DIVIPOLA/DANE"
@@ -233,6 +234,7 @@ erDiagram
         int id PK
         varchar nombre
         varchar numero_documento UK
+        varchar email "opcional · recuperación"
         varchar password_hash "bcrypt"
         tinyint activo
         enum rol "encuestador | admin"
@@ -319,9 +321,23 @@ erDiagram
         int id_encuestador PK
         varchar municipio_codigo PK
     }
+
+    RECUPERACIONES {
+        int id PK
+        int id_encuestador
+        varchar codigo_hash "bcrypt del código de 6 dígitos"
+        bigint expira_en "15 minutos"
+        int intentos "máx. 5"
+        tinyint usado
+    }
+
+    AJUSTES {
+        varchar clave PK "catalogo_municipios…"
+        varchar valor
+    }
 ```
 
-Las cuatro últimas tablas las crea `api/esquema.php` la primera vez que se necesitan (ver [ADR-05](#adr-05--automigración-de-esquema)): no hace falta tocar la base a mano.
+Las seis últimas tablas y la columna `email` las crea `api/esquema.php` la primera vez que se necesitan (ver [ADR-05](#adr-05--automigración-de-esquema)): no hace falta tocar la base a mano.
 
 ### Las dos marcas de tiempo
 
@@ -590,6 +606,44 @@ flowchart LR
 
 **Búsqueda.** En los dos clientes el municipio y la EPS se eligen escribiendo, no bajando por una lista: «popa» → Popayán, «cauca» → los municipios del Cauca con la capital primero, «cali» → Santiago de Cali. Sin tildes ni mayúsculas. El algoritmo está en `catalogos.js` (PWA) y `BuscadorCatalogo.kt` (Android), con los mismos casos de prueba. Sin escribir nada se ofrecen las 90 ciudades principales (capitales y las más pobladas). La EPS admite texto libre si no está en la lista.
 
+### 5.10 «¿Olvidaste tu contraseña?»
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor E as Encuestador
+    participant A as App (PWA o Android)
+    participant R as recuperar.php
+    participant T as restablecer.php
+    participant D as MySQL
+    participant G as Gmail (SMTP)
+
+    E->>A: ¿Olvidaste tu contraseña? + documento
+    A->>R: POST numero_documento
+    R->>D: ¿cuenta activa con correo?
+    alt Sí
+        R->>D: anula códigos anteriores · guarda bcrypt(código), vence en 15 min
+        R->>G: correo con el código de 6 dígitos
+    end
+    R-->>A: 200 · el MISMO mensaje exista o no la cuenta
+    E->>A: código + contraseña nueva
+    A->>T: POST documento, código, contraseña
+    alt Código válido, sin vencer, < 5 intentos
+        T->>D: nueva contraseña · códigos usados · DELETE sesiones
+        T->>G: aviso «tu contraseña cambió»
+        T-->>A: 200
+    else Inválido
+        T->>D: +1 intento (al 5.º el código queda anulado)
+        T-->>A: 400 «El código no es válido o ya venció»
+    end
+```
+
+- **Sin enumeración de cuentas:** la respuesta del paso 1 no cambia exista o no el documento.
+- **Límites:** 5 pedidos por documento cada 15 minutos; 5 códigos equivocados bloquean el paso 2 por 15 minutos; cada código admite 5 intentos. Los contadores usan la tabla `intentos_login` con claves que llevan `#`, que ningún documento puede tener.
+- **Al cambiarla se cierran todas las sesiones** de la cuenta: un celular perdido queda fuera.
+- **Sin correo configurado** (`SMTP_*` vacías) la app explica que se pida el cambio al administrador, que lo hace desde *Cuentas*.
+- Android actualiza además la credencial guardada para el login sin conexión: la contraseña vieja deja de servir también sin señal.
+
 ---
 
 ## 6. Decisiones de arquitectura
@@ -688,6 +742,16 @@ flowchart LR
 
 **Por qué no Playwright.** Sumaría cientos de megas de dependencias a un proyecto que hoy no tiene `node_modules`, para usar una fracción mínima.
 
+### ADR-12 · Correo por SMTP propio, sin librerías ni Google Cloud
+
+**Contexto.** «¿Olvidaste tu contraseña?» necesita enviar un código por correo. La imagen de producción no instala paquetes de Composer (por eso no hay PHPMailer) y la función de PHP `mail()` necesita un servidor de correo local que el contenedor no tiene.
+
+**Decisión.** `api/correo.php` implementa el mínimo de SMTP (SSL o STARTTLS, `AUTH LOGIN`, mensaje MIME en UTF-8 con texto y HTML). Con Gmail se usa una **contraseña de aplicación**.
+
+**Alternativa descartada.** La API de Gmail con OAuth desde Google Cloud Console: pantalla de consentimiento, credenciales de cliente y tokens que se renuevan, para lo mismo que hace una contraseña de aplicación. Las mismas variables `SMTP_*` sirven para cualquier otro proveedor.
+
+**Cómo se prueba.** `tests/php/SmtpFalso.php` es un servidor SMTP de prueba que guarda los correos en un archivo; las pruebas de PHP y de punta a punta leen de ahí el código, como lo leería la persona.
+
 ### Rotación de credenciales de base de datos
 
 Cambiar `DB_PASS` en el entorno **no cambia la contraseña de MySQL**: el `MYSQL_PASSWORD` del compose solo lo aplica el arranque sobre un volumen vacío. Secuencia sin corte de servicio (MySQL 8.0.14+):
@@ -717,7 +781,11 @@ proyecto_offline/
 │   │   └── consultas.php        # Todo el SQL del panel
 │   ├── auth/
 │   │   ├── login.php            # bcrypt → token
-│   │   └── logout.php           # revoca el token
+│   │   ├── logout.php           # revoca el token
+│   │   ├── recuperar.php        # «¿Olvidaste tu contraseña?»: código por correo
+│   │   └── restablecer.php      # código + contraseña nueva
+│   ├── correo.php               # SMTP sin dependencias + plantillas
+│   ├── politica.php             # reglas de contraseña compartidas
 │   ├── personas/
 │   │   ├── sync.php             # SUBIDA · LWW · transacción
 │   │   ├── cambios.php          # BAJADA · marca de agua · por municipios

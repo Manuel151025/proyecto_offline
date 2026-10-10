@@ -17,6 +17,7 @@
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { abrirNavegador } from './navegador.mjs';
 
@@ -28,15 +29,15 @@ const PERSONA = { doc: '1061702334', nombres: 'María Fernanda', apellidos: 'Roj
 const CAPTURAS = process.env.CAPTURAS || null;
 const foto = nombre => (CAPTURAS ? join(CAPTURAS, nombre + '.png') : null);
 
-let servidor, base, navegador, p;
+let servidor, base, archivoCorreos, navegador, p;
 
 before(async () => {
   servidor = spawn('php', [join(import.meta.dirname, 'servidor.php')], { stdio: ['pipe', 'pipe', 'inherit'] });
   base = await new Promise((ok, mal) => {
     const t = setTimeout(() => mal(new Error('El servidor de pruebas no arrancó')), 60000);
     servidor.stdout.on('data', d => {
-      const m = String(d).match(/LISTO (\S+)/);
-      if (m) { clearTimeout(t); ok(m[1].replace(/\/$/, '')); }
+      const m = String(d).match(/LISTO (\S+) (.+)/);
+      if (m) { clearTimeout(t); archivoCorreos = m[2].trim(); ok(m[1].replace(/\/$/, '')); }
     });
     servidor.on('exit', c => mal(new Error('El servidor de pruebas terminó con código ' + c)));
   });
@@ -209,4 +210,96 @@ test('panel: la persona enviada y el celular aparecen', async () => {
   await p.captura(foto('panel-sincronizacion'));
 
   assert.deepEqual(p.errores, [], 'sin excepciones de JavaScript en las páginas');
+});
+
+/** Asunto del último correo que «envió» la API (lo guarda el SMTP falso). */
+function ultimoAsunto() {
+  if (!existsSync(archivoCorreos)) return '';
+  const lineas = readFileSync(archivoCorreos, 'utf8').trim().split('\n').filter(Boolean);
+  if (!lineas.length) return '';
+  const { datos } = JSON.parse(lineas.at(-1));
+  const m = datos.match(/^Subject: =\?UTF-8\?B\?([^?]+)\?=/m);
+  return m ? Buffer.from(m[1], 'base64').toString('utf8') : '';
+}
+
+test('olvidé mi contraseña: código por correo, contraseña nueva y entrar con ella', async () => {
+  // El administrador le registra un correo al encuestador.
+  await p.ir(panel('cuentas') + '&editar=3');
+  await p.escribir('#cuenta-email', 'jairo.velasquez@correo.test');
+  await p.yEsperarCarga(() => p.evaluar(`document.querySelector('#cuenta-email').form.requestSubmit()`));
+  assert.match(await p.texto(), /Cambios guardados/);
+
+  // En la app: «¿Olvidaste tu contraseña?» con el documento ya escrito.
+  await p.tamano(390, 844);
+  await p.ir(app('/login'));
+  await p.esperar(`!!document.querySelector('#login-doc')`);
+  await p.escribir('#login-doc', ENCUESTADOR.doc);
+  await p.clic('#login-forgot');
+  await p.esperar(`!!document.querySelector('#recuperar-doc')`);
+  assert.equal(await p.evaluar(`document.querySelector('#recuperar-doc').value`), ENCUESTADOR.doc);
+  await p.captura(foto('app-recuperar-documento'));
+  await p.clic('#btn-pedir');
+  await p.esperar(`!!document.querySelector('#recuperar-codigo')`, 30000, 'pasar al paso del código');
+
+  // El código llega al correo.
+  await p.esperar('true');
+  let asunto = '';
+  for (let i = 0; i < 50 && !/\d{6}/.test(asunto); i++) {
+    asunto = ultimoAsunto();
+    if (!/\d{6}/.test(asunto)) await new Promise(r => setTimeout(r, 200));
+  }
+  const codigo = asunto.match(/(\d{6})/)?.[1];
+  assert.ok(codigo, `llegó un correo con el código (asunto: «${asunto}»)`);
+
+  await p.escribir('#recuperar-codigo', codigo);
+  await p.escribir('#recuperar-clave', 'ClaveNuevaCampo2026');
+  await p.escribir('#recuperar-confirmar', 'ClaveNuevaCampo2026');
+  await p.captura(foto('app-recuperar-codigo'));
+  await p.clic('#btn-cambiar');
+  await p.esperar(`document.body.innerText.includes('Contraseña cambiada')`, 30000, 'confirmar el cambio');
+  await p.captura(foto('app-recuperar-listo'));
+  assert.match(ultimoAsunto(), /cambió/, 'se avisa del cambio por correo');
+
+  // De vuelta al login, con el documento escrito, entra con la contraseña nueva.
+  await p.clic('#btn-ir-login');
+  await p.esperar(`document.querySelector('#login-doc')?.value === ${JSON.stringify(ENCUESTADOR.doc)}`);
+  await p.escribir('#login-pass', 'ClaveNuevaCampo2026');
+  await p.clic('#login-submit');
+  await p.esperar(`location.hash === '#/personas' && !!document.querySelector('.saludo h1')`, 30000, 'entrar con la contraseña nueva');
+  assert.deepEqual(p.errores, [], 'sin excepciones de JavaScript');
+});
+
+/**
+ * Capturas para la ficha de Google Play: 1080×1920 (360×640 a escala 3),
+ * dentro del límite de proporción 2:1 que exige Play. Solo con CAPTURAS_PLAY.
+ */
+test('capturas para Google Play', { skip: !process.env.CAPTURAS_PLAY }, async () => {
+  const destino = nombre => join(process.env.CAPTURAS_PLAY, nombre + '.png');
+  await p.tamano(360, 640, true, 3);
+  await irApp('/personas');
+  await p.esperar(`!!document.querySelector('.saludo h1')`);
+  await p.captura(destino('play-1-inicio'));
+
+  await irApp('/nueva');
+  await p.esperar(`!!document.querySelector('#municipio_buscar')`);
+  await p.evaluar(`document.querySelector('#municipio_buscar').closest('.form-field').scrollIntoView({ block: 'start' }); true`);
+  await p.escribir('#municipio_buscar', 'cauca');
+  await p.captura(destino('play-2-municipio'));
+
+  await irApp('/nueva');
+  await p.esperar(`!!document.querySelector('#numero_documento')`);
+  await p.escribir('#numero_documento', '123');
+  await p.escribir('#nombres', 'Ana');
+  await p.clic('#btn-guardar');
+  await p.esperar(`document.querySelectorAll('.field-error').length > 0`);
+  await p.evaluar(`document.querySelector('.screen-content').scrollTop = 0; true`);
+  await p.captura(destino('play-3-validacion'));
+
+  await irApp('/sync');
+  await p.esperar(`!!document.querySelector('#sync-counts')`);
+  await p.captura(destino('play-4-envio'));
+
+  await irApp('/recuperar');
+  await p.esperar(`!!document.querySelector('#recuperar-doc')`);
+  await p.captura(destino('play-5-recuperar'));
 });

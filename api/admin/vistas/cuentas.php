@@ -9,6 +9,26 @@
         . 'con documento y contraseña.') ?>
   <?php endif; ?>
 
+  <?php if (!$modoArranque): ?>
+    <div class="aviso <?= correoConfigurado() ? 'aviso-ok' : 'aviso-advertencia' ?> aviso-correo">
+      <?= icono(correoConfigurado() ? 'ok' : 'advertencia') ?>
+      <div class="aviso-texto">
+        <?php if (correoConfigurado()): ?>
+          <strong>Recuperación de contraseña por correo: activada.</strong>
+          Las cuentas con correo pueden cambiar su contraseña con «¿Olvidaste tu contraseña?».
+        <?php else: ?>
+          <strong>Recuperación de contraseña por correo: sin configurar.</strong>
+          Mientras tanto, cambia la contraseña de quien la olvide editando su cuenta. Para activarla, sigue docs/DESPLIEGUE.md.
+        <?php endif; ?>
+      </div>
+      <form method="post" action="index.php">
+        <input type="hidden" name="csrf" value="<?= h($csrf) ?>">
+        <input type="hidden" name="action" value="probar_correo">
+        <button type="submit" class="btn btn-secundario btn-sm">Enviar correo de prueba</button>
+      </form>
+    </div>
+  <?php endif; ?>
+
   <div class="rejilla-cuentas">
     <section class="tarjeta" aria-label="Lista de cuentas">
       <?php if ($cuentas === []): ?>
@@ -87,6 +107,13 @@
           <input class="input" type="text" id="cuenta-doc" name="numero_documento" value="<?= h($formCuenta['numero_documento']) ?>"
                  maxlength="20" pattern="[A-Za-z0-9\-]{1,20}" required autocomplete="off" aria-describedby="ayuda-doc">
           <p class="campo-ayuda" id="ayuda-doc">Con él se entra a la app. Letras, dígitos y guiones.</p>
+        </div>
+
+        <div class="campo">
+          <label class="campo-etiqueta" for="cuenta-email">Correo <span class="campo-opcional">(opcional)</span></label>
+          <input class="input" type="email" id="cuenta-email" name="email" value="<?= h($formCuenta['email'] ?? '') ?>"
+                 maxlength="100" autocomplete="off" aria-describedby="ayuda-email">
+          <p class="campo-ayuda" id="ayuda-email">Para «¿Olvidaste tu contraseña?»: ahí llega el código. Sin correo, la contraseña se cambia desde aquí.</p>
         </div>
 
         <div class="campo">

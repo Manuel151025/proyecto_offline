@@ -3,6 +3,7 @@ import { render as renderLista } from './screens/lista-personas.js';
 import { render as renderFormulario } from './screens/formulario-encuesta.js';
 import { render as renderSync } from './screens/estado-sincronizacion.js';
 import { render as renderLogin } from './screens/login.js';
+import { render as renderRecuperar } from './screens/recuperar.js';
 import { getSyncCounts, borrarMunicipiosGuardados } from './db.js';
 import { logout } from './api.js';
 import { syncNow } from './sync.js';
@@ -21,6 +22,8 @@ function protect(handler) {
 }
 
 onRoute('/login', () => renderLogin(getRoot()));
+// Sin sesión: es justamente para quien no puede entrar.
+onRoute('/recuperar', () => renderRecuperar(getRoot()));
 onRoute('/personas', protect(() => renderLista(getRoot())));
 onRoute('/nueva', protect(() => renderFormulario(getRoot(), {})));
 onRoute('/editar/:tipo/:numero', protect(params => renderFormulario(getRoot(), params)));
@@ -168,7 +171,7 @@ export async function cerrarSesion(mensaje) {
 
 function updateChrome() {
   const hash = window.location.hash.replace('#', '') || '/personas';
-  const isLogin = hash === '/login';
+  const isLogin = hash === '/login' || hash === '/recuperar';
   document.querySelector('.app-header')?.classList.toggle('chrome-hidden', isLogin);
   document.querySelector('.bottom-nav')?.classList.toggle('chrome-hidden', isLogin);
   if (isLogin) ocultarAvisoSesion();

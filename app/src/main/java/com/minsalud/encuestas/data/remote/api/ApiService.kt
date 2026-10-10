@@ -4,6 +4,9 @@ import com.minsalud.encuestas.data.remote.dto.LoginRequestDto
 import com.minsalud.encuestas.data.remote.dto.LoginResponseDto
 import com.minsalud.encuestas.data.remote.dto.CambiosResponseDto
 import com.minsalud.encuestas.data.remote.dto.MunicipioDto
+import com.minsalud.encuestas.data.remote.dto.RecuperarRequestDto
+import com.minsalud.encuestas.data.remote.dto.RespuestaSimpleDto
+import com.minsalud.encuestas.data.remote.dto.RestablecerRequestDto
 import com.minsalud.encuestas.data.remote.dto.SyncRequestDto
 import com.minsalud.encuestas.data.remote.dto.SyncResponseDto
 import retrofit2.Response
@@ -17,6 +20,12 @@ interface ApiService {
     suspend fun login(@Body credenciales: LoginRequestDto): Response<LoginResponseDto>
 
     /** Revoca el token actual. El interceptor lo adjunta automáticamente. */
+    @POST("api/auth/recuperar.php")
+    suspend fun pedirCodigoRecuperacion(@Body cuerpo: RecuperarRequestDto): Response<RespuestaSimpleDto>
+
+    @POST("api/auth/restablecer.php")
+    suspend fun restablecerContrasena(@Body cuerpo: RestablecerRequestDto): Response<RespuestaSimpleDto>
+
     @POST("api/auth/logout.php")
     suspend fun logout(): Response<Unit>
 

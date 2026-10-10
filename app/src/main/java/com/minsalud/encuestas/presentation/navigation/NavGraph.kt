@@ -13,6 +13,7 @@ import com.minsalud.encuestas.presentation.ui.EstadoSincronizacionScreen
 import com.minsalud.encuestas.presentation.ui.FormularioEncuestaScreen
 import com.minsalud.encuestas.presentation.ui.ListaPersonasScreen
 import com.minsalud.encuestas.presentation.ui.LoginScreen
+import com.minsalud.encuestas.presentation.ui.RecuperarScreen
 
 @Composable
 fun AppNavGraph(
@@ -36,7 +37,19 @@ fun AppNavGraph(
                     navController.navigate(Screen.ListaPersonas.route) {
                         popUpTo(0) { inclusive = true }
                     }
-                }
+                },
+                onOlvidaste = { doc -> navController.navigate(Screen.Recuperar.conDocumento(doc)) }
+            )
+        }
+
+        composable(
+            route = Screen.Recuperar.routeWithArgs,
+            arguments = listOf(navArgument("doc") { type = NavType.StringType; defaultValue = "" })
+        ) {
+            RecuperarScreen(
+                viewModel = hiltViewModel(),
+                onVolver = { navController.popBackStack() },
+                onListo = { navController.popBackStack() }
             )
         }
 

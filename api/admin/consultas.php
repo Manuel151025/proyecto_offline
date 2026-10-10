@@ -437,9 +437,10 @@ function buscarAdminPorDocumento(PDO $pdo, string $documento): ?array
 function buscarCuentaPorId(PDO $pdo, int $id): ?array
 {
     asegurarRolEncuestador($pdo);
+    asegurarRecuperacion($pdo);
 
     $stmt = $pdo->prepare(
-        'SELECT id, nombre, numero_documento, password_hash, activo, rol
+        'SELECT id, nombre, numero_documento, email, password_hash, activo, rol
            FROM encuestadores
           WHERE id = ?'
     );

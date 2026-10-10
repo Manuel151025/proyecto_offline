@@ -35,7 +35,7 @@ export async function render(container) {
           <div id="login-body"></div>
         </div>
 
-        <p class="login-foot">Los datos se guardan en el dispositivo y se sincronizan al recuperar la conexi&oacute;n.</p>
+        <p class="login-foot">Los datos se guardan en el dispositivo y se sincronizan al recuperar la conexi&oacute;n. &middot; <a href="./privacidad.html">Privacidad</a></p>
       </div>
     </div>
   `;
@@ -71,7 +71,7 @@ export async function render(container) {
           <span class="login-check-box"></span>
           <span>Recordar sesi&oacute;n</span>
         </button>
-        <a href="#" class="login-forgot" id="login-forgot">&iquest;Olvidaste tu contrase&ntilde;a?</a>
+        <a href="#/recuperar" class="login-forgot" id="login-forgot">&iquest;Olvidaste tu contrase&ntilde;a?</a>
       </div>
       <button type="submit" class="login-submit" id="login-submit">
         <span class="login-spinner hidden" id="login-spinner"></span>
@@ -127,8 +127,18 @@ export async function render(container) {
 
   forgotLink.addEventListener('click', e => {
     e.preventDefault();
-    showToast('Disponible próximamente', 'info');
+    // Lo que ya escribió pasa a la pantalla de recuperación.
+    sessionStorage.setItem('recuperar_doc', docInput.value);
+    navigate('/recuperar');
   });
+
+  // Al volver de cambiar la contraseña, el documento ya viene escrito.
+  const docPrevio = sessionStorage.getItem('login_doc');
+  if (docPrevio) {
+    sessionStorage.removeItem('login_doc');
+    docInput.value = docPrevio;
+    passInput.focus();
+  }
 
   form.addEventListener('submit', async e => {
     e.preventDefault();

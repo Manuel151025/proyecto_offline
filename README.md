@@ -18,8 +18,9 @@ Sistema de recolección de datos demográficos para el Ministerio de Salud, dise
 | [**Arquitectura**](docs/ARQUITECTURA.md) | Diagramas de componentes, despliegue, modelo de datos y flujos (registro, sincronización, validación, diseño) · 11 decisiones de arquitectura |
 | [**Historias de usuario**](docs/HISTORIAS-DE-USUARIO.md) | 35 historias con criterios de aceptación y trazabilidad a código y pruebas |
 | [**API**](docs/API.md) | Endpoints, parámetros, respuestas, reglas de validación y ejemplos |
-| [**Pruebas**](docs/PRUEBAS.md) | Inventario de las 255 pruebas automáticas y cómo correrlas |
+| [**Pruebas**](docs/PRUEBAS.md) | Inventario de las 271 pruebas automáticas y cómo correrlas |
 | [**Pruebas de campo**](docs/PRUEBAS-DE-CAMPO.md) | Lista de verificación en celulares reales |
+| [**Despliegue y operación**](docs/DESPLIEGUE.md) | Paso a paso: correo con Gmail para recuperar contraseñas, Dokploy, copias de seguridad, firma de Android y Google Play |
 | [**Pendientes**](docs/PENDIENTES.md) | Qué falta, por qué, y qué pasa si no se hace |
 
 ## Descripción
@@ -38,7 +39,7 @@ Garantizar la recolección íntegra de datos sobre el terreno y prevenir la pér
 | **Validación** | Las mismas reglas por campo en los dos clientes y el servidor, con filtro al escribir |
 | **Catálogos** | Los 1.122 municipios del DANE y las EPS de Colombia, con buscador; viajan dentro de la app |
 | **Diseño** | «Cálida de territorio»: una paleta (`design/tokens.json`) y la fuente Figtree empaquetada en las tres superficies |
-| **Pruebas** | 255 automatizadas — 85 Android · 72 PWA · 91 API y panel · 7 de punta a punta en navegador real |
+| **Pruebas** | 271 automatizadas — 89 Android · 72 PWA · 102 API y panel · 8 de punta a punta en navegador real |
 | **CI** | 4 trabajos · PHPStan nivel 8 · Android Lint · guardas de regresión |
 | **Despliegue** | Dokploy sobre Docker Swarm · TLS con acme.sh |
 
@@ -236,7 +237,10 @@ El **panel de administración** aplica el mismo límite. Estando bloqueado, incl
 > El contador del panel se guarda bajo la clave `#admin`, imposible de producir desde fuera porque `login.php` solo admite documentos con `[A-Za-z0-9-]`. Las dos cosas van juntas: si se relaja esa validación, un cliente podría bloquear el panel sin tocarlo. Hay una guarda de CI que lo impide.
 
 ### Política de contraseñas
-El panel `/api/admin` exige **mínimo 10 caracteres** al crear una cuenta o cambiar su contraseña. La regla se aplica solo al fijarla, de modo que las cuentas existentes no quedan bloqueadas retroactivamente.
+El panel `/api/admin` y la recuperación exigen **mínimo 10 caracteres** al fijar una contraseña (`api/politica.php`). La regla se aplica solo al fijarla, de modo que las cuentas existentes no quedan bloqueadas retroactivamente.
+
+### Recuperar la contraseña
+«¿Olvidaste tu contraseña?» (app, Android y panel) envía un **código de 6 dígitos** al correo de la cuenta: vence en 15 minutos, admite 5 intentos, sirve una vez y se guarda solo cifrado. La respuesta no revela si la cuenta existe. Al cambiar la contraseña se revocan todas las sesiones de la cuenta. El correo sale por SMTP (Gmail con contraseña de aplicación) sin librerías externas; configuración en [docs/DESPLIEGUE.md](docs/DESPLIEGUE.md#1--activar-olvidaste-tu-contraseña).
 
 ### Otras medidas
 - Consultas con **PDO preparado** y `EMULATE_PREPARES => false`.
@@ -255,16 +259,17 @@ Copiar `.env.example` a `.env` y completar:
 | `MYSQL_ROOT_PASS` | Contraseña root de MySQL |
 | `ADMIN_PASSWORD` | **Solo para el arranque.** Permite entrar al panel mientras no exista ninguna cuenta con rol `admin`, para poder crear la primera. En cuanto existe una, deja de aceptarse y la variable se puede borrar del entorno. |
 | `ALLOWED_ORIGINS` | Orígenes autorizados para CORS, separados por comas y sin barra final |
+| `SMTP_HOST`, `SMTP_PUERTO`, `SMTP_USUARIO`, `SMTP_CLAVE`, `SMTP_REMITENTE`, `SMTP_NOMBRE` | Opcionales. Correo para «¿Olvidaste tu contraseña?» (con Gmail: `smtp.gmail.com`, `465` y una contraseña de aplicación). Ver [DESPLIEGUE.md](docs/DESPLIEGUE.md) |
 
 ## Pruebas
 
-**255 pruebas automáticas, 0 fallos.** El inventario completo está en [docs/PRUEBAS.md](docs/PRUEBAS.md).
+**271 pruebas automáticas, 0 fallos.** El inventario completo está en [docs/PRUEBAS.md](docs/PRUEBAS.md).
 
 ```bash
-./gradlew testDebugUnitTest lintDebug assembleDebug   # 85 Android + lint + APK
+./gradlew testDebugUnitTest lintDebug assembleDebug   # 89 Android + lint + APK
 TZ=America/Bogota node --test pwa/tests/*.test.mjs    # 72 PWA (catálogos, paridad, contraste, tildes)
-vendor/bin/phpunit                                    # 91 API y panel, contra MySQL real
-node --test tests/e2e/e2e.test.mjs                    # 7 de punta a punta en Chrome/Edge
+vendor/bin/phpunit                                    # 102 API y panel, contra MySQL real (con SMTP falso)
+node --test tests/e2e/e2e.test.mjs                    # 8 de punta a punta en Chrome/Edge
 vendor/bin/phpstan analyse                            # análisis estático, nivel 8
 node scripts/check-pwa-assets.mjs                     # la caché offline está completa
 node scripts/tokens.mjs --verificar                   # la paleta coincide en las tres superficies
@@ -396,7 +401,7 @@ No es posible quitarse el rol ni desactivarse siendo el único administrador act
 - **Clientes**: Android y PWA completos y offline-first, con validación estricta por campo y la dirección visual «Cálida de territorio».
 - **Backend**: sincronización bidireccional por lotes, rechazo por fila, descarga limitada por municipios, automigración de esquema.
 - **Panel**: resumen, personas (ficha, edición, filtros, CSV, papelera), cuentas, monitor de sincronización y auditoría; acceso rediseñado.
-- **Calidad**: 255 pruebas automatizadas (85 Android, 72 PWA, 91 API y panel, 7 de punta a punta), PHPStan nivel 8, Android Lint, cobertura con JaCoCo, contraste WCAG AA verificado y guardas de regresión en CI.
+- **Calidad**: 271 pruebas automatizadas (89 Android, 72 PWA, 102 API y panel, 8 de punta a punta), PHPStan nivel 8, Android Lint, cobertura con JaCoCo, contraste WCAG AA verificado y guardas de regresión en CI.
 - **Seguridad**: autenticación por token con revocación, cuentas por rol, límite de intentos en API y panel, CORS por lista blanca, CSP en el panel, auditoría de cada acción administrativa.
 
 El detalle de lo que falta y por qué está en [docs/PENDIENTES.md](docs/PENDIENTES.md).

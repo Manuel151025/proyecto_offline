@@ -1,0 +1,33 @@
+<!doctype html>
+<!-- Gráfico destacado de Google Play (1024×500). Se convierte a PNG con
+     scripts/play/imagenes.mjs. -->
+<html lang="es"><head><meta charset="utf-8">
+<style>
+  @font-face { font-family: 'Figtree'; src: url('../../pwa/fonts/figtree-latin.woff2') format('woff2'); font-weight: 400 800; }
+  html, body { margin: 0; width: 1024px; height: 500px; overflow: hidden; }
+  body { background: #12467E; font-family: 'Figtree', sans-serif; color: #fff; position: relative; }
+  .curvas { position: absolute; right: -60px; bottom: -40px; width: 760px; opacity: .8; }
+  .contenido { position: absolute; left: 72px; top: 0; bottom: 0; display: flex; flex-direction: column; justify-content: center; gap: 22px; max-width: 560px; }
+  .marca { display: flex; align-items: center; gap: 18px; }
+  .logo { width: 84px; height: 84px; border-radius: 24px; background: #B4532A; display: flex; align-items: center; justify-content: center; }
+  h1 { margin: 0; font-size: 64px; font-weight: 800; letter-spacing: -1.5px; }
+  p { margin: 0; font-size: 30px; line-height: 1.25; font-weight: 600; color: #E8EFF7; }
+  .chips { display: flex; gap: 10px; }
+  .chip { font-size: 18px; font-weight: 800; padding: 8px 14px; border-radius: 99px; background: rgba(255,255,255,.14); white-space: nowrap; }
+</style></head>
+<body>
+  <svg class="curvas" viewBox="0 0 600 400" fill="none" stroke="#E7A07B" stroke-width="2.2" aria-hidden="true">
+    <path d="M-20 360 C90 250 170 300 260 220 S420 120 620 170"/>
+    <path d="M-20 390 C100 290 190 336 282 258 S440 162 620 205"/>
+    <path d="M-20 420 C110 330 210 372 304 296 S460 204 620 240"/>
+    <path d="M-20 450 C120 370 230 408 326 334 S480 246 620 276"/>
+  </svg>
+  <div class="contenido">
+    <div class="marca">
+      <div class="logo"><svg width="46" height="46" viewBox="0 0 24 24"><path d="M10 3h4v7h7v4h-7v7h-4v-7H3v-4h7z" fill="#fff"/></svg></div>
+      <h1>ColOffline</h1>
+    </div>
+    <p>Encuestas demográficas que funcionan sin señal y se envían solas.</p>
+    <div class="chips"><span class="chip">Sin conexión</span><span class="chip">1.122 municipios</span><span class="chip">Sincronización automática</span></div>
+  </div>
+</body></html>

@@ -14,6 +14,13 @@ services:
       DB_PASS: ${DB_PASS}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD}
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS}
+      # Correo para «¿Olvidaste tu contraseña?» (docs/DESPLIEGUE.md).
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PUERTO: ${SMTP_PUERTO:-465}
+      SMTP_USUARIO: ${SMTP_USUARIO:-}
+      SMTP_CLAVE: ${SMTP_CLAVE:-}
+      SMTP_REMITENTE: ${SMTP_REMITENTE:-}
+      SMTP_NOMBRE: ${SMTP_NOMBRE:-ColOffline}
     depends_on:
       - db
 

@@ -350,7 +350,56 @@
   box-shadow: 0 2px 8px rgba(18, 70, 126, 0.08);
 }
 
+/* ---- Recuperar contraseña ---- */
+.recuperar-pasos {
+  display: flex; gap: 6px; list-style: none;
+  margin: -8px 0 18px; padding: 0;
+  counter-reset: paso;
+}
+.recuperar-pasos li {
+  flex: 1; display: flex; align-items: center; gap: 6px;
+  font-size: 0.78rem; font-weight: 700; color: var(--on-surface-muted);
+  padding-top: 8px; border-top: 3px solid var(--divider);
+  counter-increment: paso;
+}
+.recuperar-pasos li::before {
+  content: counter(paso);
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 20px; height: 20px; border-radius: 50%;
+  background: var(--surface-alt); border: 1px solid var(--divider);
+  font-size: 0.72rem;
+}
+.recuperar-pasos li.activo { color: var(--primary); border-top-color: var(--primary); }
+.recuperar-pasos li.activo::before { background: var(--primary); border-color: var(--primary); color: #fff; }
+.recuperar-pasos li.hecho { color: var(--success); border-top-color: var(--success); }
+.recuperar-pasos li.hecho::before { content: '✓'; background: var(--success-bg); border-color: var(--success-border); color: var(--success); }
+
+.recuperar-texto { font-size: 0.92rem; line-height: 1.5; color: var(--on-surface-secondary); margin-bottom: 16px; }
+.recuperar-nota { font-size: 0.82rem; line-height: 1.45; color: var(--on-surface-secondary); margin-top: 16px; }
+.recuperar-enviado {
+  display: flex; gap: 10px; align-items: flex-start;
+  font-size: 0.88rem; line-height: 1.45;
+  color: var(--primary-dark); background: var(--primary-tint);
+  border-radius: var(--radius-sm); padding: 12px 14px; margin-bottom: 16px;
+}
+.recuperar-enviado svg { flex-shrink: 0; margin-top: 1px; }
+.login-field input.recuperar-codigo { font-size: 1.5rem; font-weight: 800; letter-spacing: 0.4em; text-align: center; }
+.recuperar-acciones { display: flex; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+.recuperar-enlace {
+  min-height: 44px; padding: 0 4px;
+  background: none; border: 0;
+  font: inherit; font-size: 0.88rem; font-weight: 700;
+  color: var(--primary); cursor: pointer;
+}
+.recuperar-enlace:disabled { color: var(--on-surface-muted); cursor: default; }
+.recuperar-volver {
+  align-self: center;
+  display: inline-flex; align-items: center; gap: 6px; min-height: 44px;
+  font-size: 0.9rem; font-weight: 700; color: var(--primary); text-decoration: none;
+}
+
 /* ---- Pie ---- */
+.login-foot a { color: var(--primary); font-weight: 700; }
 .login-foot {
   font-size: 0.82rem;
   line-height: 1.45;

@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Política de privacidad · ColOffline</title>
+<meta name="description" content="Qué datos recoge ColOffline, para qué, dónde se guardan y cómo pedir su corrección o eliminación.">
+<style>
+  @font-face { font-family: 'Figtree'; src: url('./fonts/figtree-latin.woff2') format('woff2'); font-weight: 400 800; font-display: swap; }
+  :root { --primario: #12467E; --fondo: #F6F4EF; --superficie: #FFFFFF; --texto: #1C2430; --texto-2: #5A6370; --divisor: #E4E0D8; --acento: #B4532A; }
+  @media (prefers-color-scheme: dark) {
+    :root { --primario: #9EC0E8; --fondo: #121417; --superficie: #1C2026; --texto: #E8EAED; --texto-2: #A9B2BE; --divisor: #2C323A; --acento: #E08A63; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--fondo); color: var(--texto); font-family: 'Figtree', system-ui, sans-serif; line-height: 1.6; }
+  header { background: #12467E; color: #fff; padding: 32px 20px 56px; }
+  header div, main { max-width: 760px; margin: 0 auto; }
+  header p { margin: 4px 0 0; color: #D5E2F1; }
+  h1 { margin: 0; font-size: 1.9rem; line-height: 1.2; }
+  main { background: var(--superficie); border: 1px solid var(--divisor); border-radius: 22px; margin-top: -32px; padding: 8px 28px 28px; }
+  h2 { font-size: 1.15rem; margin: 28px 0 8px; padding-left: 10px; border-left: 3px solid var(--acento); }
+  p, li { color: var(--texto); font-size: 1rem; }
+  .nota { color: var(--texto-2); font-size: 0.9rem; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.95rem; }
+  th, td { text-align: left; vertical-align: top; padding: 8px 10px; border-bottom: 1px solid var(--divisor); }
+  th { color: var(--texto-2); font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.04em; }
+  a { color: var(--primario); font-weight: 700; }
+  footer { max-width: 760px; margin: 20px auto 40px; padding: 0 20px; color: var(--texto-2); font-size: 0.85rem; }
+  @media (max-width: 600px) { main { margin-left: 12px; margin-right: 12px; padding: 4px 18px 22px; } }
+</style>
+</head>
+<body>
+<header><div>
+  <h1>Política de privacidad</h1>
+  <p>ColOffline · Encuestas demográficas · Aplicación Android, aplicación web y panel de administración</p>
+</div></header>
+
+<main>
+  <p class="nota">Última actualización: 10 de octubre de 2026.</p>
+
+  <h2>Qué es ColOffline</h2>
+  <p>ColOffline es un sistema para registrar encuestas demográficas en zonas rurales, incluso sin señal. Lo usan encuestadores con una cuenta asignada por la entidad responsable de la encuesta. No está dirigido al público general ni a menores de edad.</p>
+
+  <h2>Qué datos se recogen</h2>
+  <table>
+    <thead><tr><th>De quién</th><th>Datos</th><th>Para qué</th></tr></thead>
+    <tbody>
+      <tr><td>Personas encuestadas</td><td>Tipo y número de documento, nombres y apellidos, fecha de nacimiento, teléfono, correo, dirección, municipio y vereda, EPS, ocupación y estrato.</td><td>Registrar la encuesta demográfica y mantenerla actualizada.</td></tr>
+      <tr><td>Encuestadores y administradores</td><td>Nombre, número de documento, correo (opcional), contraseña (guardada cifrada, nunca en texto), identificador del dispositivo y versión de la app.</td><td>Iniciar sesión, saber quién hizo cada registro, recuperar la contraseña y detectar celulares que llevan días sin enviar datos.</td></tr>
+    </tbody>
+  </table>
+  <p>La app no usa la ubicación GPS, la cámara, los contactos ni el micrófono, y no tiene publicidad ni herramientas de seguimiento. En Android solo pide acceso a Internet y al estado de la red, para enviar los datos cuando hay señal.</p>
+
+  <h2>Dónde se guardan</h2>
+  <ul>
+    <li><strong>En el teléfono</strong>, mientras no hay señal. La copia de seguridad automática del teléfono está desactivada para estos datos.</li>
+    <li><strong>En el servidor del sistema</strong>, al que viajan siempre cifrados (HTTPS). Cada encuestador puede quedar limitado a descargar solo las personas de sus municipios.</li>
+  </ul>
+
+  <h2>Con quién se comparten</h2>
+  <p>Los datos no se venden ni se ceden. Solo los ven las cuentas autorizadas por la entidad responsable. Para enviar el código de «¿Olvidaste tu contraseña?» se usa un servicio de correo electrónico, que recibe únicamente la dirección del encuestador y el código.</p>
+
+  <h2>Cuánto tiempo se conservan</h2>
+  <p>Mientras la entidad responsable los necesite para la encuesta. Los registros borrados desde el panel quedan marcados como eliminados para que también desaparezcan de los celulares, y pueden eliminarse definitivamente a solicitud.</p>
+
+  <h2>Tus derechos</h2>
+  <p>De acuerdo con la Ley 1581 de 2012 de protección de datos personales de Colombia, cualquier persona puede conocer, actualizar, corregir o pedir la eliminación de sus datos. Las personas encuestadas pueden hacerlo ante la entidad que realizó la encuesta; los encuestadores, ante el administrador del sistema, que puede corregir o eliminar la información desde el panel de administración, incluida la cuenta de usuario.</p>
+
+  <h2>Seguridad</h2>
+  <p>Contraseñas cifradas con bcrypt, sesiones con tokens que se guardan solo como huella, límite de intentos de inicio de sesión, conexión cifrada y registro de cada acción de los administradores.</p>
+</main>
+<footer>ColOffline · <a href="./">Volver a la aplicación</a></footer>
+</body>
+</html>

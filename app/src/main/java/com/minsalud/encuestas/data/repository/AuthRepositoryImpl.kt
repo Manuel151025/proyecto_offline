@@ -8,6 +8,11 @@ import com.minsalud.encuestas.data.local.prefs.HashCredencial
 import com.minsalud.encuestas.data.local.prefs.SessionManager
 import com.minsalud.encuestas.data.remote.api.ApiService
 import com.minsalud.encuestas.data.remote.dto.LoginRequestDto
+import com.minsalud.encuestas.data.remote.dto.RecuperarRequestDto
+import com.minsalud.encuestas.data.remote.dto.RespuestaSimpleDto
+import com.minsalud.encuestas.data.remote.dto.RestablecerRequestDto
+import com.google.gson.Gson
+import retrofit2.Response
 import com.minsalud.encuestas.domain.model.DomainError
 import com.minsalud.encuestas.domain.model.Encuestador
 import com.minsalud.encuestas.domain.repository.AuthRepository
@@ -90,6 +95,47 @@ class AuthRepositoryImpl @Inject constructor(
             sessionManager.clear()
         }
     }
+
+    override suspend fun pedirCodigoRecuperacion(numeroDocumento: String): Result<String> =
+        llamarRecuperacion { apiService.pedirCodigoRecuperacion(RecuperarRequestDto(numeroDocumento.trim())) }
+
+    override suspend fun restablecerContrasena(numeroDocumento: String, codigo: String, nueva: String): Result<String> {
+        val doc = numeroDocumento.trim()
+        val resultado = llamarRecuperacion {
+            apiService.restablecerContrasena(RestablecerRequestDto(doc, codigo.trim(), nueva))
+        }
+        // El login sin conexión debe aceptar la contraseña nueva y no la vieja.
+        if (resultado is Result.Success) {
+            credenciales.buscar(doc)?.let { vieja ->
+                val sal = HashCredencial.nuevaSal()
+                credenciales.guardar(vieja.copy(sal = sal, hash = HashCredencial.calcular(nueva, sal)))
+            }
+        }
+        return resultado
+    }
+
+    /**
+     * Llama a un paso de la recuperación y traduce la respuesta. Los errores
+     * (400, 429, 503) traen en el cuerpo un mensaje pensado para mostrarse tal
+     * cual: «El código no es válido o ya venció», «Demasiados intentos…».
+     */
+    private suspend fun llamarRecuperacion(llamada: suspend () -> Response<RespuestaSimpleDto>): Result<String> =
+        try {
+            val respuesta = llamada()
+            val cuerpo = respuesta.body()
+            if (respuesta.isSuccessful && cuerpo?.success == true) {
+                Result.Success(cuerpo.message ?: "Listo.")
+            } else {
+                val mensaje = cuerpo?.message ?: runCatching {
+                    Gson().fromJson(respuesta.errorBody()?.string(), RespuestaSimpleDto::class.java)?.message
+                }.getOrNull()
+                Result.Error(DomainError.InvalidData(mensaje ?: "No se pudo completar. Intenta de nuevo."))
+            }
+        } catch (e: IOException) {
+            Result.Error(DomainError.NetworkError("Necesitas señal para recuperar tu contraseña: el código llega por correo."))
+        } catch (e: Exception) {
+            Result.Error(DomainError.UnknownError(originalError = e))
+        }
 
     private fun loginLocal(documento: String, password: String): Result<Encuestador> {
         val guardada = credenciales.buscar(documento)
