@@ -52,7 +52,12 @@ data class FormularioUiState(
     val apellidosError: String? = null,
     val emailError: String? = null,
     val telefonoError: String? = null,
-    val estratoError: String? = null
+    val estratoError: String? = null,
+    val fechaError: String? = null,
+    val direccionError: String? = null,
+    val veredaError: String? = null,
+    val epsError: String? = null,
+    val ocupacionError: String? = null
 )
 
 @HiltViewModel
@@ -130,30 +135,36 @@ class FormularioEncuestaViewModel @Inject constructor(
     }
 
     fun onTipoDocumentoChanged(tipo: TipoDocumento) {
-        _uiState.value = _uiState.value.copy(tipoDocumento = tipo)
+        // El número ya escrito se ajusta al formato del nuevo tipo.
+        val s = _uiState.value
+        _uiState.value = s.copy(
+            tipoDocumento = tipo,
+            numeroDocumento = if (s.isEdit) s.numeroDocumento else Validaciones.limpiarDocumento(s.numeroDocumento, tipo),
+            docError = null
+        )
     }
 
     fun onNumeroDocumentoChanged(numero: String) {
         _uiState.value = _uiState.value.copy(
-            numeroDocumento = numero.filter { it.isDigit() }.take(12), docError = null
+            numeroDocumento = Validaciones.limpiarDocumento(numero, _uiState.value.tipoDocumento), docError = null
         )
     }
 
     fun onNombresChanged(nombres: String) {
-        _uiState.value = _uiState.value.copy(nombres = nombres.take(60), nombresError = null)
+        _uiState.value = _uiState.value.copy(nombres = Validaciones.limpiarNombre(nombres), nombresError = null)
     }
 
     fun onApellidosChanged(apellidos: String) {
-        _uiState.value = _uiState.value.copy(apellidos = apellidos.take(60), apellidosError = null)
+        _uiState.value = _uiState.value.copy(apellidos = Validaciones.limpiarNombre(apellidos), apellidosError = null)
     }
 
     fun onFechaNacimientoChanged(fecha: Long?) {
-        _uiState.value = _uiState.value.copy(fechaNacimiento = fecha)
+        _uiState.value = _uiState.value.copy(fechaNacimiento = fecha, fechaError = null)
     }
 
     fun onTelefonoChanged(telefono: String) {
         _uiState.value = _uiState.value.copy(
-            telefono = telefono.filter { it.isDigit() }.take(10), telefonoError = null
+            telefono = Validaciones.limpiarTelefono(telefono), telefonoError = null
         )
     }
 
@@ -162,24 +173,32 @@ class FormularioEncuestaViewModel @Inject constructor(
     }
 
     fun onDireccionChanged(direccion: String) {
-        _uiState.value = _uiState.value.copy(direccion = direccion.take(150))
+        _uiState.value = _uiState.value.copy(
+            direccion = Validaciones.limpiarTexto(direccion, Validaciones.TextoLibre.DIRECCION), direccionError = null
+        )
     }
 
     fun onVeredaChanged(vereda: String) {
-        _uiState.value = _uiState.value.copy(vereda = vereda.take(100))
+        _uiState.value = _uiState.value.copy(
+            vereda = Validaciones.limpiarTexto(vereda, Validaciones.TextoLibre.VEREDA), veredaError = null
+        )
     }
 
     fun onEpsChanged(eps: String) {
-        _uiState.value = _uiState.value.copy(eps = eps.take(50))
+        _uiState.value = _uiState.value.copy(
+            eps = Validaciones.limpiarTexto(eps, Validaciones.TextoLibre.EPS), epsError = null
+        )
     }
 
     fun onOcupacionChanged(ocupacion: String) {
-        _uiState.value = _uiState.value.copy(ocupacion = ocupacion.take(60))
+        _uiState.value = _uiState.value.copy(
+            ocupacion = Validaciones.limpiarTexto(ocupacion, Validaciones.TextoLibre.OCUPACION), ocupacionError = null
+        )
     }
 
     fun onEstratoChanged(estrato: String) {
         _uiState.value = _uiState.value.copy(
-            estrato = estrato.filter { it.isDigit() }.take(1), estratoError = null
+            estrato = Validaciones.limpiarEstrato(estrato), estratoError = null
         )
     }
 
@@ -193,28 +212,25 @@ class FormularioEncuestaViewModel @Inject constructor(
 
     /** Valida y marca errores por campo. Devuelve true si todo es válido. */
     private fun validar(state: FormularioUiState): FormularioUiState {
-        val docError = when {
-            state.numeroDocumento.isBlank() -> "El documento es obligatorio"
-            !Validaciones.esDocumentoValido(state.numeroDocumento) -> "Debe tener al menos 6 dígitos"
-            else -> null
-        }
-        val nombresError = when {
-            state.nombres.isBlank() -> "Los nombres son obligatorios"
-            !Validaciones.esNombreValido(state.nombres) -> "No debe contener números"
-            else -> null
-        }
-        val apellidosError = when {
-            state.apellidos.isBlank() -> "Los apellidos son obligatorios"
-            !Validaciones.esNombreValido(state.apellidos) -> "No debe contener números"
-            else -> null
-        }
+        // Al editar, el documento no se puede cambiar: no se bloquea por él.
+        val docError = if (state.isEdit) null
+            else Validaciones.errorDocumento(state.numeroDocumento, state.tipoDocumento)
+        val nombresError = Validaciones.errorNombre(state.nombres)
+        val apellidosError = Validaciones.errorNombre(state.apellidos)
         val emailError = if (state.email.isNotBlank() && !Validaciones.esEmailValido(state.email))
             "Correo no válido" else null
         val telefonoError = if (!Validaciones.esTelefonoValido(state.telefono))
-            "Teléfono no válido" else null
+            "Celular de 10 dígitos (empieza por 3) o fijo de 10 (empieza por 60)" else null
         val estratoError = if (!Validaciones.esEstratoValido(state.estrato))
             "Estrato debe ser 1–6" else null
+        val fechaError = if (!Validaciones.esFechaNacimientoValida(state.fechaNacimiento))
+            "No puede ser futura ni anterior a 1900" else null
         return state.copy(
+            fechaError = fechaError,
+            direccionError = Validaciones.errorTexto(state.direccion, Validaciones.TextoLibre.DIRECCION),
+            veredaError = Validaciones.errorTexto(state.vereda, Validaciones.TextoLibre.VEREDA),
+            epsError = Validaciones.errorTexto(state.eps, Validaciones.TextoLibre.EPS),
+            ocupacionError = Validaciones.errorTexto(state.ocupacion, Validaciones.TextoLibre.OCUPACION),
             docError = docError,
             nombresError = nombresError,
             apellidosError = apellidosError,
@@ -229,7 +245,9 @@ class FormularioEncuestaViewModel @Inject constructor(
         _uiState.value = validated
         val hasError = listOf(
             validated.docError, validated.nombresError, validated.apellidosError,
-            validated.emailError, validated.telefonoError, validated.estratoError
+            validated.emailError, validated.telefonoError, validated.estratoError,
+            validated.fechaError, validated.direccionError, validated.veredaError,
+            validated.epsError, validated.ocupacionError
         ).any { it != null }
         if (hasError) return
 

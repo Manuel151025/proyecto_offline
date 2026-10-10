@@ -3,7 +3,7 @@ import { navigate } from '../router.js';
 import { generateUUID, getDeviceId, nowMs, dateToMs, msToDateInput, showToast } from '../utils.js';
 import { registerBackgroundSync } from '../sync.js';
 import { getSession } from '../session.js';
-import { validarPersona, TIPOS_DOCUMENTO } from '../validacion.js';
+import { validarPersona, limpiarCampo, TIPOS_DOCUMENTO, DOCUMENTOS, CAMPOS } from '../validacion.js';
 
 const TIPOS_DOC = TIPOS_DOCUMENTO;
 
@@ -28,6 +28,12 @@ export async function render(container, params) {
     }
   }
 
+  const tipoInicial = persona?.tipo_documento || 'CC';
+  const hoyIso = msToDateInput(Date.UTC(new Date().getFullYear(), new Date().getMonth(), new Date().getDate()));
+  const estratoActual = persona?.estrato ?? '';
+  const estratoOptions = ['', 1, 2, 3, 4, 5, 6].map(n =>
+    `<option value="${n}" ${String(estratoActual) === String(n) ? 'selected' : ''}>${n === '' ? '— Sin dato —' : n}</option>`
+  ).join('');
   const tipoOptions = TIPOS_DOC.map(t =>
     `<option value="${t}" ${(persona?.tipo_documento || 'CC') === t ? 'selected' : ''}>${t}</option>`
   ).join('');
@@ -54,26 +60,29 @@ export async function render(container, params) {
               <label for="numero_documento">Número *</label>
               <input type="text" id="numero_documento" name="numero_documento"
                      value="${esc(persona?.numero_documento || '')}"
-                     maxlength="20" ${isEdit ? 'readonly' : ''} required />
+                     inputmode="${DOCUMENTOS[tipoInicial]?.letras ? 'text' : 'numeric'}"
+                     maxlength="${DOCUMENTOS[tipoInicial]?.max ?? 20}" autocomplete="off"
+                     ${isEdit ? 'readonly' : ''} required />
             </div>
           </div>
+          ${isEdit ? '' : `<p class="field-hint" id="ayuda-documento">${DOCUMENTOS[tipoInicial]?.ayuda ?? ''}</p>`}
 
           <div class="form-section-title">Datos personales</div>
 
           <div class="form-field">
             <label for="nombres">Nombres *</label>
             <input type="text" id="nombres" name="nombres"
-                   value="${esc(persona?.nombres || '')}" maxlength="100" required />
+                   value="${esc(persona?.nombres || '')}" maxlength="${CAMPOS.nombres.max}" autocomplete="off" autocapitalize="words" required />
           </div>
           <div class="form-field">
             <label for="apellidos">Apellidos *</label>
             <input type="text" id="apellidos" name="apellidos"
-                   value="${esc(persona?.apellidos || '')}" maxlength="100" required />
+                   value="${esc(persona?.apellidos || '')}" maxlength="${CAMPOS.apellidos.max}" autocomplete="off" autocapitalize="words" required />
           </div>
           <div class="form-field">
             <label for="fecha_nacimiento">Fecha de nacimiento</label>
             <input type="date" id="fecha_nacimiento" name="fecha_nacimiento"
-                   value="${msToDateInput(persona?.fecha_nacimiento)}" />
+                   value="${msToDateInput(persona?.fecha_nacimiento)}" min="1900-01-01" max="${hoyIso}" />
           </div>
 
           <div class="form-section-title">Contacto</div>
@@ -81,17 +90,18 @@ export async function render(container, params) {
           <div class="form-field">
             <label for="telefono">Teléfono</label>
             <input type="tel" id="telefono" name="telefono"
-                   value="${esc(persona?.telefono || '')}" maxlength="20" />
+                   value="${esc(persona?.telefono || '')}" maxlength="10" inputmode="numeric"
+                   placeholder="10 dígitos, ej: 3001234567" autocomplete="off" />
           </div>
           <div class="form-field">
             <label for="email">Correo electrónico</label>
             <input type="email" id="email" name="email"
-                   value="${esc(persona?.email || '')}" maxlength="100" />
+                   value="${esc(persona?.email || '')}" maxlength="${CAMPOS.email.max}" autocomplete="off" />
           </div>
           <div class="form-field">
             <label for="direccion">Dirección</label>
             <input type="text" id="direccion" name="direccion"
-                   value="${esc(persona?.direccion || '')}" maxlength="150" />
+                   value="${esc(persona?.direccion || '')}" maxlength="${CAMPOS.direccion.max}" autocomplete="off" />
           </div>
 
           <div class="form-section-title">Ubicación</div>
@@ -111,7 +121,7 @@ export async function render(container, params) {
           <div class="form-field">
             <label for="vereda">Vereda <span class="field-optional">(opcional)</span></label>
             <input type="text" id="vereda" name="vereda"
-                   value="${esc(persona?.vereda || '')}" maxlength="100"
+                   value="${esc(persona?.vereda || '')}" maxlength="${CAMPOS.vereda.max}" autocomplete="off"
                    placeholder="Ej: Vereda El Carmen" />
           </div>
 
@@ -120,17 +130,16 @@ export async function render(container, params) {
           <div class="form-field">
             <label for="eps">EPS</label>
             <input type="text" id="eps" name="eps"
-                   value="${esc(persona?.eps || '')}" maxlength="50" />
+                   value="${esc(persona?.eps || '')}" maxlength="${CAMPOS.eps.max}" autocomplete="off" />
           </div>
           <div class="form-field">
             <label for="ocupacion">Ocupación</label>
             <input type="text" id="ocupacion" name="ocupacion"
-                   value="${esc(persona?.ocupacion || '')}" maxlength="100" />
+                   value="${esc(persona?.ocupacion || '')}" maxlength="${CAMPOS.ocupacion.max}" autocomplete="off" />
           </div>
           <div class="form-field">
-            <label for="estrato">Estrato (1–6)</label>
-            <input type="number" id="estrato" name="estrato"
-                   value="${persona?.estrato ?? ''}" min="1" max="6" />
+            <label for="estrato">Estrato</label>
+            <select id="estrato" name="estrato">${estratoOptions}</select>
           </div>
 
           <div class="form-actions">
@@ -155,6 +164,49 @@ export async function render(container, params) {
   });
 
   setupDepartamentoFilter(municipios, persona?.municipio_codigo ?? null);
+  setupFiltros(isEdit);
+}
+
+/**
+ * Filtra lo que se escribe en cada campo: lo que no puede ir ni siquiera
+ * entra, y el error de ese campo se borra en cuanto el usuario lo corrige.
+ */
+function setupFiltros(isEdit) {
+  const form = document.getElementById('encuesta-form');
+  const tipo = document.getElementById('tipo_documento');
+  const doc = document.getElementById('numero_documento');
+
+  for (const campo of ['numero_documento', 'nombres', 'apellidos', 'telefono', 'email', 'direccion', 'vereda', 'eps', 'ocupacion']) {
+    const input = document.getElementById(campo);
+    if (!input || input.readOnly) continue;
+    input.addEventListener('input', () => {
+      const limpio = limpiarCampo(campo, input.value, tipo.value);
+      if (limpio !== input.value) input.value = limpio;
+      limpiarError(input);
+    });
+  }
+  form.querySelectorAll('select, input[type="date"]').forEach(el =>
+    el.addEventListener('change', () => limpiarError(el)));
+
+  // Al cambiar el tipo cambian el teclado, el largo y la ayuda del número.
+  if (!isEdit) {
+    tipo.addEventListener('change', () => {
+      const regla = DOCUMENTOS[tipo.value];
+      doc.inputMode = regla.letras ? 'text' : 'numeric';
+      doc.maxLength = regla.max;
+      doc.value = limpiarCampo('numero_documento', doc.value, tipo.value);
+      document.getElementById('ayuda-documento').textContent = regla.ayuda;
+      limpiarError(doc);
+    });
+  }
+}
+
+function limpiarError(input) {
+  if (!input.classList.contains('input-error')) return;
+  input.classList.remove('input-error');
+  input.removeAttribute('aria-invalid');
+  const msg = input.nextElementSibling;
+  if (msg?.classList.contains('field-error')) msg.remove();
 }
 
 function setupDepartamentoFilter(municipios, selectedCodigo) {
@@ -231,7 +283,12 @@ async function handleSubmit(isEdit, existing, municipios = []) {
     nombres,
     apellidos,
     fecha_nacimiento: dateToMs(form.fecha_nacimiento.value) || null,
+    telefono: form.telefono.value.trim() || null,
     email: form.email.value.trim() || null,
+    direccion: form.direccion.value.trim() || null,
+    vereda: form.vereda.value.trim() || null,
+    eps: form.eps.value.trim() || null,
+    ocupacion: form.ocupacion.value.trim() || null,
     estrato: form.estrato.value === '' ? null : Number(form.estrato.value),
     municipio_codigo: form.municipio_codigo.value || null
   };
@@ -255,12 +312,12 @@ async function handleSubmit(isEdit, existing, municipios = []) {
       nombres,
       apellidos,
       fecha_nacimiento: borrador.fecha_nacimiento,
-      telefono: form.telefono.value.trim() || null,
+      telefono: borrador.telefono,
       email: borrador.email,
-      direccion: form.direccion.value.trim() || null,
-      vereda: form.vereda.value.trim() || null,
-      eps: form.eps.value.trim() || null,
-      ocupacion: form.ocupacion.value.trim() || null,
+      direccion: borrador.direccion,
+      vereda: borrador.vereda,
+      eps: borrador.eps,
+      ocupacion: borrador.ocupacion,
       estrato: borrador.estrato,
       municipio_codigo: form.municipio_codigo.value || null,
       updated_at: ts,

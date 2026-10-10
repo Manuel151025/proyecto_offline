@@ -15,6 +15,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.minsalud.encuestas.domain.model.Municipio
 import com.minsalud.encuestas.domain.model.TipoDocumento
+import com.minsalud.encuestas.domain.validation.Validaciones
 import com.minsalud.encuestas.presentation.viewmodel.FormularioEncuestaViewModel
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -47,7 +48,17 @@ fun FormularioEncuestaScreen(
     }
 
     if (showDatePicker) {
-        val dateState = rememberDatePickerState(initialSelectedDateMillis = uiState.fechaNacimiento)
+        // Solo días entre 1900 y hoy: una fecha futura ni siquiera se puede tocar.
+        val anioActual = java.util.Calendar.getInstance().get(java.util.Calendar.YEAR)
+        val dateState = rememberDatePickerState(
+            initialSelectedDateMillis = uiState.fechaNacimiento,
+            yearRange = 1900..anioActual,
+            selectableDates = object : SelectableDates {
+                override fun isSelectableDate(utcTimeMillis: Long) =
+                    Validaciones.esFechaNacimientoValida(utcTimeMillis)
+                override fun isSelectableYear(year: Int) = year in 1900..anioActual
+            }
+        )
         DatePickerDialog(
             onDismissRequest = { showDatePicker = false },
             confirmButton = {
@@ -112,10 +123,15 @@ fun FormularioEncuestaScreen(
                 value = uiState.numeroDocumento,
                 onValueChange = { viewModel.onNumeroDocumentoChanged(it) },
                 label = { Text("Número de documento *") },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = if (Validaciones.formato(uiState.tipoDocumento).letras) KeyboardType.Ascii
+                                   else KeyboardType.Number
+                ),
                 readOnly = uiState.isEdit,
                 isError = uiState.docError != null,
-                supportingText = uiState.docError?.let { { Text(it) } },
+                supportingText = {
+                    Text(uiState.docError ?: if (uiState.isEdit) "" else Validaciones.formato(uiState.tipoDocumento).ayuda)
+                },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true
             )
@@ -148,6 +164,8 @@ fun FormularioEncuestaScreen(
                 onValueChange = {},
                 readOnly = true,
                 label = { Text("Fecha de nacimiento") },
+                isError = uiState.fechaError != null,
+                supportingText = uiState.fechaError?.let { { Text(it) } },
                 trailingIcon = {
                     IconButton(onClick = { showDatePicker = true }) {
                         Icon(Icons.Default.DateRange, contentDescription = "Elegir fecha")
@@ -163,7 +181,8 @@ fun FormularioEncuestaScreen(
                 value = uiState.telefono,
                 onValueChange = { viewModel.onTelefonoChanged(it) },
                 label = { Text("Teléfono") },
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Phone),
+                placeholder = { Text("10 dígitos, ej: 3001234567") },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                 isError = uiState.telefonoError != null,
                 supportingText = uiState.telefonoError?.let { { Text(it) } },
                 modifier = Modifier.fillMaxWidth(),
@@ -185,6 +204,8 @@ fun FormularioEncuestaScreen(
                 value = uiState.direccion,
                 onValueChange = { viewModel.onDireccionChanged(it) },
                 label = { Text("Dirección") },
+                isError = uiState.direccionError != null,
+                supportingText = uiState.direccionError?.let { { Text(it) } },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true
             )
@@ -222,6 +243,8 @@ fun FormularioEncuestaScreen(
                 onValueChange = { viewModel.onVeredaChanged(it) },
                 label = { Text("Vereda (opcional)") },
                 placeholder = { Text("Ej: Vereda El Carmen") },
+                isError = uiState.veredaError != null,
+                supportingText = uiState.veredaError?.let { { Text(it) } },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true
             )
@@ -233,6 +256,8 @@ fun FormularioEncuestaScreen(
                 value = uiState.eps,
                 onValueChange = { viewModel.onEpsChanged(it) },
                 label = { Text("EPS") },
+                isError = uiState.epsError != null,
+                supportingText = uiState.epsError?.let { { Text(it) } },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true
             )
@@ -241,6 +266,8 @@ fun FormularioEncuestaScreen(
                 value = uiState.ocupacion,
                 onValueChange = { viewModel.onOcupacionChanged(it) },
                 label = { Text("Ocupación") },
+                isError = uiState.ocupacionError != null,
+                supportingText = uiState.ocupacionError?.let { { Text(it) } },
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true
             )
