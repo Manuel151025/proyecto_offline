@@ -290,14 +290,9 @@ La app ya cumple el nivel de API que exige Play desde el 31 de agosto de 2026 (*
 
 ## 5 · Publicar en Google Play
 
-### Antes de empezar: el nombre y el Ministerio
+### Antes de empezar: el nombre
 
-La app se presenta como **«Ministerio de Salud»**. Google Play **rechaza** apps que aparenten ser de una entidad del gobierno sin demostrar que la representan (política de *suplantación*). Tienes dos caminos:
-
-- **Publicarla para la entidad**: la cuenta de desarrollador debe ser de **organización** a nombre de la entidad, o adjuntar en Play Console la **autorización escrita** de la entidad.
-- **Publicarla como proyecto propio**: quita «Ministerio de Salud» de la ficha y de la app (o déjalo solo en *prueba interna*, que no pasa por revisión pública).
-
-Para pruebas con tu equipo, la **prueba interna** (5.5) basta y no tiene ese problema.
+La app se presenta como **ColOffline · Encuestas demográficas**, sin «Ministerio de Salud», y su identificador es `co.coloffline.encuestas`. Así no choca con la política de Google Play contra apps que aparentan ser de una entidad del gobierno. Si en el futuro una entidad la publica como propia, la cuenta de desarrollador debe ser de **organización** a nombre de esa entidad.
 
 ### 5.1 · Cuenta de desarrollador
 
@@ -331,7 +326,7 @@ Completa cada tarea de la lista:
 | **Clasificación de contenido** | Cuestionario → categoría *Todas las demás apps* → responde **No** a violencia, sexo, drogas, etc. → *Guardar* → *Enviar* |
 | **Público objetivo** | 18 años o más. No está dirigida a niños |
 | **Seguridad de los datos** | Ver la tabla de abajo |
-| **Apps gubernamentales** | Sí, si la publica la entidad (adjunta la autorización); si no, No (y sin «Ministerio» en el nombre) |
+| **Apps gubernamentales** | No |
 | **Categoría** | *Productividad* (o *Medicina*). Correo de contacto: el del proyecto |
 
 **Seguridad de los datos** (formulario *Data safety*):

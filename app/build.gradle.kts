@@ -27,7 +27,10 @@ android {
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.minsalud.encuestas"
+        // Identificador público (Google Play, ajustes del teléfono). No lleva
+        // «minsalud»: la app no la publica el Ministerio. El namespace de abajo
+        // (paquetes del código) es interno y no se ve.
+        applicationId = "co.coloffline.encuestas"
         minSdk = 24
         targetSdk = 36
         // Subir versionCode en CADA versión que se publique en Google Play;

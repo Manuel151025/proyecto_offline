@@ -21,7 +21,7 @@ class ValidacionesTest {
     fun `acepta correos con forma valida`() {
         listOf(
             "maria.rios@example.com",
-            "encuestador@minsalud.gov.co",
+            "encuestador@coloffline.co",
             "a@b.co",
             "nombre+etiqueta@dominio.org",
             "con_guion-bajo@sub.dominio.com"

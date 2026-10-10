@@ -1,6 +1,6 @@
 # Arquitectura
 
-Documento de referencia técnica del sistema de encuestas *offline-first* del Ministerio de Salud.
+Documento de referencia técnica de ColOffline, sistema de encuestas demográficas *offline-first*.
 
 > Los diagramas están en Mermaid. GitHub los renderiza directamente; en VS Code hace falta la extensión *Markdown Preview Mermaid Support*.
 
@@ -19,7 +19,7 @@ Documento de referencia técnica del sistema de encuestas *offline-first* del Mi
 
 ## 1. Panorama general
 
-El sistema resuelve un problema concreto: **encuestadores del Ministerio de Salud recogen datos demográficos en zonas rurales donde no hay señal**. La conectividad no es una condición para trabajar, es un evento que ocurre a veces.
+El sistema resuelve un problema concreto: **encuestadores de campo recogen datos demográficos en zonas rurales donde no hay señal**. La conectividad no es una condición para trabajar, es un evento que ocurre a veces.
 
 De ahí se derivan las tres propiedades que gobiernan todo el diseño:
 

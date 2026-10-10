@@ -55,7 +55,7 @@ fun RecuperarScreen(
             }
             Column {
                 Text("Recuperar contraseña", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.ExtraBold)
-                Text("ColOffline · Ministerio de Salud", color = Color.White.copy(alpha = 0.85f), fontSize = 13.sp)
+                Text("ColOffline · Encuestas demográficas sin conexión", color = Color.White.copy(alpha = 0.85f), fontSize = 13.sp)
             }
         }
 

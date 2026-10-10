@@ -156,7 +156,7 @@ function plantillaCodigo(string $nombre, string $codigo, int $minutos): array
         . "Tu código para cambiar la contraseña de ColOffline es: $codigo\r\n\r\n"
         . "Escríbelo en la app junto con tu contraseña nueva. Vence en $minutos minutos.\r\n\r\n"
         . "Si no pediste cambiar tu contraseña, ignora este correo: tu contraseña actual sigue funcionando.\r\n\r\n"
-        . "Ministerio de Salud · ColOffline";
+        . "ColOffline · Encuestas demográficas";
     $html = <<<HTML
 <!doctype html>
 <html lang="es"><body style="margin:0;padding:24px;background:#F6F4EF;font-family:Arial,Helvetica,sans-serif;color:#1C2430">
@@ -169,7 +169,7 @@ function plantillaCodigo(string $nombre, string $codigo, int $minutos): array
       <p style="margin:0 0 16px;font-size:15px;line-height:1.5">Escríbelo en la app junto con tu contraseña nueva. Vence en <strong>{$minutos} minutos</strong>.</p>
       <p style="margin:0;font-size:13px;line-height:1.5;color:#5A6370">Si no pediste cambiar tu contraseña, ignora este correo: tu contraseña actual sigue funcionando.</p>
     </td></tr>
-    <tr><td style="padding:14px 24px;border-top:1px solid #E4E0D8;font-size:12px;color:#5A6370">Ministerio de Salud · Encuestas demográficas</td></tr>
+    <tr><td style="padding:14px 24px;border-top:1px solid #E4E0D8;font-size:12px;color:#5A6370">ColOffline · Encuestas demográficas</td></tr>
   </table>
 </body></html>
 HTML;
@@ -187,7 +187,7 @@ function plantillaContrasenaCambiada(string $nombre): array
     $texto = "Hola, $nombre.\r\n\r\n"
         . "La contraseña de tu cuenta de ColOffline acaba de cambiar y se cerró la sesión en tus celulares.\r\n\r\n"
         . "Si no fuiste tú, avisa de inmediato a tu administrador.\r\n\r\n"
-        . "Ministerio de Salud · ColOffline";
+        . "ColOffline · Encuestas demográficas";
     $html = <<<HTML
 <!doctype html>
 <html lang="es"><body style="margin:0;padding:24px;background:#F6F4EF;font-family:Arial,Helvetica,sans-serif;color:#1C2430">

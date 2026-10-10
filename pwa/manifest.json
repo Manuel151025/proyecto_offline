@@ -1,7 +1,7 @@
 {
   "name": "ColOffline",
   "short_name": "ColOffline",
-  "description": "Sistema de encuestas demográficas offline-first para el Ministerio de Salud",
+  "description": "Encuestas demográficas que funcionan sin conexión y se envían solas",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",

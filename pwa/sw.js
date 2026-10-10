@@ -1,5 +1,6 @@
 // Subir esta versión en cada cambio de JS/CSS: el fetch es cache-first, así que
 // sin bump los navegadores seguirían sirviendo los archivos viejos.
+// v23: marca neutral (sin «Ministerio de Salud»).
 // v22: «¿Olvidaste tu contraseña?» con código por correo.
 // v21: catálogo completo de municipios (1.122) y EPS, con buscador en el formulario.
 // v20: login del panel, plural en la semana y pruebas de punta a punta.
@@ -19,7 +20,7 @@
 // v7: .hidden pasa a !important (el spinner del login se veía siempre).
 // v6: styles.css se dividió en 7 hojas por responsabilidad.
 // v5: api.js y session.js ahora envían el token de autenticación en la sincronización.
-const CACHE = 'encuestas-v22';
+const CACHE = 'encuestas-v23';
 
 const ASSETS = [
   './index.html',

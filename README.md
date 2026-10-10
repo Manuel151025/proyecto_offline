@@ -1,6 +1,6 @@
 # Sistema de Encuestas - Offline First 📡
 
-Sistema de recolección de datos demográficos para el Ministerio de Salud, diseñado para funcionar en zonas rurales **sin conectividad**. Compuesto por una **app Android nativa**, una **PWA**, una **API REST en PHP** y un **panel de administración web**.
+Sistema de recolección de datos demográficos en campo, diseñado para funcionar en zonas rurales **sin conectividad**. Compuesto por una **app Android nativa**, una **PWA**, una **API REST en PHP** y un **panel de administración web**.
 
 🔗 **Producción:** app de encuestas en https://encuestas.manuelcardenas.online/pwa/ · panel en https://encuestas.manuelcardenas.online/api/admin/
 
@@ -24,7 +24,7 @@ Sistema de recolección de datos demográficos para el Ministerio de Salud, dise
 | [**Pendientes**](docs/PENDIENTES.md) | Qué falta, por qué, y qué pasa si no se hace |
 
 ## Descripción
-App Android nativa para el Ministerio de Salud, diseñada específicamente para funcionar en entornos rurales sin conectividad. Permite a los encuestadores recopilar y actualizar datos demográficos sin conexión a internet y sincronizarlos automáticamente mediante procesos en background cuando el dispositivo recupera la red.
+App Android nativa diseñada específicamente para funcionar en entornos rurales sin conectividad. Permite a los encuestadores recopilar y actualizar datos demográficos sin conexión a internet y sincronizarlos automáticamente mediante procesos en background cuando el dispositivo recupera la red.
 
 ## Objetivo
 Garantizar la recolección íntegra de datos sobre el terreno y prevenir la pérdida o duplicación de información frente a concurrencia, resolviendo conflictos de manera autónoma.

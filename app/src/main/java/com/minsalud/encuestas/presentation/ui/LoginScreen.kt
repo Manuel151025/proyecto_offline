@@ -66,7 +66,7 @@ fun LoginScreen(
             Spacer(Modifier.height(14.dp))
             Text("ColOffline", color = Color.White, fontSize = 26.sp, fontWeight = FontWeight.Bold)
             Text(
-                "Ministerio de Salud · Encuestas",
+                "Encuestas demográficas sin conexión",
                 color = Color.White.copy(alpha = 0.85f),
                 fontSize = 13.sp
             )

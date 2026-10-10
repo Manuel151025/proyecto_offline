@@ -176,7 +176,7 @@ function updateChrome() {
   document.querySelector('.bottom-nav')?.classList.toggle('chrome-hidden', isLogin);
   if (isLogin) ocultarAvisoSesion();
   const subtitulo = document.getElementById('app-subtitle');
-  if (subtitulo) subtitulo.textContent = getSession()?.nombre || 'Ministerio de Salud';
+  if (subtitulo) subtitulo.textContent = getSession()?.nombre || 'Encuestas demográficas';
 }
 
 async function init() {
