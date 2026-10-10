@@ -592,7 +592,7 @@ Catálogo funcional del sistema. Cada historia incluye criterios de aceptación 
 
 ## HU-30 · Cobertura de pruebas ✅
 
-**Estado actual:** **254 pruebas automatizadas** — 85 en Android (JVM), 72 en la PWA, 90 de la API y el panel (59 de integración con MySQL real y 31 unitarias) y 7 de punta a punta en un navegador real. Inventario completo en [PRUEBAS.md](PRUEBAS.md).
+**Estado actual:** **255 pruebas automatizadas** — 85 en Android (JVM), 72 en la PWA, 91 de la API y el panel (60 de integración con MySQL real y 31 unitarias) y 7 de punta a punta en un navegador real. Inventario completo en [PRUEBAS.md](PRUEBAS.md).
 
 | Suite | Qué cubre |
 |---|---|
