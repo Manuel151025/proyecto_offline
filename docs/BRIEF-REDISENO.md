@@ -10,7 +10,7 @@ Para usar con Claude Design: ejecuta `/design` y pídele que use este archivo.
 
 ## 1 · El producto
 
-ColOffline es el sistema del Ministerio de Salud de Colombia para registrar encuestas demográficas en zonas rurales **sin conectividad**. Tiene dos superficies que deben verse como **un solo producto**:
+ColOffline es un sistema para registrar encuestas demográficas en Colombia en zonas rurales **sin conectividad**. Tiene dos superficies que deben verse como **un solo producto**:
 
 | Superficie | Quién la usa | Dónde | Tecnología |
 |---|---|---|---|
@@ -28,7 +28,7 @@ Un rediseño **moderno, agradable y profesional**, que dé orgullo mostrar a la 
 - **Marca:** azul institucional `#12467E` (oscuro `#0C325C`, tinte `#EEF3F9`). Logo: círculo azul con una cruz blanca (`pwa/icons/icon.svg`).
 - **Estados:** éxito `#1B7A4B` · advertencia `#A15C00` · error `#B3261E`. Fondo `#F2F5F9`, texto `#16202C` / `#5B6878`.
 - **Estilo actual:** plano y sobrio, fuente del sistema, bordes finos, sombras mínimas. Funciona, pero se ve genérico.
-- **Exploración anterior descartada:** un login verde con fondo animado y tarjeta de vidrio (`design_handoff_login/`). Se descartó porque creaba **dos identidades** (verde en el login, azul en el resto). No repetir ese error: una sola identidad en todas las pantallas.
+- **Exploración anterior descartada:** un login verde con fondo animado y tarjeta de vidrio (antes en `design_handoff_login/`, ya borrado). Se descartó porque creaba **dos identidades** (verde en el login, azul en el resto). No repetir ese error: una sola identidad en todas las pantallas.
 
 El azul institucional se conserva como ancla. Todo lo demás se puede evolucionar: tipografía, acento secundario, iconografía, ilustración, ritmo y profundidad.
 

@@ -1,6 +1,6 @@
 {
     "name": "manuel151025/proyecto-offline-api",
-    "description": "API REST del sistema de encuestas offline-first del Ministerio de Salud",
+    "description": "API REST de ColOffline, sistema de encuestas demográficas offline-first",
     "type": "project",
     "license": "MIT",
     "require": {

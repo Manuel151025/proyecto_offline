@@ -41,7 +41,6 @@ local.properties
 
 # --- Documentacion y material de diseno ---
 *.md
-design_handoff_login/
 
 # --- Esquema y seeds SQL ---
 # Seguro de excluir: ningun PHP lee database/ en runtime. api/setup/migrate.php

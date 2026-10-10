@@ -822,7 +822,7 @@ if ($aviso !== null) {
       <img src="../../pwa/icons/icon.svg" alt="" width="40" height="40">
       <div>
         <p class="marca-nombre">ColOffline</p>
-        <p class="marca-sub">Ministerio de Salud · Encuestas demográficas</p>
+        <p class="marca-sub">Encuestas demográficas sin conexión</p>
       </div>
     </div>
     <div class="acceso-mensaje">

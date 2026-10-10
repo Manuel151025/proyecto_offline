@@ -31,7 +31,7 @@ export async function render(container) {
           </div>
           <div>
             <h1 class="login-brand">ColOffline</h1>
-            <p class="login-subtitle">Ministerio de Salud &middot; Encuestas demogr&aacute;ficas</p>
+            <p class="login-subtitle">Encuestas demogr&aacute;ficas sin conexi&oacute;n</p>
           </div>
         </header>
 

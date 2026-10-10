@@ -59,7 +59,7 @@ fun ListaPersonasScreen(
                     Column {
                         Text("ColOffline", fontWeight = FontWeight.ExtraBold, fontSize = 18.sp)
                         Text(
-                            uiState.nombreEncuestador.ifBlank { "Ministerio de Salud" },
+                            uiState.nombreEncuestador.ifBlank { "Encuestas demográficas" },
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )

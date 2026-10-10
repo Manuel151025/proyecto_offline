@@ -33,7 +33,7 @@ Todo el código está listo; estos pasos necesitan tus cuentas. El paso a paso e
 1. **Correo para «¿Olvidaste tu contraseña?»**: cuenta de Gmail con verificación en 2 pasos, contraseña de aplicación y variables `SMTP_*` en Dokploy.
 2. **Retirar `ADMIN_PASSWORD`** de Dokploy si sigue definida.
 3. **Copias de seguridad automáticas** de la base (cron en el VPS).
-4. **Llave de firma de Android** y, si se va a publicar, **cuenta de Google Play**. Ojo: para publicar con el nombre «Ministerio de Salud» hace falta la autorización de la entidad.
+4. **Llave de firma de Android** y, si se va a publicar, **cuenta de Google Play**. La app ya no se presenta como del Ministerio de Salud, así que no hace falta autorización de ninguna entidad.
 
 ## 1 · Pruebas en celulares reales
 
@@ -105,7 +105,7 @@ Todo el código está listo; estos pasos necesitan tus cuentas. El paso a paso e
 | PR de Dependabot de androidx que exige `compileSdk 37` + AGP 9 | Cerrarlo: la parte compatible ya se aplicó; lo demás espera a migrar a AGP 9 |
 | Otras actualizaciones de Dependabot (Retrofit 3, OkHttp 5, Hilt, Compose BOM) | Revisar una a una; Retrofit 3 y OkHttp 5 son cambios mayores |
 | `ADMIN_PASSWORD` en el entorno de Dokploy | Retirarla si sigue definida: producción ya tiene administrador y la variable no se acepta, pero no hace falta tenerla |
-| Archivos del andamiaje inicial (`scaffold.ps1`, `step*.ps1`, `update_step5.ps1`, `design_handoff_login/`) | Se pueden borrar del repositorio: ya no los usa nada |
+| Archivos del andamiaje inicial (`scaffold.ps1`, `step*.ps1`, `update_step5.ps1`) | Se pueden borrar del repositorio: ya no los usa nada. (`design_handoff_login/` ya se borró: era un boceto con la marca del Ministerio) |
 | Pruebas instrumentadas en CI | Exigen un emulador en el runner; hoy solo se compilan |
 
 ---
