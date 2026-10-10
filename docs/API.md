@@ -291,11 +291,15 @@ Para monitoreo externo. `200` si la API responde y la base acepta consultas; `50
 
 ## `GET /municipios/index.php`
 
-Catálogo DIVIPOLA/DANE. Sin autenticación: es información pública y los clientes la necesitan antes de iniciar sesión.
+Catálogo DIVIPOLA/DANE completo: **1.122 municipios en 33 departamentos**, ordenados por código. Sin autenticación: es información pública.
 
 ```json
-[ { "codigo": "18001", "nombre": "Florencia", "departamento": "Caquetá" } ]
+[ { "codigo": "05001", "nombre": "Medellín", "departamento": "Antioquia" }, … ]
 ```
+
+Antes de responder, `asegurarCatalogoMunicipios()` (en `api/esquema.php`) compara la versión guardada en la tabla `ajustes` con la de `api/municipios/catalogo.php`; si difiere, inserta los municipios que falten y corrige nombres y departamentos. Lo mismo se hace al sincronizar (para que un celular con el catálogo nuevo nunca reciba «Municipio no reconocido») y al abrir el panel. Los códigos nunca cambian, así que ninguna persona pierde su municipio.
+
+La PWA y Android **no** usan este endpoint: traen el catálogo dentro de la app (`pwa/data/municipios.json`, `assets/catalogos/`), así que funciona sin señal desde el primer uso. Ver [ARQUITECTURA §5.9](ARQUITECTURA.md#59-catálogos-de-municipios-y-eps).
 
 ---
 

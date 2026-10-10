@@ -125,12 +125,6 @@ export async function descargarCambios(cursor = { sello: 0 }, limite = 200) {
   return data;
 }
 
-export async function fetchMunicipios() {
-  const res = await fetch(`${BASE_URL}/municipios/index.php`);
-  if (!res.ok) throw new Error(`Error HTTP ${res.status}`);
-  return res.json();
-}
-
 export async function syncData(payload) {
   const token = getToken();
   if (!token) throw sinToken();

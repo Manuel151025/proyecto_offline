@@ -13,6 +13,8 @@ import com.minsalud.encuestas.domain.validation.Validaciones
 import com.minsalud.encuestas.domain.usecase.ObtenerMunicipiosUseCase
 import com.minsalud.encuestas.domain.usecase.ObtenerPersonaUseCase
 import com.minsalud.encuestas.domain.usecase.SeedMunicipiosUseCase
+import com.minsalud.encuestas.domain.usecase.ObtenerEpsUseCase
+import com.minsalud.encuestas.domain.catalogo.BuscadorCatalogo
 import com.minsalud.encuestas.worker.SyncWorkerScheduler
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -29,6 +31,7 @@ data class FormularioUiState(
     val isEdit: Boolean = false,
     val errorMessage: String? = null,
     val municipios: List<Municipio> = emptyList(),
+    val catalogoEps: List<Eps> = emptyList(),
 
     // Campos del formulario
     val tipoDocumento: TipoDocumento = TipoDocumento.CC,
@@ -43,7 +46,8 @@ data class FormularioUiState(
     val eps: String = "",
     val ocupacion: String = "",
     val estrato: String = "",
-    val departamento: String? = null,
+    /** Lo que se ve en el campo de municipio: lo escrito, o «Popayán, Cauca» al elegir. */
+    val municipioTexto: String = "",
     val municipioCodigo: String? = null,
 
     // Errores por campo (validación)
@@ -57,7 +61,8 @@ data class FormularioUiState(
     val direccionError: String? = null,
     val veredaError: String? = null,
     val epsError: String? = null,
-    val ocupacionError: String? = null
+    val ocupacionError: String? = null,
+    val municipioError: String? = null
 )
 
 @HiltViewModel
@@ -66,6 +71,7 @@ class FormularioEncuestaViewModel @Inject constructor(
     private val obtenerMunicipiosUseCase: ObtenerMunicipiosUseCase,
     private val obtenerPersonaUseCase: ObtenerPersonaUseCase,
     private val seedMunicipiosUseCase: SeedMunicipiosUseCase,
+    private val obtenerEpsUseCase: ObtenerEpsUseCase,
     private val sessionManager: SessionManager,
     private val dispositivo: DispositivoManager,
     @ApplicationContext private val appContext: Context,
@@ -77,6 +83,7 @@ class FormularioEncuestaViewModel @Inject constructor(
 
     init {
         viewModelScope.launch { seedMunicipiosUseCase() }
+        viewModelScope.launch { _uiState.value = _uiState.value.copy(catalogoEps = obtenerEpsUseCase()) }
         cargarMunicipios()
 
         val tipoArg = savedStateHandle.get<String>("tipo")
@@ -92,11 +99,11 @@ class FormularioEncuestaViewModel @Inject constructor(
                 if (result is Result.Success) {
                     val municipios = result.data
                     val state = _uiState.value
-                    // En edición, preselecciona el departamento a partir del municipio.
-                    val depto = if (state.departamento == null && state.municipioCodigo != null) {
-                        municipios.find { it.codigo == state.municipioCodigo }?.departamento
-                    } else state.departamento
-                    _uiState.value = state.copy(municipios = municipios, departamento = depto)
+                    // En edición, el campo muestra el municipio guardado.
+                    val texto = if (state.municipioTexto.isEmpty() && state.municipioCodigo != null) {
+                        municipios.find { it.codigo == state.municipioCodigo }?.let(BuscadorCatalogo::etiqueta) ?: ""
+                    } else state.municipioTexto
+                    _uiState.value = state.copy(municipios = municipios, municipioTexto = texto)
                 }
             }
         }
@@ -108,7 +115,8 @@ class FormularioEncuestaViewModel @Inject constructor(
             when (val result = obtenerPersonaUseCase(tipoDoc, numero)) {
                 is Result.Success -> {
                     val p = result.data ?: return@launch
-                    val depto = _uiState.value.municipios.find { it.codigo == p.municipioCodigo }?.departamento
+                    val texto = _uiState.value.municipios.find { it.codigo == p.municipioCodigo }
+                        ?.let(BuscadorCatalogo::etiqueta) ?: ""
                     _uiState.value = _uiState.value.copy(
                         isEdit = true,
                         tipoDocumento = p.tipoDocumento,
@@ -124,7 +132,7 @@ class FormularioEncuestaViewModel @Inject constructor(
                         ocupacion = p.ocupacion ?: "",
                         estrato = p.estrato?.toString() ?: "",
                         municipioCodigo = p.municipioCodigo,
-                        departamento = depto
+                        municipioTexto = texto
                     )
                 }
                 is Result.Error -> {
@@ -202,12 +210,23 @@ class FormularioEncuestaViewModel @Inject constructor(
         )
     }
 
-    fun onDepartamentoChanged(departamento: String?) {
-        _uiState.value = _uiState.value.copy(departamento = departamento, municipioCodigo = null)
+    /** Al escribir se pierde la elección: hay que volver a tocar una sugerencia. */
+    fun onMunicipioTextoChanged(texto: String) {
+        _uiState.value = _uiState.value.copy(
+            municipioTexto = texto.take(80), municipioCodigo = null, municipioError = null
+        )
     }
 
-    fun onMunicipioChanged(codigo: String?) {
-        _uiState.value = _uiState.value.copy(municipioCodigo = codigo)
+    fun onMunicipioElegido(municipio: Municipio) {
+        _uiState.value = _uiState.value.copy(
+            municipioTexto = BuscadorCatalogo.etiqueta(municipio),
+            municipioCodigo = municipio.codigo,
+            municipioError = null
+        )
+    }
+
+    fun onEpsElegida(eps: Eps) {
+        _uiState.value = _uiState.value.copy(eps = eps.nombre, epsError = null)
     }
 
     /** Valida y marca errores por campo. Devuelve true si todo es válido. */
@@ -225,7 +244,10 @@ class FormularioEncuestaViewModel @Inject constructor(
             "Estrato debe ser 1–6" else null
         val fechaError = if (!Validaciones.esFechaNacimientoValida(state.fechaNacimiento))
             "No puede ser futura ni anterior a 1900" else null
+        val municipioError = if (state.municipioTexto.isNotBlank() && state.municipioCodigo == null)
+            "Elige el municipio de la lista de sugerencias" else null
         return state.copy(
+            municipioError = municipioError,
             fechaError = fechaError,
             direccionError = Validaciones.errorTexto(state.direccion, Validaciones.TextoLibre.DIRECCION),
             veredaError = Validaciones.errorTexto(state.vereda, Validaciones.TextoLibre.VEREDA),
@@ -247,7 +269,7 @@ class FormularioEncuestaViewModel @Inject constructor(
             validated.docError, validated.nombresError, validated.apellidosError,
             validated.emailError, validated.telefonoError, validated.estratoError,
             validated.fechaError, validated.direccionError, validated.veredaError,
-            validated.epsError, validated.ocupacionError
+            validated.epsError, validated.ocupacionError, validated.municipioError
         ).any { it != null }
         if (hasError) return
 

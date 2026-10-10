@@ -256,3 +256,51 @@ function asegurarRolEncuestador(PDO $pdo): void
 
     $verificado = true;
 }
+
+/**
+ * Completa y corrige la tabla `municipios` con el catálogo DIVIPOLA.
+ *
+ * Producción tenía 162 municipios cargados a mano. El catálogo completo
+ * (1.122) vive en api/municipios/catalogo.php, generado desde
+ * database/catalogos/municipios.json, y lleva una versión. Si la versión
+ * guardada en la tabla `ajustes` no coincide, se insertan los que falten y se
+ * corrigen nombres y departamentos de los que ya estaban. Los códigos no
+ * cambian nunca, así que ninguna persona pierde su municipio.
+ *
+ * Debe llamarse FUERA de transacciones (CREATE TABLE hace commit implícito).
+ */
+function asegurarCatalogoMunicipios(PDO $pdo): void
+{
+    static $verificado = false;
+    if ($verificado) {
+        return;
+    }
+
+    $pdo->exec('CREATE TABLE IF NOT EXISTS ajustes (
+        clave VARCHAR(40) PRIMARY KEY,
+        valor VARCHAR(100) NOT NULL
+    )');
+
+    /** @var array{version: string, municipios: list<array{0: string, 1: string, 2: string}>} $catalogo */
+    $catalogo = require __DIR__ . '/municipios/catalogo.php';
+    $stmt = $pdo->prepare('SELECT valor FROM ajustes WHERE clave = ?');
+    $stmt->execute(['catalogo_municipios']);
+    if ($stmt->fetchColumn() === $catalogo['version']) {
+        $verificado = true;
+        return;
+    }
+
+    // En bloques de 200 filas: una sola sentencia con 1.122 filas funciona,
+    // pero así no depende de max_allowed_packet.
+    foreach (array_chunk($catalogo['municipios'], 200) as $bloque) {
+        $marcas = implode(', ', array_fill(0, count($bloque), '(?, ?, ?)'));
+        $pdo->prepare("INSERT INTO municipios (codigo, nombre, departamento) VALUES $marcas
+                       ON DUPLICATE KEY UPDATE nombre = VALUES(nombre), departamento = VALUES(departamento)")
+            ->execute(array_merge(...$bloque));
+    }
+    $pdo->prepare('INSERT INTO ajustes (clave, valor) VALUES (?, ?) ON DUPLICATE KEY UPDATE valor = VALUES(valor)')
+        ->execute(['catalogo_municipios', $catalogo['version']]);
+
+    error_log('[esquema] catálogo de municipios actualizado a la versión ' . $catalogo['version']);
+    $verificado = true;
+}

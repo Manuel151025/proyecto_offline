@@ -35,13 +35,13 @@ class GuardarRegistroCompletoUseCase(
             val outboxItem = ColaSincronizacion(
                 idCola = 0,
                 idEncuesta = encuesta.id,
-                payload = "", // El payload real podrÃ­a serializarse aquÃ­ o delegarse a la capa Data
+                payload = "", // El payload real podría serializarse aquí o delegarse a la capa Data
                 estado = EstadoSync.PENDING,
                 intentos = 0,
                 ultimoError = null
             )
 
-            // Todo se ejecuta como una Ãºnica transacciÃ³n de negocio
+            // Todo se ejecuta como una única transacción de negocio
             transactionRunner {
                 personaRepository.savePersona(personaToSave)
                 encuestaRepository.saveEncuesta(encuestaToSave)

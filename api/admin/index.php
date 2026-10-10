@@ -27,6 +27,7 @@ require_once __DIR__ . '/../personas/validacion.php';
 require_once __DIR__ . '/consultas.php';
 require_once __DIR__ . '/vista.php';
 $pdo = conectarBD();
+asegurarCatalogoMunicipios($pdo);
 
 /** Longitud mínima al crear o cambiar la contraseña de una cuenta. */
 const MIN_LONGITUD_PASSWORD = 10;

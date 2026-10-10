@@ -108,23 +108,14 @@ export async function markPersonasSynced(keys) {
 
 // --- Municipios ---
 
-export async function getMunicipios() {
-  return openDB().then(db => new Promise((resolve, reject) => {
-    const t = db.transaction('municipios', 'readonly');
-    const req = t.objectStore('municipios').getAll();
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = e => reject(e.target.error);
-  }));
-}
-
-export async function saveMunicipios(list) {
+/** Vacía el almacén de municipios (copia vieja; ver limpiarCatalogoViejo en app.js). */
+export async function borrarMunicipiosGuardados() {
   const db = await openDB();
   return new Promise((resolve, reject) => {
     const t = db.transaction('municipios', 'readwrite');
-    const store = t.objectStore('municipios');
-    list.forEach(m => store.put(m));
-    t.oncomplete = resolve;
-    t.onerror = e => reject(e.target.error);
+    t.objectStore('municipios').clear();
+    t.oncomplete = () => resolve();
+    t.onerror = () => reject(t.error);
   });
 }
 

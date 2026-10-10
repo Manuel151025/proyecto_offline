@@ -3,10 +3,12 @@ require_once __DIR__ . '/../cors.php';
 aplicarCors('GET, OPTIONS');
 
 require_once __DIR__ . '/../db.php';
+require_once __DIR__ . '/../esquema.php';
 $pdo = conectarBD();
 
 try {
-    $stmt = $pdo->query('SELECT codigo, nombre, departamento FROM municipios');
+    asegurarCatalogoMunicipios($pdo);
+    $stmt = $pdo->query('SELECT codigo, nombre, departamento FROM municipios ORDER BY codigo');
     if ($stmt === false) {
         throw new RuntimeException('No se pudo preparar la consulta de municipios');
     }

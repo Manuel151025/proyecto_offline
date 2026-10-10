@@ -569,6 +569,27 @@ flowchart LR
 
 La dirección visual es **«Cálida de territorio»**: azul institucional `#12467E`, fondo cálido `#F6F4EF` y un acento terracota `#B4532A` reservado para la acción de registrar y el día de hoy en los gráficos. La fuente **Figtree** va empaquetada en las tres superficies (`pwa/fonts/`, `res/font/`): no se descarga nada de terceros, así que la app se ve igual sin señal y no se filtra la IP de nadie a Google Fonts.
 
+### 5.9 Catálogos de municipios y EPS
+
+```mermaid
+flowchart LR
+    F[("database/catalogos/<br/>municipios.json · eps.json<br/><i>única fuente</i>")] --> G["node scripts/catalogos.mjs"]
+    G --> P["pwa/data/*.json<br/><i>cacheados por el service worker</i>"]
+    G --> A["assets/catalogos/*.json<br/><i>dentro del APK</i>"]
+    G --> S["api/municipios/catalogo.php"]
+    G --> Q["database/schema.sql<br/><i>bases nuevas</i>"]
+    S --> E["asegurarCatalogoMunicipios()<br/><i>completa y corrige la tabla<br/>cuando cambia la versión</i>"]
+    CI["CI: catalogos.mjs --verificar"] -.-> P & A & S & Q
+
+    style F fill:#B4532A,color:#fff
+```
+
+**El problema que resuelve.** La PWA pedía los municipios a la API una sola vez y los guardaba para siempre; Android sembraba unos 200 escritos a mano solo si la tabla estaba vacía; el servidor tenía 162. Un teléfono podía quedarse con 3 departamentos y tildes dañadas sin forma de corregirlo.
+
+**Ahora.** Una sola fuente con los **1.122 municipios** del DANE (DIVIPOLA) y las **EPS** que operan en Colombia más los regímenes especiales. Cada copia lleva una versión (huella del contenido): la PWA la recibe con cada versión de la app; Android reemplaza su tabla cuando la versión cambia; el servidor completa la suya en la primera petición.
+
+**Búsqueda.** En los dos clientes el municipio y la EPS se eligen escribiendo, no bajando por una lista: «popa» → Popayán, «cauca» → los municipios del Cauca con la capital primero, «cali» → Santiago de Cali. Sin tildes ni mayúsculas. El algoritmo está en `catalogos.js` (PWA) y `BuscadorCatalogo.kt` (Android), con los mismos casos de prueba. Sin escribir nada se ofrecen las 90 ciudades principales (capitales y las más pobladas). La EPS admite texto libre si no está en la lista.
+
 ---
 
 ## 6. Decisiones de arquitectura
@@ -740,7 +761,8 @@ proyecto_offline/
 │   └── e2e/                     # navegador real: panel → app → sin señal → panel
 │
 ├── design/tokens.json           # paleta: única fuente
-├── scripts/                     # tokens.mjs · check-pwa-assets.mjs
+├── database/catalogos/          # municipios (DIVIPOLA) y EPS: única fuente
+├── scripts/                     # tokens.mjs · catalogos.mjs · check-pwa-assets.mjs
 ├── database/
 │   ├── schema.sql               # esquema completo + municipios DANE
 │   └── migrations/              # histórico versionado

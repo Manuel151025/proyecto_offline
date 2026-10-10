@@ -3,8 +3,8 @@ import { render as renderLista } from './screens/lista-personas.js';
 import { render as renderFormulario } from './screens/formulario-encuesta.js';
 import { render as renderSync } from './screens/estado-sincronizacion.js';
 import { render as renderLogin } from './screens/login.js';
-import { getMunicipios, saveMunicipios, getSyncCounts } from './db.js';
-import { fetchMunicipios, logout } from './api.js';
+import { getSyncCounts, borrarMunicipiosGuardados } from './db.js';
+import { logout } from './api.js';
 import { syncNow } from './sync.js';
 import { showToast } from './utils.js';
 import { hasActiveSession, clearSession, getToken, getSession } from './session.js';
@@ -26,13 +26,13 @@ onRoute('/nueva', protect(() => renderFormulario(getRoot(), {})));
 onRoute('/editar/:tipo/:numero', protect(params => renderFormulario(getRoot(), params)));
 onRoute('/sync', protect(() => renderSync(getRoot())));
 
-async function loadMunicipios() {
-  try {
-    const local = await getMunicipios();
-    if (local.length) return;
-    const remote = await fetchMunicipios();
-    await saveMunicipios(remote);
-  } catch (_) {}
+/**
+ * Los municipios ya no se guardan en IndexedDB: vienen en pwa/data/ con la
+ * app. Se borra la copia vieja, que en algunos teléfonos tenía solo 3
+ * departamentos y tildes dañadas, y que nunca se actualizaba.
+ */
+async function limpiarCatalogoViejo() {
+  try { await borrarMunicipiosGuardados(); } catch (_) {}
 }
 
 /**
@@ -182,7 +182,7 @@ async function init() {
   setupLogout();
   setupOnlineSync();
   window.addEventListener('hashchange', updateChrome);
-  await loadMunicipios();
+  limpiarCatalogoViejo();
   initRouter();
   updateChrome();
   autoSync();

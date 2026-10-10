@@ -137,7 +137,7 @@ test('app: el formulario no deja escribir lo que no corresponde y explica los er
   await p.escribir('#eps', '12');
   await p.clic('#btn-guardar');
   await p.esperar(`document.querySelectorAll('.field-error').length >= 3`);
-  const errores = await p.evaluar(`[...document.querySelectorAll('.field-error')].map(e => e.previousElementSibling.id)`);
+  const errores = await p.evaluar(`[...document.querySelectorAll('.field-error')].map(e => e.previousElementSibling.querySelector('input')?.id || e.previousElementSibling.id)`);
   for (const campo of ['numero_documento', 'fecha_nacimiento', 'eps']) assert.ok(errores.includes(campo), campo);
   await p.captura(foto('app-formulario-errores'));
 });
@@ -154,6 +154,22 @@ test('app: sin señal la persona queda guardada; con señal se envía sola', asy
   await p.escribir('#apellidos', PERSONA.apellidos);
   await p.evaluar(`document.querySelector('#fecha_nacimiento').value = '1990-05-12'`);
   await p.escribir('#telefono', '3001234567');
+
+  // Municipio: se escribe parte del nombre, sin tilde, y se elige la sugerencia.
+  await p.escribir('#municipio_buscar', 'popa');
+  await p.esperar(`document.querySelector('#municipio_lista [role=option]')?.textContent.includes('Popayán')`, 10000, 'sugerir Popayán');
+  await p.captura(foto('app-formulario-municipio'));
+  await p.evaluar(`document.querySelector('#municipio_lista [role=option]').dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))`);
+  assert.equal(await p.evaluar(`document.querySelector('#municipio_codigo').value`), '19001');
+  assert.equal(await p.evaluar(`document.querySelector('#municipio_buscar').value`), 'Popayán, Cauca');
+
+  // EPS: igual, desde el catálogo.
+  await p.escribir('#eps', 'asmet');
+  await p.esperar(`document.querySelector('#eps_lista [role=option]')?.textContent.includes('Asmet Salud')`, 10000, 'sugerir Asmet Salud');
+  await p.evaluar(`document.querySelector('#eps_lista [role=option]').dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))`);
+  assert.equal(await p.evaluar(`document.querySelector('#eps').value`), 'Asmet Salud');
+  await p.escribir('#vereda', 'Vereda El Carmen');
+
   await p.clic('#btn-guardar');
 
   await p.esperar(`location.hash === '#/personas' && document.body.innerText.includes(${JSON.stringify(PERSONA.nombres)})`, 30000, 'volver a la lista');
@@ -183,7 +199,9 @@ test('panel: la persona enviada y el celular aparecen', async () => {
   await p.captura(foto('panel-resumen'));
 
   await p.ir(panel('personas'));
-  assert.match(await p.texto(), new RegExp(PERSONA.apellidos));
+  const lista = await p.texto();
+  assert.match(lista, new RegExp(PERSONA.apellidos));
+  assert.match(lista, /Popayán/, 'el municipio llegó con su tilde');
   await p.captura(foto('panel-personas'));
 
   await p.ir(panel('sincronizacion'));

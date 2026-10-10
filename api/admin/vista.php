@@ -261,3 +261,22 @@ function icono(string $nombre, int $tamano = 18): string
          . 'stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" '
          . 'aria-hidden="true" focusable="false">' . (TRAZOS_ICONOS[$nombre] ?? '') . '</svg>';
 }
+
+/**
+ * EPS del catálogo de la app (pwa/data/eps.json, generado por
+ * scripts/catalogos.mjs), para sugerirlas al editar una persona.
+ *
+ * @return list<array{nombre: string, detalle: string}>
+ */
+function catalogoEps(): array
+{
+    $json = @file_get_contents(__DIR__ . '/../../pwa/data/eps.json');
+    $datos = $json === false ? null : json_decode($json, true);
+    $eps = [];
+    foreach ((is_array($datos) && is_array($datos['eps'] ?? null)) ? $datos['eps'] : [] as $e) {
+        if (is_array($e) && is_string($e['nombre'] ?? null)) {
+            $eps[] = ['nombre' => $e['nombre'], 'detalle' => is_string($e['detalle'] ?? null) ? $e['detalle'] : ''];
+        }
+    }
+    return $eps;
+}

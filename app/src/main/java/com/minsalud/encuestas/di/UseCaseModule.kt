@@ -61,6 +61,11 @@ object UseCaseModule {
     ): SeedMunicipiosUseCase = SeedMunicipiosUseCase(municipioRepository)
 
     @Provides
+    fun provideObtenerEpsUseCase(
+        municipioRepository: MunicipioRepository
+    ): ObtenerEpsUseCase = ObtenerEpsUseCase(municipioRepository)
+
+    @Provides
     fun provideLoginUseCase(
         authRepository: AuthRepository
     ): LoginUseCase = LoginUseCase(authRepository)
