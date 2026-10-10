@@ -7,6 +7,8 @@ import com.minsalud.encuestas.data.local.prefs.SessionManager
 import com.minsalud.encuestas.data.remote.api.ApiService
 import com.minsalud.encuestas.data.remote.dto.EncuestadorDto
 import com.minsalud.encuestas.data.remote.dto.LoginResponseDto
+import com.minsalud.encuestas.data.remote.dto.RespuestaSimpleDto
+import com.minsalud.encuestas.data.local.prefs.HashCredencial
 import com.minsalud.encuestas.domain.model.DomainError
 import io.mockk.coEvery
 import io.mockk.mockk
@@ -168,6 +170,54 @@ class AuthRepositoryImplTest {
         val guardada = credenciales.guardadas.getValue("1000000001")
         assertFalse(guardada.hash.contains("Demo2026Salud"))
         assertEquals(64, guardada.hash.length) // 256 bits en hexadecimal
+    }
+
+    @Test
+    fun `pedir el codigo devuelve el mensaje del servidor`() = runTest {
+        coEvery { apiService.pedirCodigoRecuperacion(any()) } returns
+            Response.success(RespuestaSimpleDto(true, "Si tu cuenta tiene un correo registrado, te enviamos un código"))
+
+        val r = repository.pedirCodigoRecuperacion("1077123456")
+
+        assertTrue(r is Result.Success)
+        assertTrue((r as Result.Success).data.contains("código"))
+    }
+
+    @Test
+    fun `un codigo invalido muestra el mensaje del error del servidor`() = runTest {
+        coEvery { apiService.restablecerContrasena(any()) } returns Response.error(
+            400, """{"success":false,"message":"El código no es válido o ya venció. Pide uno nuevo."}"""
+                .toResponseBody("application/json".toMediaTypeOrNull())
+        )
+
+        val r = repository.restablecerContrasena("1077123456", "000000", "ClaveNueva2026")
+
+        assertTrue(r is Result.Error)
+        assertEquals("El código no es válido o ya venció. Pide uno nuevo.", (r as Result.Error).error.message)
+    }
+
+    @Test
+    fun `sin red la recuperacion explica que necesita senal`() = runTest {
+        coEvery { apiService.pedirCodigoRecuperacion(any()) } throws IOException("sin red")
+
+        val r = repository.pedirCodigoRecuperacion("1077123456")
+
+        assertTrue((r as Result.Error).error is DomainError.NetworkError)
+        assertTrue(r.error.message!!.contains("señal"))
+    }
+
+    @Test
+    fun `tras cambiar la contrasena el login sin red acepta la nueva y no la vieja`() = runTest {
+        coEvery { apiService.login(any()) } returns respuestaOk()
+        repository.login("1000000001", "ClaveVieja2026")
+        coEvery { apiService.restablecerContrasena(any()) } returns
+            Response.success(RespuestaSimpleDto(true, "Listo."))
+
+        repository.restablecerContrasena("1000000001", "123456", "ClaveNueva2026")
+
+        val guardada = credenciales.guardadas.getValue("1000000001")
+        assertTrue(HashCredencial.coincide("ClaveNueva2026", guardada))
+        assertFalse(HashCredencial.coincide("ClaveVieja2026", guardada))
     }
 
     @Test

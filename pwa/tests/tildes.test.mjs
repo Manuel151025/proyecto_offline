@@ -12,7 +12,7 @@ import { fileURLToPath } from 'node:url';
  * Android. Esta prueba recorre la app, la API, la PWA y los catálogos.
  */
 const raiz = fileURLToPath(new URL('../../', import.meta.url));
-const CARPETAS = ['app/src/main', 'api', 'pwa/js', 'pwa/css', 'pwa/data', 'pwa/index.html', 'database', 'design'];
+const CARPETAS = ['app/src/main', 'api', 'pwa/js', 'pwa/css', 'pwa/data', 'pwa/index.html', 'pwa/privacidad.html', 'docs/DESPLIEGUE.md', 'database', 'design'];
 const EXTENSIONES = /\.(kt|kts|xml|php|js|mjs|css|html|json|sql)$/;
 // Secuencias que solo produce un UTF-8 leído como Latin-1, y el carácter de reemplazo.
 const DAÑADO = /Ã[\u0080-¿¡-ÿ]|Â[ -¿]|â€|�/;

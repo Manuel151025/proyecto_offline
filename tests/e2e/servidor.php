@@ -24,7 +24,8 @@ if (getenv('PRUEBAS_PUERTO') === false) {
 require_once __DIR__ . '/../php/Entorno.php';
 
 Entorno::preparar();
-echo "LISTO " . Entorno::url('') . PHP_EOL;
+// La ruta del archivo de correos permite leer los códigos que «envía» la API.
+echo 'LISTO ' . Entorno::url('') . ' ' . Entorno::archivoCorreos() . PHP_EOL;
 flush();
 
 while (fgets(STDIN) !== false) {
