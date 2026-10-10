@@ -13,6 +13,17 @@ updates:
     open-pull-requests-limit: 5
     commit-message:
       prefix: "build"
+    # Estas versiones exigen compileSdk 37 y Android Gradle Plugin 9.1. El
+    # proyecto usa SDK 36 y AGP 8.13, y pasar a AGP 9 es una migración (Kotlin
+    # integrado, nuevo DSL), no una actualización: cada PR que las incluía
+    # fallaba en checkDebugAarMetadata. Quitar estas reglas al migrar a AGP 9.
+    ignore:
+      - dependency-name: "androidx.core:core-ktx"
+        versions: [">= 1.18.0"]
+      - dependency-name: "androidx.navigation:*"
+        versions: [">= 2.10.0"]
+      - dependency-name: "androidx.lifecycle:*"
+        versions: [">= 2.11.0"]
     # Agrupadas para no recibir cinco PRs por la misma familia de librerías.
     groups:
       androidx:

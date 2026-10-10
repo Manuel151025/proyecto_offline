@@ -1,6 +1,6 @@
 /* Pantalla de inicio de sesión.
-   Rediseño sobrio: sin degradados ni formas decorativas. La jerarquía la dan
-   el espacio, el peso tipográfico y una sola franja de color institucional. */
+   Dirección "Cálida de territorio": banda azul institucional arriba con la
+   marca, y una hoja clara que sube sobre ella con el formulario. */
 
 @keyframes loginSpin { to { transform: rotate(360deg); } }
 
@@ -18,25 +18,24 @@
 .login-screen {
   height: 100%;
   overflow-y: auto;
-  background: var(--bg);
+  background: linear-gradient(#12467E 0, #12467E 230px, var(--bg) 230px);
   display: flex;
   flex-direction: column;
 }
 
 /* Franja superior: el único uso pleno del color de marca en la pantalla. */
-.login-bar {
-  height: 4px;
-  background: var(--primary);
-  flex-shrink: 0;
+.login-bar { display: none; }
+@media (prefers-color-scheme: dark) {
+  .login-screen { background: linear-gradient(#1A3A5F 0, #1A3A5F 230px, var(--bg) 230px); }
 }
 
 .login-container {
   flex: 1;
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  gap: 24px;
-  padding: 32px 20px 24px;
+  justify-content: flex-start;
+  gap: 22px;
+  padding: 40px 20px 24px;
   max-width: 400px;
   width: 100%;
   margin: 0 auto;
@@ -51,10 +50,10 @@
 }
 
 .login-logo {
-  width: 44px;
-  height: 44px;
-  border-radius: var(--radius-sm);
-  background: var(--primary);
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  background: var(--accent);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -62,16 +61,16 @@
 }
 
 .login-brand {
-  font-size: 1.15rem;
-  font-weight: 700;
-  color: var(--on-surface);
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #ffffff;
   letter-spacing: -0.01em;
   line-height: 1.2;
 }
 
 .login-subtitle {
-  font-size: 0.78rem;
-  color: var(--on-surface-secondary);
+  font-size: 0.85rem;
+  color: #D5E2F1;
   margin-top: 2px;
 }
 
@@ -79,9 +78,9 @@
 .login-card {
   background: var(--surface);
   border: 1px solid var(--divider);
-  border-radius: var(--radius);
-  box-shadow: var(--shadow);
-  padding: 22px 20px;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  padding: 24px 20px;
 }
 
 .login-card-head {
@@ -93,8 +92,8 @@
 }
 
 .login-card-title {
-  font-size: 1rem;
-  font-weight: 600;
+  font-size: 1.3rem;
+  font-weight: 800;
   color: var(--on-surface);
 }
 
@@ -141,20 +140,21 @@
 
 .login-field label {
   display: block;
-  font-size: 0.78rem;
-  font-weight: 600;
-  color: var(--on-surface-secondary);
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--on-surface);
   margin-bottom: 6px;
 }
 
 .login-field input {
   width: 100%;
-  padding: 11px 13px;
-  font-size: 0.95rem;
+  height: 52px;
+  padding: 0 14px;
+  font-size: 1.03rem;
   font-family: inherit;
   color: var(--on-surface);
   background: var(--surface);
-  border: 1px solid var(--border-input);
+  border: 1.5px solid var(--border-input);
   border-radius: var(--radius-sm);
   outline: none;
   transition: border-color 0.15s, box-shadow 0.15s;
@@ -177,10 +177,11 @@
   transform: translateY(-50%);
   background: none;
   border: none;
-  padding: 6px 8px;
-  border-radius: 6px;
-  font-size: 0.78rem;
-  font-weight: 600;
+  min-height: 40px;
+  padding: 0 10px;
+  border-radius: 10px;
+  font-size: 0.85rem;
+  font-weight: 800;
   font-family: inherit;
   color: var(--primary);
   cursor: pointer;
@@ -220,16 +221,17 @@
   background: none;
   border: none;
   padding: 2px;
-  font-size: 0.82rem;
+  min-height: 44px;
+  font-size: 0.9rem;
   font-family: inherit;
-  color: var(--on-surface-secondary);
+  color: var(--on-surface);
   cursor: pointer;
 }
 
 .login-check-box {
-  width: 17px;
-  height: 17px;
-  border-radius: 4px;
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
   border: 1.5px solid var(--border-input);
   background: var(--surface);
   flex-shrink: 0;
@@ -243,8 +245,8 @@
 .login-check.on .login-check-box::after {
   content: '';
   position: absolute;
-  left: 5px; top: 1px;
-  width: 4px; height: 9px;
+  left: 6px; top: 2px;
+  width: 5px; height: 10px;
   border: solid #fff;
   border-width: 0 2px 2px 0;
   transform: rotate(45deg);
@@ -266,19 +268,20 @@
   align-items: center;
   justify-content: center;
   gap: 8px;
-  padding: 12px;
+  min-height: 54px;
+  padding: 0 16px;
   border: none;
-  border-radius: var(--radius-sm);
-  background: var(--primary);
-  color: var(--on-primary);
-  font-size: 0.92rem;
-  font-weight: 600;
+  border-radius: 16px;
+  background: #12467E;
+  color: #ffffff;
+  font-size: 1rem;
+  font-weight: 800;
   font-family: inherit;
   cursor: pointer;
   transition: background 0.15s;
 }
-.login-submit:hover:not(:disabled) { background: var(--primary-hover); }
-.login-submit:active:not(:disabled) { background: var(--primary-dark); }
+.login-submit:hover:not(:disabled),
+.login-submit:active:not(:disabled) { background: #0C325C; }
 .login-submit:disabled { opacity: 0.65; cursor: not-allowed; }
 .login-submit:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
 
@@ -327,9 +330,10 @@
   justify-content: center;
   gap: 8px;
   width: 100%;
-  padding: 10px 14px;
-  font-size: 0.82rem;
-  font-weight: 600;
+  min-height: 48px;
+  padding: 0 14px;
+  font-size: 0.9rem;
+  font-weight: 700;
   color: var(--primary);
   background: var(--surface-alt);
   border: 1px solid var(--divider);
@@ -348,7 +352,8 @@
 
 /* ---- Pie ---- */
 .login-foot {
-  font-size: 0.72rem;
+  font-size: 0.82rem;
+  line-height: 1.45;
   color: var(--on-surface-muted);
   text-align: center;
 }

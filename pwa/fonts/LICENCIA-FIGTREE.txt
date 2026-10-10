@@ -1,0 +1,3 @@
+Figtree — Copyright 2022 The Figtree Project Authors (https://github.com/erikdkennedy/figtree)
+Licencia: SIL Open Font License 1.1 — https://openfontlicense.org
+Se usa también en app/src/main/res/font/ y en el panel (api/admin/admin.css).

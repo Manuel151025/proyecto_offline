@@ -1,4 +1,5 @@
 import { getPersonas, resumenLocal } from '../db.js';
+import { getSession } from '../session.js';
 import { navigate } from '../router.js';
 import { formatDate } from '../utils.js';
 
@@ -20,23 +21,26 @@ const TAMANO_PAGINA = 50;
 const MARGEN_PRECARGA = '300px';
 
 export async function render(container) {
+  const nombre = (getSession()?.nombre || '').split(' ')[0];
+  const hoy = new Date().toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long' });
   container.innerHTML = `
     <div class="screen">
-      <div class="screen-top">
-        <div class="search-bar">
-          <span class="search-icon">&#128269;</span>
-          <input type="search" id="search-input" placeholder="Buscar por nombre o documento..." autocomplete="off" />
-        </div>
-      </div>
       <div class="screen-content" id="area-scroll">
+        <div class="saludo">
+          <h1>${nombre ? `Hola, ${escHtml(nombre)}` : 'Hola'}</h1>
+          <p>${escHtml(hoy.charAt(0).toUpperCase() + hoy.slice(1))}</p>
+        </div>
         <div id="resumen-dia"></div>
-        <div id="persona-list"></div>
+        <div class="lista-titulo">Personas <span id="lista-total"></span></div>
+        <label class="search-label" for="search-input">Buscar persona</label>
+        <div class="search-bar">
+          <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+          <input type="search" id="search-input" placeholder="Nombre o documento" autocomplete="off" />
+        </div>
+        <div id="persona-list" style="margin-top: 10px"></div>
       </div>
-      <button class="fab" id="btn-nueva" title="Registrar nueva persona">&#43;</button>
     </div>
   `;
-
-  document.getElementById('btn-nueva').onclick = () => navigate('/nueva');
 
   // El área de scroll y la lista son elementos distintos a propósito: al
   // filtrar se vacía la lista, y el resumen debe sobrevivir a eso.
@@ -102,30 +106,36 @@ export async function render(container) {
     }
 
     const maximo = Math.max(1, ...r.porDia.map(d => d.total));
-    const barras = r.porDia.map(d => `
-      <div class="mini-col" title="${escHtml(d.dia)}: ${d.total}">
-        <div class="mini-barra" style="height:${d.total ? Math.max(8, Math.round(100 * d.total / maximo)) : 2}%"></div>
-        <span class="mini-eti">${escHtml(d.dia)}</span>
+    const ultimo = r.porDia.length - 1;
+    const semanaTotal = r.porDia.reduce((s, d) => s + d.total, 0);
+    const barras = r.porDia.map((d, i) => `
+      <div class="mini-col ${i === ultimo ? 'hoy' : ''}" title="${escHtml(d.dia)}: ${d.total}">
+        <div class="mini-barra" style="height:${d.total ? Math.max(6, Math.round(64 * d.total / maximo)) : 3}px"></div>
+        <span class="mini-eti">${i === ultimo ? 'hoy' : escHtml(d.semana)}</span>
       </div>`).join('');
 
+    const total = document.getElementById('lista-total');
+    if (total) total.textContent = `${r.total}`;
+
     caja.innerHTML = `
-      <div class="resumen">
-        <div class="resumen-cifras">
-          <div class="resumen-dato">
-            <span class="resumen-n">${r.hoy}</span>
-            <span class="resumen-t">Hoy</span>
-          </div>
-          <div class="resumen-dato">
-            <span class="resumen-n">${r.total}</span>
-            <span class="resumen-t">En total</span>
-          </div>
-          <div class="resumen-dato ${r.pendientes ? 'pendiente' : ''}">
-            <span class="resumen-n">${r.pendientes}</span>
-            <span class="resumen-t">Sin enviar</span>
-          </div>
+      <section class="hero">
+        <svg class="hero-curvas" viewBox="0 0 220 120" aria-hidden="true" fill="none" stroke="#E7A07B" stroke-width="1.6" opacity="0.55"><path d="M0 110 C40 70 70 90 100 60 S160 30 220 50"/><path d="M10 120 C50 85 80 104 112 76 S170 50 220 66"/><path d="M24 128 C62 100 92 118 124 92 S180 70 220 82"/></svg>
+        <div class="hero-principal">
+          <span class="hero-n">${r.hoy}</span>
+          <span>${r.hoy === 1 ? 'persona registrada hoy' : 'personas registradas hoy'}</span>
         </div>
-        <div class="resumen-grafico" aria-label="Registros de los últimos 7 días">${barras}</div>
-      </div>
+        <div class="hero-datos">
+          <div class="hero-dato ${r.pendientes ? 'pendiente' : ''}"><b>${r.pendientes}</b><span>sin enviar</span></div>
+          <div class="hero-dato"><b>${r.total}</b><span>en total</span></div>
+        </div>
+        <p class="hero-nota">${r.pendientes
+          ? 'Todo queda guardado en el teléfono. Se enviará solo cuando haya señal.'
+          : 'Todo lo registrado ya llegó al servidor.'}</p>
+      </section>
+      <section class="semana" aria-label="Registros de los últimos 7 días">
+        <div class="semana-cabecera"><h2>Esta semana</h2><span>${semanaTotal} registros</span></div>
+        <div class="resumen-grafico">${barras}</div>
+      </section>
     `;
   }
 
@@ -147,9 +157,9 @@ export async function render(container) {
     if (!lista.length) {
       contenedor.innerHTML = `
         <div class="empty-state">
-          <div class="empty-icon">&#128100;</div>
-          <p class="empty-title">Sin personas registradas</p>
-          <p class="empty-sub">Toca el botón &#43; para agregar la primera persona</p>
+          <svg class="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" aria-hidden="true"><circle cx="9" cy="8" r="4"/><path d="M2 21v-1a6 6 0 0 1 6-6h2a6 6 0 0 1 6 6v1M19 8v6M16 11h6"/></svg>
+          <p class="empty-title">Todavía no hay personas</p>
+          <p class="empty-sub">Toca el botón naranja de abajo para registrar la primera.</p>
         </div>
       `;
       return;
@@ -186,7 +196,11 @@ export async function render(container) {
 function tarjeta(p) {
   const pendiente = p._pendingSync;
   const clase = pendiente ? 'badge-warning' : 'badge-success';
-  const texto = pendiente ? 'Pendiente' : 'Sincronizado';
+  // El estado lleva icono y palabra: el color nunca es la única señal.
+  const icono = pendiente
+    ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>'
+    : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7"/></svg>';
+  const texto = pendiente ? 'Pendiente' : 'Enviada';
   const iniciales = ((p.nombres || '')[0] || '') + ((p.apellidos || '')[0] || '');
   return `
     <div class="card persona-card"
@@ -200,7 +214,7 @@ function tarjeta(p) {
         ${p.fecha_nacimiento ? `<div class="persona-meta">Nac: ${formatDate(p.fecha_nacimiento)}</div>` : ''}
       </div>
       <div class="persona-status">
-        <span class="badge ${clase}">${texto}</span>
+        <span class="badge ${clase}">${icono}${texto}</span>
       </div>
     </div>
   `;

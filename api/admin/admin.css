@@ -1,41 +1,51 @@
 /* Panel de administración.
-   Misma identidad que la PWA (pwa/css/base.css): un solo azul institucional,
-   bordes finos en vez de sombras marcadas, sin degradados y con la fuente del
-   sistema. La versión anterior cargaba Inter desde Google Fonts, lo que
-   filtraba la IP de cada administrador a un tercero en una página con datos
-   de salud. */
+   Misma identidad que la PWA (pwa/css/base.css), dirección "Cálida de
+   territorio": azul institucional, fondo cálido, esquinas generosas y Figtree.
+   La fuente se sirve desde el propio servidor (la de la PWA): cargarla de
+   Google Fonts filtraría la IP de cada administrador a un tercero en una
+   página con datos de salud. */
+
+@font-face {
+  font-family: 'Figtree';
+  src: url('../../pwa/fonts/figtree-latin.woff2') format('woff2');
+  font-weight: 400 800;
+  font-style: normal;
+  font-display: swap;
+}
 
 :root {
   --primary: #12467E;
   --primary-dark: #0C325C;
   --primary-hover: #16599E;
-  --primary-tint: #EEF3F9;
+  --primary-tint: #E8EFF7;
   --primary-soft: #D3DFEE;
+  --acento: #B4532A;
+  --acento-tinte: #F8E9E1;
 
   --surface: #FFFFFF;
-  --surface-alt: #F7F9FC;
-  --bg: #F2F5F9;
-  --texto: #16202C;
-  --texto-2: #5B6878;
-  --texto-3: #8695A8;
-  --divisor: #DCE3EC;
-  --borde: #C3CDDA;
+  --surface-alt: #FBFAF7;
+  --bg: #F6F4EF;
+  --texto: #1C2430;
+  --texto-2: #5A6370;
+  --texto-3: #858B94;
+  --divisor: #E4E0D8;
+  --borde: #D8D3C9;
 
   --error: #B3261E;
-  --error-bg: #FCEEEE;
-  --error-borde: #F0D2D0;
-  --advertencia: #8A4F00;
-  --advertencia-bg: #FDF3E4;
-  --advertencia-borde: #EFD9B4;
-  --ok: #1B7A4B;
-  --ok-bg: #E8F5EE;
+  --error-bg: #FBEAE8;
+  --error-borde: #F1C9C4;
+  --advertencia: #6E4100;
+  --advertencia-bg: #FBF0DC;
+  --advertencia-borde: #EED6A8;
+  --ok: #1E6B44;
+  --ok-bg: #E5F3EB;
   --ok-borde: #BFE3D0;
 
-  --radio: 10px;
-  --radio-sm: 8px;
+  --radio: 16px;
+  --radio-sm: 11px;
   --sombra: 0 1px 2px rgba(22, 32, 44, 0.05), 0 1px 3px rgba(22, 32, 44, 0.06);
   --anillo: 0 0 0 3px rgba(18, 70, 126, 0.18);
-  --fuente: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --fuente: 'Figtree', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
 
   color-scheme: light;
 }
@@ -73,12 +83,12 @@ ul, ol { list-style: none; }
   align-items: center;
   justify-content: center;
   gap: 8px;
-  min-height: 38px;
+  min-height: 42px;
   padding: 0 14px;
   border: 1px solid transparent;
   border-radius: var(--radio-sm);
   font-size: 0.875rem;
-  font-weight: 600;
+  font-weight: 700;
   line-height: 1;
   text-decoration: none;
   white-space: nowrap;
@@ -202,11 +212,11 @@ ul, ol { list-style: none; }
 
 .marca { display: flex; align-items: center; gap: 12px; min-width: 0; }
 .marca img { width: 38px; height: 38px; flex-shrink: 0; }
-.marca-nombre { font-size: 1rem; font-weight: 700; line-height: 1.2; color: var(--texto); }
+.marca-nombre { font-size: 1.05rem; font-weight: 800; line-height: 1.2; color: var(--texto); }
 .marca-sub { font-size: 0.75rem; color: var(--texto-2); line-height: 1.3; }
 
 .acceso-tarjeta { padding: 24px 22px; display: flex; flex-direction: column; gap: 16px; }
-.acceso-tarjeta h1 { font-size: 1.125rem; font-weight: 700; }
+.acceso-tarjeta h1 { font-size: 1.3rem; font-weight: 800; }
 .acceso-tarjeta .titulo p { font-size: 0.85rem; color: var(--texto-2); margin-top: 2px; }
 .acceso-tarjeta form .btn { margin-top: 20px; }
 
@@ -271,7 +281,7 @@ ul, ol { list-style: none; }
   gap: 12px 24px;
   margin-bottom: 24px;
 }
-.encabezado h1 { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.01em; line-height: 1.2; }
+.encabezado h1 { font-size: 1.6rem; font-weight: 800; letter-spacing: -0.02em; line-height: 1.2; }
 .encabezado p { font-size: 0.9rem; color: var(--texto-2); margin-top: 4px; }
 .encabezado-acciones { display: flex; flex-wrap: wrap; gap: 8px; }
 
@@ -463,7 +473,7 @@ ul, ol { list-style: none; }
   border-bottom: 1px solid var(--divisor);
 }
 
-.pestanas { display: inline-flex; gap: 2px; padding: 3px; background: var(--surface-alt); border: 1px solid var(--divisor); border-radius: 9px; }
+.pestanas { display: inline-flex; gap: 2px; padding: 3px; background: var(--surface-alt); border: 1px solid var(--divisor); border-radius: 12px; }
 .pestanas a {
   display: inline-flex; align-items: center; gap: 6px;
   padding: 5px 12px;

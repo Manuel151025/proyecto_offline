@@ -1,46 +1,49 @@
-/* Pantalla de estado de sincronización.
-   Extraído de styles.css; el orden de carga en index.html preserva la cascada. */
+/* Pantalla de envío de datos (sincronización). */
 
-/* ---- Sync screen ---- */
-.sync-screen { display: flex; flex-direction: column; gap: 16px; padding-top: 16px; padding-bottom: 32px; }
+.sync-screen { display: flex; flex-direction: column; gap: 14px; padding-top: 4px; padding-bottom: 32px; }
+
+.sync-titulo { font-size: 1.6rem; font-weight: 800; letter-spacing: -0.02em; }
 
 .sync-status-card {
-  background: var(--surface);
-  border-radius: var(--radius);
-  padding: 16px;
-  box-shadow: var(--shadow);
-  border: 1px solid var(--divider);
+  background: #12467E;
+  color: #ffffff;
+  border-radius: var(--radius-lg);
+  padding: 18px;
 }
-.sync-connection { display: flex; align-items: center; gap: 10px; font-size: 0.9rem; font-weight: 500; }
-.connection-dot { width: 12px; height: 12px; border-radius: 50%; background: #ccc; flex-shrink: 0; transition: background 0.3s; }
-.connection-dot.online { background: #4CAF50; box-shadow: 0 0 0 3px rgba(76,175,80,0.2); }
-.connection-dot.offline { background: #F44336; box-shadow: 0 0 0 3px rgba(244,67,54,0.2); }
+@media (prefers-color-scheme: dark) {
+  .sync-status-card { background: #1A3A5F; border: 1px solid #2A4E78; }
+}
+.sync-connection { display: flex; align-items: center; gap: 10px; font-size: 1rem; font-weight: 700; }
+.connection-dot { width: 12px; height: 12px; border-radius: 50%; background: #B9CCE3; flex-shrink: 0; }
+.connection-dot.online { background: #7FD3A5; box-shadow: 0 0 0 4px rgba(127,211,165,0.25); }
+.connection-dot.offline { background: #F6C77A; box-shadow: 0 0 0 4px rgba(246,199,122,0.25); }
 
-.sync-counts { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+.sync-counts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .count-card {
-  flex: 1;
   background: var(--surface);
   border-radius: var(--radius);
-  padding: 16px 10px;
-  text-align: center;
-  box-shadow: var(--shadow);
+  padding: 12px 14px;
   border: 1px solid var(--divider);
 }
-.count-number { font-size: 2rem; font-weight: 700; line-height: 1; }
-.count-label { font-size: 0.7rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-top: 4px; color: var(--on-surface-secondary); }
+.count-number { font-size: 1.7rem; font-weight: 800; line-height: 1.1; }
+.count-label { font-size: 0.88rem; font-weight: 600; margin-top: 2px; color: var(--on-surface-secondary); }
 .count-pending .count-number { color: var(--warning); }
 .count-sent .count-number { color: var(--success); }
-.count-error .count-number { color: var(--error); }
+.count-error .count-number { color: var(--on-surface); }
 
-.btn-sync { font-size: 1rem; padding: 14px; }
+.btn-sync { width: 100%; }
 
 .sync-history-title {
-  font-size: 0.75rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.8px;
-  color: var(--on-surface-secondary);
-  margin-top: 4px;
+  font-size: 1rem;
+  font-weight: 800;
+  margin-top: 6px;
+}
+
+#sync-history {
+  background: var(--surface);
+  border: 1px solid var(--divider);
+  border-radius: var(--radius);
+  padding: 0 14px;
 }
 
 .sync-item {
@@ -53,24 +56,30 @@
 }
 .sync-item:last-child { border-bottom: none; }
 .sync-item-info { min-width: 0; }
-.sync-item-name { font-size: 0.9rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.sync-item-meta { font-size: 0.75rem; color: var(--on-surface-secondary); margin-top: 2px; }
-
+.sync-item-name { font-size: 0.98rem; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sync-item-meta { font-size: 0.82rem; color: var(--on-surface-secondary); margin-top: 2px; }
 
 /* ---- Rechazados ----
    Terminales: el servidor no los acepta y no se reintentan. Se muestran con
    su motivo y un acceso directo para corregir la persona. */
+.count-rechazado { border-color: var(--error-border); }
 .count-rechazado .count-number { color: var(--error); }
 .sync-item-motivo {
   margin-top: 4px;
-  font-size: 0.78rem;
+  font-size: 0.85rem;
   color: var(--error);
   line-height: 1.35;
 }
 .sync-item-corregir {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  min-height: 40px;
   margin-top: 6px;
-  font-size: 0.8rem;
-  font-weight: 600;
+  padding: 0 14px;
+  border: 1.5px solid var(--primary);
+  border-radius: 12px;
+  font-size: 0.88rem;
+  font-weight: 800;
   color: var(--primary);
+  text-decoration: none;
 }

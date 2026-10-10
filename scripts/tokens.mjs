@@ -23,6 +23,7 @@ const CSS = {
   'pwa/css/base.css': {
     'primary': 'primario', 'primary-dark': 'primario-oscuro', 'primary-hover': 'primario-hover',
     'primary-tint': 'primario-tinte', 'primary-light': 'primario-claro',
+    'accent': 'acento', 'accent-tint': 'acento-tinte',
     'surface': 'superficie', 'surface-alt': 'superficie-alt', 'bg': 'fondo',
     'on-surface': 'texto', 'on-surface-secondary': 'texto-2', 'on-surface-muted': 'texto-3',
     'divider': 'divisor', 'border-input': 'borde',
@@ -32,6 +33,7 @@ const CSS = {
   'api/admin/admin.css': {
     'primary': 'primario', 'primary-dark': 'primario-oscuro', 'primary-hover': 'primario-hover',
     'primary-tint': 'primario-tinte', 'primary-soft': 'primario-suave',
+    'acento': 'acento', 'acento-tinte': 'acento-tinte',
     'surface': 'superficie', 'surface-alt': 'superficie-alt', 'bg': 'fondo',
     'texto': 'texto', 'texto-2': 'texto-2', 'texto-3': 'texto-3', 'divisor': 'divisor', 'borde': 'borde',
     'error': 'error', 'error-bg': 'error-fondo', 'error-borde': 'error-borde',
@@ -44,6 +46,7 @@ const CSS = {
 const KOTLIN = {
   'app/src/main/java/com/minsalud/encuestas/presentation/theme/Theme.kt': {
     'BrandPrimary': 'primario', 'BrandPrimaryDark': 'primario-oscuro', 'BrandPrimaryTint': 'primario-tinte',
+    'BrandAccent': 'acento', 'BrandAccentTint': 'acento-tinte',
     'StatusSuccess': 'exito', 'StatusSuccessBg': 'exito-fondo', 'StatusWarning': 'advertencia',
     'StatusWarningBg': 'advertencia-fondo', 'Fondo': 'fondo', 'Superficie': 'superficie',
     'SuperficieAlt': 'superficie-alt', 'TextoPrincipal': 'texto', 'TextoSecundario': 'texto-2',

@@ -7,7 +7,7 @@ import { getMunicipios, saveMunicipios, getSyncCounts } from './db.js';
 import { fetchMunicipios, logout } from './api.js';
 import { syncNow } from './sync.js';
 import { showToast } from './utils.js';
-import { hasActiveSession, clearSession, getToken } from './session.js';
+import { hasActiveSession, clearSession, getToken, getSession } from './session.js';
 
 const appRoot = document.getElementById('app-root');
 
@@ -172,6 +172,8 @@ function updateChrome() {
   document.querySelector('.app-header')?.classList.toggle('chrome-hidden', isLogin);
   document.querySelector('.bottom-nav')?.classList.toggle('chrome-hidden', isLogin);
   if (isLogin) ocultarAvisoSesion();
+  const subtitulo = document.getElementById('app-subtitle');
+  if (subtitulo) subtitulo.textContent = getSession()?.nombre || 'Ministerio de Salud';
 }
 
 async function init() {
