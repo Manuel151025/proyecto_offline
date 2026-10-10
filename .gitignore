@@ -49,3 +49,8 @@ scaffold.ps1
 
 # Caché de PHPUnit
 .phpunit.cache/
+
+# Llaves de firma de Android: nunca al repositorio.
+*.jks
+*.keystore
+keystore.properties

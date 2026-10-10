@@ -5,6 +5,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.*
@@ -27,7 +29,8 @@ import com.minsalud.encuestas.presentation.viewmodel.LoginViewModel
 @Composable
 fun LoginScreen(
     viewModel: LoginViewModel,
-    onLoginSuccess: () -> Unit
+    onLoginSuccess: () -> Unit,
+    onOlvidaste: (documento: String) -> Unit = {}
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
@@ -78,6 +81,7 @@ fun LoginScreen(
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
                     .padding(24.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
@@ -143,7 +147,12 @@ fun LoginScreen(
                     }
                 }
 
-                Spacer(Modifier.height(4.dp))
+                TextButton(
+                    onClick = { onOlvidaste(uiState.documento) },
+                    modifier = Modifier.align(Alignment.CenterHorizontally)
+                ) {
+                    Text("¿Olvidaste tu contraseña?", fontWeight = FontWeight.Bold)
+                }
 
                 Surface(
                     color = MaterialTheme.colorScheme.surfaceVariant,

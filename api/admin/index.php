@@ -29,8 +29,8 @@ require_once __DIR__ . '/vista.php';
 $pdo = conectarBD();
 asegurarCatalogoMunicipios($pdo);
 
-/** Longitud mínima al crear o cambiar la contraseña de una cuenta. */
-const MIN_LONGITUD_PASSWORD = 10;
+require_once __DIR__ . '/../politica.php';
+require_once __DIR__ . '/../correo.php';
 
 /** Tiempo sin actividad tras el que la sesión del panel caduca. */
 const INACTIVIDAD_MAXIMA_SEGUNDOS = 3600;
@@ -423,6 +423,26 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             error_log('[admin] editar persona: ' . $e->getMessage());
             $errorPersona = 'No se pudo guardar. Intenta de nuevo.';
         }
+    } elseif ($action === 'probar_correo') {
+        // Comprueba la configuración SMTP enviándole un correo al propio administrador.
+        $yo = isset($_SESSION['admin_id']) ? buscarCuentaPorId($pdo, (int)$_SESSION['admin_id']) : null;
+        $destino = (string)($yo['email'] ?? '');
+        if (!correoConfigurado()) {
+            avisar('error', 'El correo no está configurado: faltan las variables SMTP_HOST, SMTP_USUARIO y SMTP_CLAVE. '
+                          . 'La guía está en docs/DESPLIEGUE.md.');
+        } elseif ($destino === '') {
+            avisar('error', 'Tu cuenta no tiene correo. Agrégalo en tu cuenta (más abajo) y vuelve a probar.');
+        } else {
+            $texto = "Este es un correo de prueba del panel de ColOffline.\r\n\r\nSi lo recibes, la recuperación de contraseña por correo funciona.";
+            $html = '<p style="font-family:Arial,sans-serif;font-size:15px">Este es un correo de prueba del panel de <strong>ColOffline</strong>.</p>'
+                  . '<p style="font-family:Arial,sans-serif;font-size:15px">Si lo recibes, la recuperación de contraseña por correo funciona.</p>';
+            $ok = enviarCorreo($destino, 'Prueba de correo de ColOffline', $texto, $html);
+            auditar($pdo, 'probar_correo', 'panel', ['enviado' => $ok]);
+            avisar($ok ? 'ok' : 'error', $ok
+                ? "Correo de prueba enviado a $destino. Revisa la bandeja de entrada (y la de spam)."
+                : 'No se pudo enviar el correo. Revisa SMTP_USUARIO y SMTP_CLAVE (la contraseña de aplicación de Google) y que el servidor pueda salir por el puerto ' . (getenv('SMTP_PUERTO') ?: '465') . '.');
+        }
+        redirigir(urlPanel(['seccion' => 'cuentas']));
     } elseif ($action === 'cerrar_sesiones' || $action === 'desbloquear_cuenta') {
         $id = textoPost('id');
         $cuenta = ctype_digit($id) ? buscarCuentaPorId($pdo, (int)$id) : null;
@@ -449,12 +469,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $password = is_string($_POST['password'] ?? null) ? $_POST['password'] : '';
         $activo = isset($_POST['activo']) ? 1 : 0;
         $rol = textoPost('rol') === 'admin' ? 'admin' : 'encuestador';
+        // Correo para «¿Olvidaste tu contraseña?». Opcional.
+        $email = mb_strtolower(textoPost('email'));
         // Municipios que descargará esta cuenta. Ninguno = todos.
         $municipiosSel = array_values(array_unique(array_filter(
             array_map(fn ($c) => is_string($c) ? trim($c) : '', is_array($_POST['municipios'] ?? null) ? $_POST['municipios'] : []),
             fn ($c) => $c !== ''
         )));
-        $formCuenta = ['id' => $id, 'nombre' => $nombre, 'numero_documento' => $documento, 'rol' => $rol, 'activo' => $activo, 'municipios' => $municipiosSel];
+        $formCuenta = ['id' => $id, 'nombre' => $nombre, 'numero_documento' => $documento, 'email' => $email, 'rol' => $rol, 'activo' => $activo, 'municipios' => $municipiosSel];
         $codigosValidos = array_flip(array_map('strval', array_column(listarMunicipios($pdo), 'codigo')));
 
         $cuentaActual = ($id !== '' && ctype_digit($id)) ? buscarCuentaPorId($pdo, (int)$id) : null;
@@ -472,6 +494,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         } elseif (!preg_match(PATRON_DOCUMENTO_CUENTA, $documento)) {
             $errorCuenta = 'El documento solo admite letras, dígitos y guiones, hasta 20 caracteres, '
                          . 'sin puntos ni espacios. Con otro formato la app no dejaría entrar.';
+        } elseif ($email !== '' && (mb_strlen($email) > 100 || filter_var($email, FILTER_VALIDATE_EMAIL) === false)) {
+            $errorCuenta = 'El correo no es válido. Revísalo o déjalo vacío.';
         } elseif (array_diff($municipiosSel, array_keys($codigosValidos)) !== []) {
             $errorCuenta = 'Hay municipios que no existen en la lista.';
         } elseif ($id === '' && $password === '') {
@@ -519,10 +543,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
                 $idGuardado = $cuentaActual === null ? (int)$pdo->lastInsertId() : (int)$id;
                 guardarMunicipiosAsignados($pdo, $idGuardado, $municipiosSel);
+                asegurarRecuperacion($pdo);
+                $pdo->prepare('UPDATE encuestadores SET email = ? WHERE id = ?')
+                    ->execute([$email !== '' ? $email : null, $idGuardado]);
 
                 // Nunca la contraseña: solo si cambió.
                 auditar($pdo, $cuentaActual === null ? 'crear_cuenta' : 'editar_cuenta', "cuenta:$documento", [
                     'nombre' => $nombre, 'rol' => $rol, 'activo' => $activo, 'cambio_contrasena' => $nuevoHash !== null,
+                    'con_correo' => $email !== '',
                     'municipios' => count($municipiosSel),
                     'antes' => $cuentaActual === null ? null : [
                         'nombre' => $cuentaActual['nombre'], 'rol' => $cuentaActual['rol'], 'activo' => (int)$cuentaActual['activo'],
@@ -615,6 +643,7 @@ if ($loggedIn && $formCuenta === null && $editarId !== '') {
             'id'               => (string)$cuentaEditada['id'],
             'nombre'           => (string)$cuentaEditada['nombre'],
             'numero_documento' => (string)($cuentaEditada['numero_documento'] ?? ''),
+            'email'            => (string)($cuentaEditada['email'] ?? ''),
             'rol'              => (string)$cuentaEditada['rol'],
             'activo'           => (int)$cuentaEditada['activo'],
             'municipios'       => municipiosAsignados($pdo, (int)$cuentaEditada['id']),
@@ -625,7 +654,7 @@ if ($errorCuenta !== null) {
     $seccion = 'cuentas';
 }
 // En modo arranque lo único que tiene sentido crear es el primer administrador.
-$formCuenta ??= ['id' => '', 'nombre' => '', 'numero_documento' => '', 'rol' => $modoArranque ? 'admin' : 'encuestador', 'activo' => 1, 'municipios' => []];
+$formCuenta ??= ['id' => '', 'nombre' => '', 'numero_documento' => '', 'email' => '', 'rol' => $modoArranque ? 'admin' : 'encuestador', 'activo' => 1, 'municipios' => []];
 $editando = $formCuenta['id'] !== '';
 
 $resumen = ['personas' => 0, 'borradas' => 0, 'encuestas' => 0, 'encuestadores' => 0, 'cuentas' => 0, 'dispositivos' => 0, 'ultima_sync' => null];
@@ -804,7 +833,7 @@ if ($aviso !== null) {
         <li><?= icono('cuentas', 20) ?><span>Cuentas, roles y municipios de cada encuestador.</span></li>
       </ul>
     </div>
-    <p class="acceso-pie">Acceso restringido a administradores. Cada acción queda en la auditoría.</p>
+    <p class="acceso-pie">Acceso restringido a administradores. Cada acción queda en la auditoría. · <a href="../../pwa/privacidad.html">Privacidad</a></p>
   </section>
 
   <section class="acceso-lado">
@@ -847,6 +876,9 @@ if ($aviso !== null) {
 
       <button class="btn btn-primario btn-bloque btn-grande" type="submit">Ingresar</button>
     </form>
+    <?php if (!$modoArranque): ?>
+      <a class="acceso-olvido" href="../../pwa/index.html#/recuperar">¿Olvidaste tu contraseña?</a>
+    <?php endif; ?>
   </div>
 
   <a class="acceso-volver" href="../../pwa/"><?= icono('volver', 16) ?>Volver a la app de encuestas</a>

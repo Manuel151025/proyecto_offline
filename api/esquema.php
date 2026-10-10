@@ -360,3 +360,43 @@ function retirarCodigosInexistentes(PDO $pdo, array $catalogo): void
         }
     }
 }
+
+/**
+ * Correo de cada cuenta (opcional) y códigos para recuperar la contraseña.
+ *
+ * - `encuestadores.email`: a dónde se envía el código. Opcional: muchos
+ *   encuestadores de campo no tienen correo; para ellos el administrador
+ *   cambia la contraseña desde el panel.
+ * - `recuperaciones`: un renglón por código pedido. Se guarda solo el hash del
+ *   código, vence a los 15 minutos, admite 5 intentos y sirve una sola vez.
+ */
+function asegurarRecuperacion(PDO $pdo): void
+{
+    static $verificado = false;
+    if ($verificado) {
+        return;
+    }
+
+    $stmt = $pdo->prepare(
+        'SELECT COUNT(*) FROM information_schema.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND COLUMN_NAME = ?'
+    );
+    $stmt->execute(['encuestadores', 'email']);
+    if ((int)$stmt->fetchColumn() === 0) {
+        $pdo->exec('ALTER TABLE encuestadores ADD COLUMN email VARCHAR(100) NULL');
+        error_log('[esquema] columna encuestadores.email creada automáticamente');
+    }
+
+    $pdo->exec('CREATE TABLE IF NOT EXISTS recuperaciones (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        id_encuestador INT NOT NULL,
+        codigo_hash VARCHAR(255) NOT NULL,
+        creado_en BIGINT NOT NULL,
+        expira_en BIGINT NOT NULL,
+        intentos INT NOT NULL DEFAULT 0,
+        usado TINYINT(1) NOT NULL DEFAULT 0,
+        INDEX idx_recuperaciones_cuenta (id_encuestador, creado_en)
+    )');
+
+    $verificado = true;
+}

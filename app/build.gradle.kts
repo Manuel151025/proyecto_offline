@@ -30,8 +30,10 @@ android {
         applicationId = "com.minsalud.encuestas"
         minSdk = 24
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        // Subir versionCode en CADA versión que se publique en Google Play;
+        // Play rechaza un número repetido. versionName es lo que ve la gente.
+        versionCode = 2
+        versionName = "1.1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -39,10 +41,26 @@ android {
         }
     }
 
+    // Firma de la versión para publicar. La llave NUNCA va en el repositorio:
+    // se lee de ~/.gradle/gradle.properties o de variables de entorno (CI).
+    // Cómo crearla y dónde ponerla: docs/DESPLIEGUE.md, sección Android.
+    val llave = providers.gradleProperty("COLOFFLINE_KEYSTORE").orElse(providers.environmentVariable("COLOFFLINE_KEYSTORE")).orNull
+    if (llave != null) {
+        signingConfigs {
+            create("release") {
+                storeFile = file(llave)
+                storePassword = providers.gradleProperty("COLOFFLINE_KEYSTORE_CLAVE").orElse(providers.environmentVariable("COLOFFLINE_KEYSTORE_CLAVE")).orNull
+                keyAlias = providers.gradleProperty("COLOFFLINE_ALIAS").orElse(providers.environmentVariable("COLOFFLINE_ALIAS")).getOrElse("coloffline")
+                keyPassword = providers.gradleProperty("COLOFFLINE_ALIAS_CLAVE").orElse(providers.environmentVariable("COLOFFLINE_ALIAS_CLAVE")).orNull
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            if (llave != null) signingConfig = signingConfigs.getByName("release")
         }
         debug {
             // Sin esto no se produce el archivo .exec y la tarea de cobertura

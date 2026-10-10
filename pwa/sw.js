@@ -1,5 +1,6 @@
 // Subir esta versión en cada cambio de JS/CSS: el fetch es cache-first, así que
 // sin bump los navegadores seguirían sirviendo los archivos viejos.
+// v22: «¿Olvidaste tu contraseña?» con código por correo.
 // v21: catálogo completo de municipios (1.122) y EPS, con buscador en el formulario.
 // v20: login del panel, plural en la semana y pruebas de punta a punta.
 // v19: validación estricta por campo y filtro de lo que se escribe en el formulario.
@@ -18,7 +19,7 @@
 // v7: .hidden pasa a !important (el spinner del login se veía siempre).
 // v6: styles.css se dividió en 7 hojas por responsabilidad.
 // v5: api.js y session.js ahora envían el token de autenticación en la sincronización.
-const CACHE = 'encuestas-v21';
+const CACHE = 'encuestas-v22';
 
 const ASSETS = [
   './index.html',
@@ -47,7 +48,8 @@ const ASSETS = [
   './js/screens/lista-personas.js',
   './js/screens/formulario-encuesta.js',
   './js/screens/estado-sincronizacion.js',
-  './js/screens/login.js'
+  './js/screens/login.js',
+  './js/screens/recuperar.js'
 ];
 
 self.addEventListener('install', e => {

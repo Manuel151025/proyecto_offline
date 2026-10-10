@@ -53,6 +53,43 @@ function sinToken() {
   );
 }
 
+/**
+ * POST JSON a la API con tiempo límite. Devuelve la respuesta ya leída o
+ * lanza un Error con el mensaje del servidor, listo para mostrar.
+ */
+async function postJson(ruta, cuerpo, mensajePorDefecto) {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 15000);
+  let res;
+  try {
+    res = await fetch(`${BASE_URL}${ruta}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(cuerpo),
+      signal: controller.signal
+    });
+  } catch (err) {
+    throw new Error(err.name === 'AbortError'
+      ? 'El servidor no respondió. Verifica tu conexión.'
+      : 'No se pudo conectar con el servidor. Necesitas señal para esto.');
+  } finally {
+    clearTimeout(timeout);
+  }
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !data.success) throw new Error(data.message || mensajePorDefecto);
+  return data;
+}
+
+/** «¿Olvidaste tu contraseña?», paso 1: pide que se envíe un código al correo de la cuenta. */
+export function pedirCodigoRecuperacion(numero_documento) {
+  return postJson('/auth/recuperar.php', { numero_documento }, 'No se pudo pedir el código');
+}
+
+/** Paso 2: con el código del correo, fija la contraseña nueva. */
+export function restablecerContrasena(numero_documento, codigo, password) {
+  return postJson('/auth/restablecer.php', { numero_documento, codigo, password }, 'No se pudo cambiar la contraseña');
+}
+
 export async function login(numero_documento, password) {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 10000);
