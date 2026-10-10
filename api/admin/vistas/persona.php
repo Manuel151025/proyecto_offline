@@ -68,20 +68,20 @@ $dato = fn (mixed $v): string => ($v === null || $v === '') ? $vacio : h($v);
       <div class="rejilla-campos">
         <div class="campo">
           <label class="campo-etiqueta" for="p-nombres">Nombres</label>
-          <input class="input" id="p-nombres" name="nombres" value="<?= h($valores['nombres'] ?? '') ?>" maxlength="100" required>
+          <input class="input" id="p-nombres" name="nombres" value="<?= h($valores['nombres'] ?? '') ?>" maxlength="60" minlength="2" pattern="[A-Za-zÁÉÍÓÚÜÑáéíóúüñ' \-]+" title="Solo letras, espacios, guion o apóstrofo" required>
         </div>
         <div class="campo">
           <label class="campo-etiqueta" for="p-apellidos">Apellidos</label>
-          <input class="input" id="p-apellidos" name="apellidos" value="<?= h($valores['apellidos'] ?? '') ?>" maxlength="100" required>
+          <input class="input" id="p-apellidos" name="apellidos" value="<?= h($valores['apellidos'] ?? '') ?>" maxlength="60" minlength="2" pattern="[A-Za-zÁÉÍÓÚÜÑáéíóúüñ' \-]+" title="Solo letras, espacios, guion o apóstrofo" required>
         </div>
         <div class="campo">
           <label class="campo-etiqueta" for="p-nacimiento">Fecha de nacimiento</label>
-          <input class="input" type="date" id="p-nacimiento" name="fecha_nacimiento"
+          <input class="input" type="date" id="p-nacimiento" name="fecha_nacimiento" min="1900-01-01" max="<?= h(date('Y-m-d')) ?>"
                  value="<?= is_numeric($valores['fecha_nacimiento'] ?? null) ? h(gmdate('Y-m-d', intdiv((int)$valores['fecha_nacimiento'], 1000))) : '' ?>">
         </div>
         <div class="campo">
           <label class="campo-etiqueta" for="p-telefono">Teléfono</label>
-          <input class="input" type="tel" id="p-telefono" name="telefono" value="<?= h($valores['telefono'] ?? '') ?>" maxlength="20">
+          <input class="input" type="tel" id="p-telefono" name="telefono" value="<?= h($valores['telefono'] ?? '') ?>" maxlength="10" inputmode="numeric" pattern="3[0-9]{9}|60[0-9]{8}" title="Celular de 10 dígitos (empieza por 3) o fijo de 10 (empieza por 60)">
         </div>
         <div class="campo">
           <label class="campo-etiqueta" for="p-email">Correo</label>
@@ -89,7 +89,7 @@ $dato = fn (mixed $v): string => ($v === null || $v === '') ? $vacio : h($v);
         </div>
         <div class="campo">
           <label class="campo-etiqueta" for="p-direccion">Dirección</label>
-          <input class="input" id="p-direccion" name="direccion" value="<?= h($valores['direccion'] ?? '') ?>" maxlength="150">
+          <input class="input" id="p-direccion" name="direccion" value="<?= h($valores['direccion'] ?? '') ?>" maxlength="150" minlength="5">
         </div>
         <div class="campo">
           <label class="campo-etiqueta" for="p-municipio">Municipio</label>
@@ -107,15 +107,15 @@ $dato = fn (mixed $v): string => ($v === null || $v === '') ? $vacio : h($v);
         </div>
         <div class="campo">
           <label class="campo-etiqueta" for="p-vereda">Vereda</label>
-          <input class="input" id="p-vereda" name="vereda" value="<?= h($valores['vereda'] ?? '') ?>" maxlength="100">
+          <input class="input" id="p-vereda" name="vereda" value="<?= h($valores['vereda'] ?? '') ?>" maxlength="100" minlength="3">
         </div>
         <div class="campo">
           <label class="campo-etiqueta" for="p-eps">EPS</label>
-          <input class="input" id="p-eps" name="eps" value="<?= h($valores['eps'] ?? '') ?>" maxlength="50">
+          <input class="input" id="p-eps" name="eps" value="<?= h($valores['eps'] ?? '') ?>" maxlength="50" minlength="3">
         </div>
         <div class="campo">
           <label class="campo-etiqueta" for="p-ocupacion">Ocupación</label>
-          <input class="input" id="p-ocupacion" name="ocupacion" value="<?= h($valores['ocupacion'] ?? '') ?>" maxlength="100">
+          <input class="input" id="p-ocupacion" name="ocupacion" value="<?= h($valores['ocupacion'] ?? '') ?>" maxlength="60" minlength="3">
         </div>
         <div class="campo">
           <label class="campo-etiqueta" for="p-estrato">Estrato</label>

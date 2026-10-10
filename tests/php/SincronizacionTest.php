@@ -86,6 +86,11 @@ final class SincronizacionTest extends IntegracionTestCase
             'nombre con números' => [['nombres' => 'Ana 2'], 'nombres'],
             'nacimiento futuro' => [['fecha_nacimiento' => (time() + 30 * 86400) * 1000], 'nacimiento'],
             'documento corto' => [['numero_documento' => '123'], 'documento'],
+            'cédula con letras' => [['numero_documento' => 'abc12345'], 'dígitos'],
+            'apellido con signos' => [['apellidos' => 'Velasquez.,s'], 'apellidos'],
+            'teléfono con letras' => [['telefono' => 'saddc'], 'teléfono'],
+            'teléfono de 7 dígitos' => [['telefono' => '6012345'], 'teléfono'],
+            'vereda muy corta' => [['vereda' => 'ab'], 'vereda'],
         ];
     }
 

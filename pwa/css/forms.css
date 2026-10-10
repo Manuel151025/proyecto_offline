@@ -72,6 +72,9 @@
 .form-field select:disabled { background: var(--surface-alt); color: var(--on-surface-secondary); }
 
 .field-optional { font-weight: 500; color: var(--on-surface-secondary); }
+.field-hint { margin: -6px 0 14px; font-size: 0.82rem; color: var(--on-surface-secondary); }
+/* Si el número ya muestra su error, la ayuda sobra. */
+.form-row:has(.input-error) + .field-hint { display: none; }
 
 .form-row { display: flex; gap: 10px; }
 .form-row .form-field { flex-shrink: 0; width: 96px; }

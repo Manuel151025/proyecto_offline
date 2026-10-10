@@ -70,8 +70,20 @@ function enteroOpcional(array $fila, string $clave): ?int
  */
 const TIPOS_DOCUMENTO = ['CC', 'TI', 'RC', 'CE', 'PP', 'NIT', 'PE'];
 
-/** Longitud mínima del documento; la misma que ya exigen los clientes. */
-const MIN_LONGITUD_DOCUMENTO = 6;
+/**
+ * Formato del número por tipo de documento: [mínimo, máximo, admite letras].
+ * Es la misma tabla que DOCUMENTOS en pwa/js/validacion.js y que
+ * Validaciones.kt en Android. Solo el pasaporte lleva letras.
+ */
+const FORMATO_DOCUMENTO = [
+    'CC'  => [6, 10, false],
+    'TI'  => [10, 11, false],
+    'RC'  => [10, 11, false],
+    'CE'  => [6, 10, false],
+    'PP'  => [6, 12, true],
+    'NIT' => [9, 10, false],
+    'PE'  => [6, 15, false],
+];
 
 /**
  * Valida el documento, que es la CLAVE PRIMARIA de personas.
@@ -80,10 +92,9 @@ const MIN_LONGITUD_DOCUMENTO = 6;
  * validación: cualquiera con un token y curl puede saltársela. En producción
  * apareció una persona con documento "hola", prueba de que se podía.
  *
- * No se exige que sean solo dígitos a propósito: los pasaportes y algunas
- * cédulas de extranjería llevan letras, y rechazarlos dejaría fuera a personas
- * reales. Se comprueba la longitud y que no haya caracteres imposibles en un
- * identificador.
+ * Cada tipo tiene su largo, y todos son solo dígitos salvo el pasaporte, que
+ * puede llevar letras. Un documento con letras en una cédula era un error de
+ * digitación que llegaba hasta la base de datos.
  *
  * @param array<string, mixed> $fila
  */
@@ -95,30 +106,89 @@ function documentoValidado(array $fila): string
     }
 
     $numero = trim((string)($fila['numero_documento'] ?? ''));
-    if (mb_strlen($numero) < MIN_LONGITUD_DOCUMENTO) {
-        throw new DatoInvalido('El número de documento debe tener al menos ' . MIN_LONGITUD_DOCUMENTO . ' caracteres');
+    [$min, $max, $letras] = FORMATO_DOCUMENTO[$tipo];
+    if (!preg_match($letras ? '/^[A-Za-z0-9]+$/' : '/^\d+$/', $numero)) {
+        throw new DatoInvalido($letras
+            ? 'El número de documento solo admite letras y dígitos'
+            : "El número de documento ($tipo) solo admite dígitos");
     }
-    if (mb_strlen($numero) > 20) {
-        throw new DatoInvalido('El número de documento no puede superar 20 caracteres');
-    }
-    if (!preg_match('/^[A-Za-z0-9\-]+$/', $numero)) {
-        throw new DatoInvalido('El número de documento solo admite letras, dígitos y guiones');
+    $largo = strlen($numero);
+    if ($largo < $min || $largo > $max) {
+        throw new DatoInvalido($min === $max
+            ? "El número de documento ($tipo) debe tener $min dígitos"
+            : "El número de documento ($tipo) debe tener entre $min y $max caracteres");
     }
 
-    return $numero;
+    return $letras ? strtoupper($numero) : $numero;
 }
 
 /**
- * Nombres y apellidos: obligatorios y sin dígitos (la misma regla que aplica
- * Android en Validaciones.kt).
+ * Nombres y apellidos: obligatorios, de 2 a 60 caracteres, solo letras
+ * (con tildes y ñ), espacios, guion y apóstrofo. Misma regla que la PWA y
+ * Android.
  *
  * @param array<string, mixed> $fila
  */
 function nombreValidado(array $fila, string $clave): string
 {
-    $valor = textoRequerido($fila, $clave, 100);
+    $valor = (string)preg_replace('/\s+/u', ' ', trim((string)($fila[$clave] ?? '')));
+    if ($valor === '') {
+        throw new DatoInvalido("Campo obligatorio faltante o vacío: $clave");
+    }
     if (preg_match('/\d/u', $valor)) {
         throw new DatoInvalido("El campo $clave no puede contener números");
+    }
+    if (!preg_match("/^\p{L}[\p{L}\p{M} '\-]*$/u", $valor)) {
+        throw new DatoInvalido("El campo $clave solo admite letras, espacios, guion o apóstrofo");
+    }
+    $largo = mb_strlen($valor);
+    if ($largo < 2 || $largo > 60) {
+        throw new DatoInvalido("El campo $clave debe tener entre 2 y 60 caracteres");
+    }
+    return $valor;
+}
+
+/**
+ * Teléfono opcional: celular de 10 dígitos que empieza por 3, o fijo de 10
+ * que empieza por 60 (marcación nacional desde 2021).
+ *
+ * @param array<string, mixed> $fila
+ */
+function telefonoValidado(array $fila): ?string
+{
+    $tel = textoOpcional($fila, 'telefono', 20);
+    if ($tel !== null && !preg_match('/^(3\d{9}|60\d{8})$/', $tel)) {
+        throw new DatoInvalido('El teléfono debe ser un celular de 10 dígitos (empieza por 3) o un fijo de 10 (empieza por 60)');
+    }
+    return $tel;
+}
+
+/**
+ * Textos libres opcionales (dirección, vereda, EPS, ocupación): largo y
+ * caracteres admitidos, los mismos que filtra el formulario al escribir.
+ */
+const TEXTOS_LIBRES = [
+    'direccion' => [5, 150, "\p{L}\p{M}0-9 #\-.,\/°º"],
+    'vereda'    => [3, 100, "\p{L}\p{M}0-9 .'\-"],
+    'eps'       => [3, 50,  "\p{L}\p{M}0-9 .&\-"],
+    'ocupacion' => [3, 60,  "\p{L}\p{M} ,.\-"],
+];
+
+/** @param array<string, mixed> $fila */
+function textoLibreValidado(array $fila, string $clave): ?string
+{
+    $valor = trim((string)($fila[$clave] ?? ''));
+    if ($valor === '') {
+        return null;
+    }
+    $valor = (string)preg_replace('/\s+/u', ' ', $valor);
+    [$min, $max, $permitidos] = TEXTOS_LIBRES[$clave];
+    $largo = mb_strlen($valor);
+    if ($largo < $min || $largo > $max) {
+        throw new DatoInvalido("El campo $clave debe tener entre $min y $max caracteres");
+    }
+    if (!preg_match('/^[' . $permitidos . ']+$/u', $valor) || !preg_match('/\p{L}/u', $valor)) {
+        throw new DatoInvalido("El campo $clave tiene caracteres no permitidos");
     }
     return $valor;
 }
