@@ -73,6 +73,80 @@
 
 .field-optional { font-weight: 500; color: var(--on-surface-secondary); }
 .field-hint { margin: -6px 0 14px; font-size: 0.82rem; color: var(--on-surface-secondary); }
+.form-field .field-hint { margin: 6px 0 0; }
+
+/* ---- Buscador (municipio, EPS) ----
+   Un campo con lupa o icono a la izquierda; al escribir aparece debajo una
+   tarjeta con sugerencias. Elegida una, el campo muestra un visto verde. */
+.buscador { position: relative; }
+.form-field .buscador input { padding-left: 44px; padding-right: 44px; }
+.buscador-icono {
+  position: absolute; left: 14px; top: 15px;
+  width: 22px; height: 22px;
+  color: var(--on-surface-secondary);
+  pointer-events: none;
+}
+.buscador.elegido .buscador-icono { color: var(--primary); }
+.buscador-check {
+  position: absolute; right: 14px; top: 16px;
+  width: 20px; height: 20px;
+  color: var(--success);
+  display: none;
+  pointer-events: none;
+}
+.buscador.elegido .buscador-check { display: block; }
+.buscador.elegido .form-field input, .buscador.elegido input { font-weight: 700; border-color: var(--success-border); }
+.buscador-limpiar {
+  position: absolute; right: 4px; top: 4px;
+  width: 44px; height: 44px;
+  display: none; align-items: center; justify-content: center;
+  border: 0; background: none; border-radius: 12px;
+  color: var(--on-surface-secondary); cursor: pointer;
+}
+.buscador-limpiar svg { width: 18px; height: 18px; }
+.buscador.abierto .buscador-limpiar { display: inline-flex; }
+.buscador.abierto .buscador-check { display: none; }
+
+.buscador-lista {
+  position: absolute; left: 0; right: 0; top: calc(100% + 6px);
+  z-index: 20;
+  max-height: min(320px, 50vh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  list-style: none;
+  margin: 0; padding: 6px;
+  background: var(--surface);
+  border: 1px solid var(--divider);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+}
+.buscador-encabezado {
+  padding: 8px 10px 6px;
+  font-size: 0.75rem; font-weight: 800;
+  letter-spacing: 0.04em; text-transform: uppercase;
+  color: var(--on-surface-secondary);
+}
+.buscador-opcion {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  min-height: 52px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.buscador-opcion:hover, .buscador-opcion.activa { background: var(--primary-tint); }
+.buscador-texto { display: flex; flex-direction: column; min-width: 0; }
+.buscador-titulo { font-size: 1rem; font-weight: 600; color: var(--on-surface); }
+.buscador-detalle { font-size: 0.82rem; color: var(--on-surface-secondary); }
+.buscador-opcion mark { background: none; color: inherit; font-weight: 800; text-decoration: underline; text-decoration-color: var(--accent); text-underline-offset: 3px; }
+.buscador-etiqueta {
+  flex-shrink: 0;
+  padding: 3px 9px; border-radius: 99px;
+  font-size: 0.72rem; font-weight: 800;
+  background: var(--accent-tint); color: var(--accent);
+}
+.buscador-detalle mark { text-decoration: none; font-weight: 700; }
+.buscador-vacio { padding: 14px 10px; font-size: 0.9rem; color: var(--on-surface-secondary); }
 /* Si el número ya muestra su error, la ayuda sobra. */
 .form-row:has(.input-error) + .field-hint { display: none; }
 

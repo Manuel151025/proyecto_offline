@@ -1,9 +1,11 @@
-import { getPersona, savePersona, addSyncItem, softDeletePersona, getMunicipios } from '../db.js';
+import { getPersona, savePersona, addSyncItem, softDeletePersona } from '../db.js';
 import { navigate } from '../router.js';
 import { generateUUID, getDeviceId, nowMs, dateToMs, msToDateInput, showToast } from '../utils.js';
 import { registerBackgroundSync } from '../sync.js';
 import { getSession } from '../session.js';
 import { validarPersona, limpiarCampo, TIPOS_DOCUMENTO, DOCUMENTOS, CAMPOS } from '../validacion.js';
+import { cargarMunicipios, cargarEps, buscarMunicipios, buscarEps, etiquetaMunicipio, BOGOTA } from '../catalogos.js';
+import { crearBuscador } from '../componentes/buscador.js';
 
 const TIPOS_DOC = TIPOS_DOCUMENTO;
 
@@ -16,7 +18,8 @@ export async function render(container, params) {
   const title = isEdit ? 'Editar Persona' : 'Registrar Persona';
 
   let municipios = [];
-  try { municipios = await getMunicipios(); } catch (_) {}
+  let eps = [];
+  try { [municipios, eps] = await Promise.all([cargarMunicipios(), cargarEps()]); } catch (_) {}
 
   let persona = null;
   if (isEdit) {
@@ -34,6 +37,7 @@ export async function render(container, params) {
   const estratoOptions = ['', 1, 2, 3, 4, 5, 6].map(n =>
     `<option value="${n}" ${String(estratoActual) === String(n) ? 'selected' : ''}>${n === '' ? '— Sin dato —' : n}</option>`
   ).join('');
+  const municipioActual = municipios.find(m => m.codigo === persona?.municipio_codigo) ?? null;
   const tipoOptions = TIPOS_DOC.map(t =>
     `<option value="${t}" ${(persona?.tipo_documento || 'CC') === t ? 'selected' : ''}>${t}</option>`
   ).join('');
@@ -107,16 +111,17 @@ export async function render(container, params) {
           <div class="form-section-title">Ubicación</div>
 
           <div class="form-field">
-            <label for="departamento_filtro">Departamento</label>
-            <select id="departamento_filtro">
-              <option value="">— Seleccionar departamento —</option>
-            </select>
-          </div>
-          <div class="form-field">
-            <label for="municipio_codigo">Municipio</label>
-            <select id="municipio_codigo" name="municipio_codigo">
-              <option value="">— Seleccionar municipio —</option>
-            </select>
+            <label for="municipio_buscar">Municipio</label>
+            <div class="buscador${municipioActual ? ' elegido' : ''}">
+              <svg class="buscador-icono" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 21s-7-6.2-7-11.5A7 7 0 0 1 19 9.5C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg>
+              <input type="text" id="municipio_buscar" placeholder="Escribe la ciudad o el departamento"
+                     value="${esc(municipioActual ? etiquetaMunicipio(municipioActual) : '')}" />
+              <svg class="buscador-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7"/></svg>
+              <button type="button" class="buscador-limpiar" aria-label="Borrar municipio"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+              <ul class="buscador-lista" id="municipio_lista" hidden></ul>
+            </div>
+            <input type="hidden" id="municipio_codigo" name="municipio_codigo" value="${esc(persona?.municipio_codigo || '')}" />
+            <p class="field-hint">Los ${(municipios.length || 1122).toLocaleString('es-CO')} municipios de Colombia. Escribe parte del nombre o el departamento: «popa», «cauca», «cali».</p>
           </div>
           <div class="form-field">
             <label for="vereda">Vereda <span class="field-optional">(opcional)</span></label>
@@ -129,8 +134,14 @@ export async function render(container, params) {
 
           <div class="form-field">
             <label for="eps">EPS</label>
-            <input type="text" id="eps" name="eps"
-                   value="${esc(persona?.eps || '')}" maxlength="${CAMPOS.eps.max}" autocomplete="off" />
+            <div class="buscador${persona?.eps ? ' elegido' : ''}">
+              <svg class="buscador-icono" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M12 21s-7-4.5-7-11a4 4 0 0 1 7-2.6A4 4 0 0 1 19 10c0 6.5-7 11-7 11z"/><path d="M12 9v5M9.5 11.5h5"/></svg>
+              <input type="text" id="eps" name="eps" placeholder="Busca la EPS o escríbela"
+                     value="${esc(persona?.eps || '')}" maxlength="${CAMPOS.eps.max}" />
+              <svg class="buscador-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7"/></svg>
+              <button type="button" class="buscador-limpiar" aria-label="Borrar EPS"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+              <ul class="buscador-lista" id="eps_lista" hidden></ul>
+            </div>
           </div>
           <div class="form-field">
             <label for="ocupacion">Ocupación</label>
@@ -163,8 +174,44 @@ export async function render(container, params) {
     await handleSubmit(isEdit, persona, municipios);
   });
 
-  setupDepartamentoFilter(municipios, persona?.municipio_codigo ?? null);
   setupFiltros(isEdit);
+  setupBuscadores(municipios, eps);
+}
+
+/**
+ * Municipio y EPS se eligen escribiendo: «popa» → Popayán, «cauca» → los
+ * municipios del Cauca. Antes eran dos listas desplegables con 3 departamentos.
+ */
+function setupBuscadores(municipios, eps) {
+  const codigo = document.getElementById('municipio_codigo');
+  crearBuscador({
+    input: document.getElementById('municipio_buscar'),
+    lista: document.getElementById('municipio_lista'),
+    buscar: q => buscarMunicipios(municipios, q, 60),
+    pintar: m => ({
+      titulo: m.nombre,
+      detalle: m.codigo === BOGOTA ? 'Distrito Capital' : m.departamento,
+      etiqueta: m.capital ? 'Capital' : ''
+    }),
+    texto: etiquetaMunicipio,
+    alElegir: m => {
+      codigo.value = m?.codigo ?? '';
+      if (m) limpiarError(document.getElementById('municipio_buscar'));
+    },
+    encabezado: q => (q.trim() ? '' : 'Ciudades principales'),
+    vacio: municipios.length ? 'Ningún municipio coincide. Revisa cómo está escrito.' : 'El catálogo aún no se ha cargado. Conéctate una vez para descargarlo.'
+  });
+
+  crearBuscador({
+    input: document.getElementById('eps'),
+    lista: document.getElementById('eps_lista'),
+    buscar: q => buscarEps(eps, q, 40),
+    pintar: e => ({ titulo: e.nombre, detalle: e.detalle }),
+    texto: e => e.nombre,
+    alElegir: e => { if (e) limpiarError(document.getElementById('eps')); },
+    encabezado: q => (q.trim() ? '' : 'EPS en Colombia'),
+    vacio: 'No está en la lista: puedes dejarla escrita así.'
+  });
 }
 
 /**
@@ -205,38 +252,12 @@ function limpiarError(input) {
   if (!input.classList.contains('input-error')) return;
   input.classList.remove('input-error');
   input.removeAttribute('aria-invalid');
-  const msg = input.nextElementSibling;
+  const msg = (input.closest('.buscador') ?? input).nextElementSibling;
   if (msg?.classList.contains('field-error')) msg.remove();
 }
 
-function setupDepartamentoFilter(municipios, selectedCodigo) {
-  const depSelect = document.getElementById('departamento_filtro');
-  const muniSelect = document.getElementById('municipio_codigo');
-
-  const departamentos = [...new Set(municipios.map(m => m.departamento))].sort();
-  const currentMuni = municipios.find(m => m.codigo === selectedCodigo);
-  const currentDep = currentMuni?.departamento ?? '';
-
-  depSelect.innerHTML = '<option value="">— Seleccionar departamento —</option>' +
-    departamentos.map(d =>
-      `<option value="${esc(d)}" ${d === currentDep ? 'selected' : ''}>${esc(d)}</option>`
-    ).join('');
-
-  renderMunicipios(currentDep);
-
-  depSelect.addEventListener('change', () => {
-    renderMunicipios(depSelect.value);
-    muniSelect.value = '';
-  });
-
-  function renderMunicipios(dep) {
-    const filtered = dep ? municipios.filter(m => m.departamento === dep) : municipios;
-    muniSelect.innerHTML = '<option value="">— Seleccionar municipio —</option>' +
-      filtered.map(m =>
-        `<option value="${esc(m.codigo)}" ${m.codigo === selectedCodigo ? 'selected' : ''}>${esc(m.nombre)}</option>`
-      ).join('');
-  }
-}
+/** Campo oculto → campo que ve el encuestador. */
+const VISIBLE = { municipio_codigo: 'municipio_buscar' };
 
 /**
  * Marca los campos con error y deja el mensaje debajo de cada uno.
@@ -251,17 +272,17 @@ function mostrarErrores(form, errores) {
 
   const campos = Object.keys(errores);
   for (const campo of campos) {
-    const input = document.getElementById(campo);
+    const input = document.getElementById(VISIBLE[campo] ?? campo);
     if (!input) continue;
     input.classList.add('input-error');
     input.setAttribute('aria-invalid', 'true');
     const msg = document.createElement('p');
     msg.className = 'field-error';
     msg.textContent = errores[campo];
-    input.insertAdjacentElement('afterend', msg);
+    (input.closest('.buscador') ?? input).insertAdjacentElement('afterend', msg);
   }
   if (campos.length) {
-    document.getElementById(campos[0])?.focus();
+    document.getElementById(VISIBLE[campos[0]] ?? campos[0])?.focus();
     showToast('Revisa los campos marcados', 'error');
   }
   return campos.length > 0;
@@ -300,6 +321,10 @@ async function handleSubmit(isEdit, existing, municipios = []) {
   });
   // Al editar, el documento no se puede cambiar: no se bloquea por él.
   if (isEdit) delete errores.numero_documento;
+  // Se escribió algo en el municipio pero no se eligió de la lista.
+  if (!borrador.municipio_codigo && form.querySelector('#municipio_buscar').value.trim()) {
+    errores.municipio_codigo = 'Elige el municipio de la lista de sugerencias';
+  }
   if (mostrarErrores(form, errores)) return;
 
   btn.disabled = true;

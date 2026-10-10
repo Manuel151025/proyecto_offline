@@ -23,12 +23,12 @@ Catálogo funcional del sistema. Cada historia incluye criterios de aceptación 
 | Épica | Historias | ✅ | 🟡 | ⏳ |
 |---|---:|---:|---:|---:|
 | E1 · Acceso y sesión | 5 | 5 | 0 | 0 |
-| E2 · Recolección de datos | 6 | 5 | 1 | 0 |
+| E2 · Recolección de datos | 6 | 6 | 0 | 0 |
 | E3 · Sincronización | 8 | 7 | 1 | 0 |
 | E4 · Administración | 7 | 6 | 1 | 0 |
 | E5 · Calidad y operación | 5 | 5 | 0 | 0 |
 | E6 · Futuro | 4 | 0 | 1 | 3 |
-| **Total** | **35** | **28** | **4** | **3** |
+| **Total** | **35** | **29** | **3** | **3** |
 
 *Revisado el 9 de octubre de 2026.* Las pruebas que se citan están descritas en [PRUEBAS.md](PRUEBAS.md); «E2E n» es la prueba número *n* de punta a punta.
 
@@ -237,19 +237,26 @@ Catálogo funcional del sistema. Cada historia incluye criterios de aceptación 
 
 ---
 
-## HU-11 · Seleccionar municipio de la lista oficial 🟡
+## HU-11 · Buscar el municipio y la EPS en los catálogos oficiales ✅
 
 > **Como** encuestador
-> **quiero** elegir el municipio de una lista
-> **para** que el dato sea homogéneo y no dependa de cómo lo escriba cada uno.
+> **quiero** encontrar el municipio y la EPS escribiendo unas letras
+> **para** que el dato sea homogéneo y no tenga que bajar por una lista de mil opciones.
 
 **Criterios de aceptación**
 
-1. El catálogo usa códigos **DIVIPOLA/DANE** con los 33 departamentos.
-2. Está disponible **sin conexión**: se siembra localmente en el primer arranque.
-3. El municipio se guarda por código, no por nombre.
+1. El catálogo trae los **1.122 municipios** DIVIPOLA/DANE en los **33 departamentos**, con sus tildes.
+2. Un solo campo busca por municipio o por departamento, sin tildes ni mayúsculas: «popa» → Popayán, «cauca» → los del Cauca con la capital primero, «cali» → Santiago de Cali.
+3. Sin escribir nada se ofrecen las ciudades principales.
+4. El municipio se guarda por código; si se escribe algo sin elegirlo de la lista, el formulario lo señala.
+5. La EPS se busca en el catálogo de las que operan en Colombia (y regímenes especiales) o se escribe libre.
+6. Todo funciona **sin conexión**: el catálogo viaja dentro de la app.
+7. Cuando el catálogo cambia, se actualiza solo en los teléfonos y en el servidor.
 
-**Implementación** · [`schema.sql`](../database/schema.sql) · `SeedMunicipiosUseCase.kt` · `api/municipios/index.php`
+**Motivación.** Un teléfono se quedó con una lista vieja de 3 departamentos y tildes dañadas, porque el catálogo se descargaba una sola vez y nunca se actualizaba.
+
+**Implementación** · [`database/catalogos/`](../database/catalogos/) · [`scripts/catalogos.mjs`](../scripts/catalogos.mjs) · [`catalogos.js`](../pwa/js/catalogos.js) · [`buscador.js`](../pwa/js/componentes/buscador.js) · `BuscadorCatalogo.kt` · `asegurarCatalogoMunicipios` en [`esquema.php`](../api/esquema.php)
+**Pruebas** · `catalogos.test.mjs` · `BuscadorCatalogoTest` · `CatalogoTest` (PHP) · `tildes.test.mjs` · E2E 6
 
 ---
 
@@ -585,7 +592,7 @@ Catálogo funcional del sistema. Cada historia incluye criterios de aceptación 
 
 ## HU-30 · Cobertura de pruebas ✅
 
-**Estado actual:** **230 pruebas automatizadas** — 77 en Android (JVM), 58 en la PWA, 88 de la API y el panel (57 de integración con MySQL real y 31 unitarias) y 7 de punta a punta en un navegador real. Inventario completo en [PRUEBAS.md](PRUEBAS.md).
+**Estado actual:** **254 pruebas automatizadas** — 85 en Android (JVM), 72 en la PWA, 90 de la API y el panel (59 de integración con MySQL real y 31 unitarias) y 7 de punta a punta en un navegador real. Inventario completo en [PRUEBAS.md](PRUEBAS.md).
 
 | Suite | Qué cubre |
 |---|---|
@@ -662,7 +669,7 @@ Implementada en Android después de escribirse esta historia: la pantalla de sin
 
 ## HU-35 · Pruebas instrumentadas de interfaz ⏳
 
-Las 77 pruebas de Android son **unitarias en JVM**: cubren dominio, datos y ViewModels. En `androidTest` solo está `MigracionesRoomTest`, que necesita un dispositivo; ninguna prueba verifica la interfaz Compose real. La PWA sí tiene prueba de interfaz de punta a punta (`tests/e2e`).
+Las 85 pruebas de Android son **unitarias en JVM**: cubren dominio, datos y ViewModels. En `androidTest` solo está `MigracionesRoomTest`, que necesita un dispositivo; ninguna prueba verifica la interfaz Compose real. La PWA sí tiene prueba de interfaz de punta a punta (`tests/e2e`).
 
 ---
 

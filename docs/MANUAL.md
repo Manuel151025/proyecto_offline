@@ -63,6 +63,24 @@ Lo que pide cada campo:
 
 <br clear="right">
 
+### 3b. Municipio y EPS: se buscan escribiendo
+
+<img src="capturas/app-formulario-municipio.png" alt="Buscador de municipio con la sugerencia Popayán" width="300" align="right">
+
+**Municipio.** Toca el campo y escribe unas letras del municipio **o del departamento**, sin preocuparte por tildes ni mayúsculas:
+
+- «popa» → Popayán, Cauca
+- «cauca» → todos los municipios del Cauca, con Popayán primero
+- «cali» → Santiago de Cali · «cucuta» → San José de Cúcuta
+
+Toca la sugerencia correcta: el campo queda en negrita con un visto verde. Si solo tocas el campo, aparecen las ciudades principales. Están los **1.122 municipios** de Colombia y funcionan sin señal. Si escribes algo y no eliges de la lista, al guardar te pedirá elegirlo.
+
+**Vereda.** Se escribe libre (por ejemplo, *Vereda El Carmen*).
+
+**EPS.** Igual: escribe «sanit», «asmet», «nueva»… y toca la EPS. Están las que operan en Colombia, las indígenas y los regímenes especiales (Magisterio, Fuerzas Militares, Policía, Ecopetrol), además de *No afiliado*. Si la de la persona no aparece, déjala escrita.
+
+<br clear="right">
+
 ### 4. Sin señal
 
 <img src="capturas/app-inicio-sin-senal.png" alt="Inicio sin conexión con una persona pendiente" width="300" align="right">

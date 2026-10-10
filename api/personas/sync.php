@@ -51,6 +51,9 @@ $rechazadas = [];
 /** Documento de cada encuesta rechazada, para guardarlo en sync_rechazos. */
 $documentoRechazo = [];
 
+// Antes de leer los códigos válidos: un celular con el catálogo nuevo puede
+// enviar un municipio que la tabla todavía no tiene.
+asegurarCatalogoMunicipios($pdo);
 $stmtMunicipios = $pdo->query('SELECT codigo FROM municipios');
 $codigosMunicipio = $stmtMunicipios === false
     ? []

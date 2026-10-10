@@ -111,7 +111,8 @@ $dato = fn (mixed $v): string => ($v === null || $v === '') ? $vacio : h($v);
         </div>
         <div class="campo">
           <label class="campo-etiqueta" for="p-eps">EPS</label>
-          <input class="input" id="p-eps" name="eps" value="<?= h($valores['eps'] ?? '') ?>" maxlength="50" minlength="3">
+          <input class="input" id="p-eps" name="eps" value="<?= h($valores['eps'] ?? '') ?>" maxlength="50" minlength="3" list="lista-eps" autocomplete="off">
+          <datalist id="lista-eps"><?php foreach (catalogoEps() as $e): ?><option value="<?= h($e['nombre']) ?>"><?= h($e['detalle']) ?></option><?php endforeach; ?></datalist>
         </div>
         <div class="campo">
           <label class="campo-etiqueta" for="p-ocupacion">Ocupación</label>

@@ -6,7 +6,18 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.FavoriteBorder
+import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.graphics.vector.ImageVector
+import com.minsalud.encuestas.domain.catalogo.BuscadorCatalogo
+import com.minsalud.encuestas.presentation.theme.BrandAccent
+import com.minsalud.encuestas.presentation.theme.BrandAccentTint
+import com.minsalud.encuestas.presentation.theme.StatusSuccess
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -213,29 +224,27 @@ fun FormularioEncuestaScreen(
             // --- Ubicación ---
             SectionTitle("Ubicación")
 
-            val departamentos = remember(uiState.municipios) {
-                uiState.municipios.map { it.departamento }.distinct().sortedBy { it.lowercase() }
+            // Un solo campo: se escribe la ciudad o el departamento y se elige
+            // la sugerencia. Antes eran dos listas desplegables.
+            val sugerenciasMunicipio = remember(uiState.municipios, uiState.municipioTexto, uiState.municipioCodigo) {
+                if (uiState.municipioCodigo != null) emptyList()
+                else BuscadorCatalogo.buscarMunicipios(uiState.municipios, uiState.municipioTexto, 40)
             }
-            val municipiosFiltrados = remember(uiState.municipios, uiState.departamento) {
-                uiState.municipios
-                    .filter { uiState.departamento == null || it.departamento == uiState.departamento }
-                    .sortedBy { it.nombre.lowercase() }
-            }
-
-            DropdownField(
-                label = "Departamento",
-                options = departamentos,
-                selected = uiState.departamento,
-                optionLabel = { it },
-                onSelected = { viewModel.onDepartamentoChanged(it) }
-            )
-
-            DropdownField(
-                label = if (uiState.departamento == null) "Municipio (elige un departamento)" else "Municipio",
-                options = municipiosFiltrados,
-                selected = municipiosFiltrados.find { it.codigo == uiState.municipioCodigo },
-                optionLabel = { it.nombre },
-                onSelected = { viewModel.onMunicipioChanged(it.codigo) }
+            CampoBuscador(
+                valor = uiState.municipioTexto,
+                onValorChange = { viewModel.onMunicipioTextoChanged(it) },
+                etiqueta = "Municipio",
+                placeholder = "Escribe la ciudad o el departamento",
+                icono = Icons.Default.LocationOn,
+                sugerencias = sugerenciasMunicipio,
+                encabezado = if (uiState.municipioTexto.isBlank()) "Ciudades principales" else null,
+                titulo = { it.nombre },
+                detalle = { if (it.codigo == BuscadorCatalogo.BOGOTA) "Distrito Capital" else it.departamento },
+                marca = { if (it.capital) "Capital" else null },
+                onElegir = { viewModel.onMunicipioElegido(it) },
+                elegido = uiState.municipioCodigo != null,
+                error = uiState.municipioError,
+                ayuda = "Los ${uiState.municipios.size} municipios de Colombia. Ej: «popa», «cauca», «cali»."
             )
 
             OutlinedTextField(
@@ -252,14 +261,25 @@ fun FormularioEncuestaScreen(
             // --- Información socioeconómica ---
             SectionTitle("Información socioeconómica")
 
-            OutlinedTextField(
-                value = uiState.eps,
-                onValueChange = { viewModel.onEpsChanged(it) },
-                label = { Text("EPS") },
-                isError = uiState.epsError != null,
-                supportingText = uiState.epsError?.let { { Text(it) } },
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true
+            val elegidaEps = uiState.catalogoEps.any { it.nombre == uiState.eps }
+            val sugerenciasEps = remember(uiState.catalogoEps, uiState.eps) {
+                if (elegidaEps) emptyList() else BuscadorCatalogo.buscarEps(uiState.catalogoEps, uiState.eps)
+            }
+            CampoBuscador(
+                valor = uiState.eps,
+                onValorChange = { viewModel.onEpsChanged(it) },
+                etiqueta = "EPS",
+                placeholder = "Busca la EPS o escríbela",
+                icono = Icons.Default.FavoriteBorder,
+                sugerencias = sugerenciasEps,
+                encabezado = if (uiState.eps.isBlank()) "EPS en Colombia" else null,
+                titulo = { it.nombre },
+                detalle = { it.detalle },
+                marca = { null },
+                onElegir = { viewModel.onEpsElegida(it) },
+                elegido = elegidaEps,
+                error = uiState.epsError,
+                ayuda = null
             )
 
             OutlinedTextField(
@@ -313,6 +333,94 @@ private fun SectionTitle(text: String) {
         color = MaterialTheme.colorScheme.primary,
         modifier = Modifier.padding(top = 4.dp)
     )
+}
+
+/**
+ * Campo de texto con sugerencias debajo (municipio, EPS). Al elegir una, el
+ * campo muestra un visto; al volver a escribir, la elección se pierde.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun <T> CampoBuscador(
+    valor: String,
+    onValorChange: (String) -> Unit,
+    etiqueta: String,
+    placeholder: String,
+    icono: ImageVector,
+    sugerencias: List<T>,
+    encabezado: String?,
+    titulo: (T) -> String,
+    detalle: (T) -> String,
+    marca: (T) -> String?,
+    onElegir: (T) -> Unit,
+    elegido: Boolean,
+    error: String?,
+    ayuda: String?
+) {
+    var abierto by remember { mutableStateOf(false) }
+    ExposedDropdownMenuBox(
+        expanded = abierto && sugerencias.isNotEmpty(),
+        onExpandedChange = { abierto = it }
+    ) {
+        OutlinedTextField(
+            value = valor,
+            onValueChange = { onValorChange(it); abierto = true },
+            label = { Text(etiqueta) },
+            placeholder = { Text(placeholder) },
+            leadingIcon = {
+                Icon(icono, contentDescription = null,
+                    tint = if (elegido) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant)
+            },
+            trailingIcon = {
+                when {
+                    elegido -> Icon(Icons.Default.Check, contentDescription = "Elegido", tint = StatusSuccess)
+                    valor.isNotEmpty() -> IconButton(onClick = { onValorChange("") }) {
+                        Icon(Icons.Default.Clear, contentDescription = "Borrar")
+                    }
+                }
+            },
+            textStyle = LocalTextStyle.current.copy(fontWeight = if (elegido) FontWeight.Bold else FontWeight.Normal),
+            isError = error != null,
+            supportingText = (error ?: ayuda)?.let { { Text(it) } },
+            singleLine = true,
+            modifier = Modifier
+                .menuAnchor(MenuAnchorType.PrimaryEditable)
+                .fillMaxWidth()
+        )
+        ExposedDropdownMenu(
+            expanded = abierto && sugerencias.isNotEmpty(),
+            onDismissRequest = { abierto = false }
+        ) {
+            if (encabezado != null) {
+                Text(
+                    encabezado.uppercase(),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                )
+            }
+            sugerencias.forEach { s ->
+                DropdownMenuItem(
+                    text = {
+                        Column {
+                            Text(titulo(s), fontWeight = FontWeight.SemiBold)
+                            Text(detalle(s), style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        }
+                    },
+                    trailingIcon = marca(s)?.let { m ->
+                        {
+                            Text(m, style = MaterialTheme.typography.labelSmall, color = BrandAccent,
+                                modifier = Modifier
+                                    .background(BrandAccentTint, RoundedCornerShape(99.dp))
+                                    .padding(horizontal = 8.dp, vertical = 3.dp))
+                        }
+                    },
+                    onClick = { onElegir(s); abierto = false }
+                )
+            }
+        }
+    }
 }
 
 @OptIn(ExperimentalMaterial3Api::class)

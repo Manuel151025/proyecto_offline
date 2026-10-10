@@ -339,6 +339,12 @@ jobs:
       - name: Verificar que la paleta coincida con design/tokens.json
         run: node scripts/tokens.mjs --verificar
 
+      # Municipios (DIVIPOLA) y EPS viven en database/catalogos/. Si alguien edita
+      # a mano la copia de la PWA, de Android, del servidor o de schema.sql,
+      # un teléfono volvería a quedarse con una lista distinta a la del servidor.
+      - name: Verificar que los catálogos coincidan con database/catalogos/
+        run: node scripts/catalogos.mjs --verificar
+
       # El huso se fija a propósito: el fallo que motivó estas pruebas (la fecha
       # de nacimiento corriéndose un día) solo se manifestaba con desfase
       # negativo respecto a UTC, y Colombia es donde corre la app.

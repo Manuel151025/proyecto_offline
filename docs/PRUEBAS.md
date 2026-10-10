@@ -2,15 +2,15 @@
 
 Inventario de las pruebas automáticas del sistema, qué cubre cada una y cómo correrlas.
 
-**Última ejecución completa:** 9 de octubre de 2026 · **230 pruebas, 0 fallos**.
+**Última ejecución completa:** 10 de octubre de 2026 · **254 pruebas, 0 fallos**.
 
 | Suite | Pruebas | Herramienta | Necesita |
 |---|---:|---|---|
-| Android (unitarias JVM) | 77 | JUnit 4 + MockK | JDK 17 (Gradle lo descarga) |
-| PWA (unitarias, paridad y contraste) | 58 | `node --test` | Node 20 o superior |
-| API y panel (integración + unitarias) | 88 | PHPUnit 11 | PHP 8.2 con `pdo_mysql` y un MySQL |
+| Android (unitarias JVM) | 85 | JUnit 4 + MockK | JDK 17 (Gradle lo descarga) |
+| PWA (unitarias, catálogos, paridad, contraste y tildes) | 72 | `node --test` | Node 20 o superior |
+| API y panel (integración + unitarias) | 90 | PHPUnit 11 | PHP 8.2 con `pdo_mysql` y un MySQL |
 | Punta a punta | 7 | `node --test` + Chrome/Edge | Node 22, PHP, MySQL y Chrome o Edge |
-| **Total** | **230** | | |
+| **Total** | **254** | | |
 
 Además corren en cada cambio: **PHPStan nivel 8** (0 errores), **Android Lint** (0 errores), la verificación del caché offline de la PWA y la de la paleta de diseño.
 
@@ -27,6 +27,7 @@ TZ=America/Bogota node --test pwa/tests/*.test.mjs
 TZ=Asia/Tokyo     node --test pwa/tests/*.test.mjs
 node scripts/check-pwa-assets.mjs     # todo lo que usa la app está en la caché offline
 node scripts/tokens.mjs --verificar   # la paleta coincide con design/tokens.json
+node scripts/catalogos.mjs --verificar   # municipios y EPS iguales en todas las copias
 
 # API y panel (crea y borra su propia base, colo_pruebas)
 composer install
@@ -48,8 +49,8 @@ Las de punta a punta buscan Chrome o Edge en las rutas habituales; si está en o
 
 ```mermaid
 flowchart BT
-    U["Unitarias · 77 Android + 58 PWA + 31 PHP"]
-    I["Integración · 57 PHP con MySQL real"]
+    U["Unitarias · 85 Android + 72 PWA + 31 PHP"]
+    I["Integración · 59 PHP con MySQL real"]
     E["Punta a punta · 7 en navegador real"]
     C["Campo · celular real (manual)"]
     U --> I --> E --> C
@@ -64,6 +65,7 @@ flowchart BT
 | `SyncRepositoryImplTest` | 23 | Envío por lotes de 100, confirmación parcial, rechazos terminales, descarga paginada con cursor, fallos de red |
 | `AuthRepositoryImplTest` | 10 | Inicio de sesión con y sin red, credenciales guardadas, cierre de sesión |
 | `ValidacionesTest` | 10 | Formato del documento por tipo, filtro de lo que se escribe, nombres, teléfono, textos libres, fecha |
+| `BuscadorCatalogoTest` | 8 | Catálogo completo con tildes; buscar municipio o departamento sin tildes; EPS |
 | `DecisionMezclaTest` | 6 | Qué conservar al descargar; nunca se pisa un cambio sin enviar |
 | `GuardarPersonaUseCaseTest` | 6 | Reglas de negocio al guardar |
 | `ListaPersonasViewModelTest` | 6 | Estado de la lista y marca de pendiente |
@@ -78,6 +80,7 @@ La prueba de migraciones de Room (`MigracionesRoomTest`, en `androidTest`) neces
 
 | Archivo | Pruebas | Qué cubre |
 |---|---:|---|
+| `catalogos.test.mjs` | 13 | 1.122 municipios y 33 departamentos con tildes; búsqueda («popa», «cauca», «cali»); EPS válidas |
 | `utils.test.mjs` | 11 | Fechas: la de nacimiento no se corre un día en ningún huso horario |
 | `validacion.test.mjs` | 11 | Reglas por campo y el filtro de lo que se escribe (`limpiarCampo`) |
 | `mezcla.test.mjs` | 8 | `decidirMezcla`: los mismos casos que `DecisionMezclaTest.kt` |
@@ -86,6 +89,7 @@ La prueba de migraciones de Room (`MigracionesRoomTest`, en `androidTest`) neces
 | `api.test.mjs` | 5 | Cliente HTTP: token, errores y sesión vencida |
 | `paridad.test.mjs` | 4 | **Las reglas de validación son idénticas** en la PWA, el servidor y Android |
 | `contraste.test.mjs` | 4 | **Contraste WCAG AA** de cada combinación de texto sobre fondo, en modo claro y oscuro |
+| `tildes.test.mjs` | 1 | Ningún archivo de la app, la API, la PWA ni los catálogos tiene tildes dañadas («PopayÃ¡n») |
 
 Se corren en dos husos horarios (`America/Bogota`, desfase negativo, y `Asia/Tokyo`, positivo) porque el fallo que motivó las pruebas de fecha —la fecha de nacimiento corriéndose un día en cada edición— solo aparecía con desfase negativo.
 
@@ -98,6 +102,7 @@ Se corren en dos husos horarios (`America/Bogota`, desfase negativo, y `Asia/Tok
 | `SincronizacionTest` | 21 | Integración | Token, lote válido, cursor compuesto, lote de más de 500, rechazo por fila (10 casos de datos inválidos), registro de rechazos y celulares, reloj adelantado, Last-Write-Wins, salud |
 | `PanelFuncionesTest` | 13 | Integración | Ficha, edición con las reglas de la sincronización, filtros, CSV filtrado, sesiones de celulares, desbloqueo, monitor, auditoría, CSP |
 | `AlcanceTest` | 4 | Integración | Descarga limitada a los municipios de cada encuestador |
+| `CatalogoTest` | 2 | Integración | Una base con el catálogo viejo (menos municipios, tildes dañadas) se completa y corrige sola; un celular con el catálogo nuevo puede enviar cualquier municipio |
 
 Las de integración levantan el servidor embebido de PHP contra una base desechable y hablan con él por HTTP, como lo haría un celular o un navegador.
 
@@ -112,7 +117,7 @@ Un navegador real (Chrome o Edge, sin ventana) recorre lo que hace una persona, 
 | 3 | Clave equivocada | No entra al panel |
 | 4 | Login en la app | El encuestador entra y ve «Hola, Jairo» |
 | 5 | Formulario | Lo que no corresponde no se puede escribir (`sdscf1ds5ds1c` → `151`, `584Jairo` → `Jairo`) y cada error se explica en su campo |
-| 6 | Sin señal | Registra a una persona sin red: queda **Pendiente**; al volver la señal pasa sola a **Enviada** |
+| 6 | Sin señal | Busca el municipio («popa» → Popayán) y la EPS, registra a una persona sin red: queda **Pendiente**; al volver la señal pasa sola a **Enviada** |
 | 7 | De vuelta en el panel | La persona y el celular aparecen; ninguna página lanzó errores de JavaScript |
 
 El control del navegador está en `tests/e2e/navegador.mjs` (protocolo DevTools con el `WebSocket` nativo de Node 22), sin Playwright ni Puppeteer. Con `CAPTURAS=<carpeta>` guarda una imagen de cada pantalla; las de [`docs/capturas/`](capturas/) salieron de ahí.
