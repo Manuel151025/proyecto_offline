@@ -18,7 +18,7 @@ Sistema de recolección de datos demográficos para el Ministerio de Salud, dise
 | [**Arquitectura**](docs/ARQUITECTURA.md) | Diagramas de componentes, despliegue, modelo de datos y flujos (registro, sincronización, validación, diseño) · 11 decisiones de arquitectura |
 | [**Historias de usuario**](docs/HISTORIAS-DE-USUARIO.md) | 35 historias con criterios de aceptación y trazabilidad a código y pruebas |
 | [**API**](docs/API.md) | Endpoints, parámetros, respuestas, reglas de validación y ejemplos |
-| [**Pruebas**](docs/PRUEBAS.md) | Inventario de las 254 pruebas automáticas y cómo correrlas |
+| [**Pruebas**](docs/PRUEBAS.md) | Inventario de las 255 pruebas automáticas y cómo correrlas |
 | [**Pruebas de campo**](docs/PRUEBAS-DE-CAMPO.md) | Lista de verificación en celulares reales |
 | [**Pendientes**](docs/PENDIENTES.md) | Qué falta, por qué, y qué pasa si no se hace |
 
@@ -38,7 +38,7 @@ Garantizar la recolección íntegra de datos sobre el terreno y prevenir la pér
 | **Validación** | Las mismas reglas por campo en los dos clientes y el servidor, con filtro al escribir |
 | **Catálogos** | Los 1.122 municipios del DANE y las EPS de Colombia, con buscador; viajan dentro de la app |
 | **Diseño** | «Cálida de territorio»: una paleta (`design/tokens.json`) y la fuente Figtree empaquetada en las tres superficies |
-| **Pruebas** | 254 automatizadas — 85 Android · 72 PWA · 90 API y panel · 7 de punta a punta en navegador real |
+| **Pruebas** | 255 automatizadas — 85 Android · 72 PWA · 91 API y panel · 7 de punta a punta en navegador real |
 | **CI** | 4 trabajos · PHPStan nivel 8 · Android Lint · guardas de regresión |
 | **Despliegue** | Dokploy sobre Docker Swarm · TLS con acme.sh |
 
@@ -258,12 +258,12 @@ Copiar `.env.example` a `.env` y completar:
 
 ## Pruebas
 
-**254 pruebas automáticas, 0 fallos.** El inventario completo está en [docs/PRUEBAS.md](docs/PRUEBAS.md).
+**255 pruebas automáticas, 0 fallos.** El inventario completo está en [docs/PRUEBAS.md](docs/PRUEBAS.md).
 
 ```bash
 ./gradlew testDebugUnitTest lintDebug assembleDebug   # 85 Android + lint + APK
 TZ=America/Bogota node --test pwa/tests/*.test.mjs    # 72 PWA (catálogos, paridad, contraste, tildes)
-vendor/bin/phpunit                                    # 90 API y panel, contra MySQL real
+vendor/bin/phpunit                                    # 91 API y panel, contra MySQL real
 node --test tests/e2e/e2e.test.mjs                    # 7 de punta a punta en Chrome/Edge
 vendor/bin/phpstan analyse                            # análisis estático, nivel 8
 node scripts/check-pwa-assets.mjs                     # la caché offline está completa
@@ -396,7 +396,7 @@ No es posible quitarse el rol ni desactivarse siendo el único administrador act
 - **Clientes**: Android y PWA completos y offline-first, con validación estricta por campo y la dirección visual «Cálida de territorio».
 - **Backend**: sincronización bidireccional por lotes, rechazo por fila, descarga limitada por municipios, automigración de esquema.
 - **Panel**: resumen, personas (ficha, edición, filtros, CSV, papelera), cuentas, monitor de sincronización y auditoría; acceso rediseñado.
-- **Calidad**: 254 pruebas automatizadas (85 Android, 72 PWA, 90 API y panel, 7 de punta a punta), PHPStan nivel 8, Android Lint, cobertura con JaCoCo, contraste WCAG AA verificado y guardas de regresión en CI.
+- **Calidad**: 255 pruebas automatizadas (85 Android, 72 PWA, 91 API y panel, 7 de punta a punta), PHPStan nivel 8, Android Lint, cobertura con JaCoCo, contraste WCAG AA verificado y guardas de regresión en CI.
 - **Seguridad**: autenticación por token con revocación, cuentas por rol, límite de intentos en API y panel, CORS por lista blanca, CSP en el panel, auditoría de cada acción administrativa.
 
 El detalle de lo que falta y por qué está en [docs/PENDIENTES.md](docs/PENDIENTES.md).

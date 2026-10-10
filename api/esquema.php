@@ -283,9 +283,13 @@ function asegurarCatalogoMunicipios(PDO $pdo): void
 
     /** @var array{version: string, municipios: list<array{0: string, 1: string, 2: string}>} $catalogo */
     $catalogo = require __DIR__ . '/municipios/catalogo.php';
+    // Versión del catálogo + revisión de este procedimiento: si el
+    // procedimiento cambia (p. ej. ahora retira códigos inexistentes), subir
+    // la revisión hace que se ejecute otra vez aunque el catálogo sea el mismo.
+    $version = $catalogo['version'] . ':2';
     $stmt = $pdo->prepare('SELECT valor FROM ajustes WHERE clave = ?');
     $stmt->execute(['catalogo_municipios']);
-    if ($stmt->fetchColumn() === $catalogo['version']) {
+    if ($stmt->fetchColumn() === $version) {
         $verificado = true;
         return;
     }
@@ -298,9 +302,61 @@ function asegurarCatalogoMunicipios(PDO $pdo): void
                        ON DUPLICATE KEY UPDATE nombre = VALUES(nombre), departamento = VALUES(departamento)")
             ->execute(array_merge(...$bloque));
     }
-    $pdo->prepare('INSERT INTO ajustes (clave, valor) VALUES (?, ?) ON DUPLICATE KEY UPDATE valor = VALUES(valor)')
-        ->execute(['catalogo_municipios', $catalogo['version']]);
+    retirarCodigosInexistentes($pdo, $catalogo['municipios']);
 
-    error_log('[esquema] catálogo de municipios actualizado a la versión ' . $catalogo['version']);
+    $pdo->prepare('INSERT INTO ajustes (clave, valor) VALUES (?, ?) ON DUPLICATE KEY UPDATE valor = VALUES(valor)')
+        ->execute(['catalogo_municipios', $version]);
+
+    error_log('[esquema] catálogo de municipios actualizado a la versión ' . $version);
     $verificado = true;
+}
+
+/**
+ * Retira los códigos que no existen en el DIVIPOLA.
+ *
+ * La lista cargada a mano traía al menos uno equivocado (95040 para
+ * Miraflores, Guaviare, cuyo código es 95200). Si el catálogo tiene un
+ * municipio con el mismo nombre y departamento, las personas se pasan a ese
+ * código y se sellan para que el cambio llegue a los celulares; luego se
+ * borra el código falso. Si no hay equivalente y nadie lo usa, se borra; si
+ * alguien lo usa, se deja y se avisa en el log.
+ *
+ * @param list<array{0: string, 1: string, 2: string}> $catalogo
+ */
+function retirarCodigosInexistentes(PDO $pdo, array $catalogo): void
+{
+    $validos = array_flip(array_column($catalogo, 0));
+    $porNombre = [];
+    foreach ($catalogo as [$codigo, $nombre, $depto]) {
+        $porNombre[mb_strtolower($nombre . '|' . $depto)] = $codigo;
+    }
+
+    $stmt = $pdo->query('SELECT codigo, nombre, departamento FROM municipios');
+    foreach ($stmt === false ? [] : $stmt->fetchAll(PDO::FETCH_ASSOC) as $fila) {
+        $viejo = (string)$fila['codigo'];
+        if (isset($validos[$viejo])) {
+            continue;
+        }
+        $nuevo = $porNombre[mb_strtolower($fila['nombre'] . '|' . $fila['departamento'])] ?? null;
+        if ($nuevo !== null) {
+            $ahora = (int)round(microtime(true) * 1000);
+            $pdo->prepare('UPDATE personas SET municipio_codigo = ?, updated_at = ?, server_updated_at = ? WHERE municipio_codigo = ?')
+                ->execute([$nuevo, $ahora, $ahora, $viejo]);
+            try {
+                $pdo->prepare('UPDATE IGNORE encuestador_municipios SET municipio_codigo = ? WHERE municipio_codigo = ?')
+                    ->execute([$nuevo, $viejo]);
+                $pdo->prepare('DELETE FROM encuestador_municipios WHERE municipio_codigo = ?')->execute([$viejo]);
+            } catch (PDOException $e) {
+                // La tabla aún no existe: nada que mover.
+            }
+        }
+        $usos = $pdo->prepare('SELECT COUNT(*) FROM personas WHERE municipio_codigo = ?');
+        $usos->execute([$viejo]);
+        if ((int)$usos->fetchColumn() === 0) {
+            $pdo->prepare('DELETE FROM municipios WHERE codigo = ?')->execute([$viejo]);
+            error_log("[esquema] código de municipio inexistente retirado: $viejo" . ($nuevo !== null ? " (personas pasadas a $nuevo)" : ''));
+        } else {
+            error_log("[esquema] código de municipio inexistente en uso, sin equivalente: $viejo");
+        }
+    }
 }

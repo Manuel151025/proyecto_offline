@@ -2,15 +2,15 @@
 
 Inventario de las pruebas automáticas del sistema, qué cubre cada una y cómo correrlas.
 
-**Última ejecución completa:** 10 de octubre de 2026 · **254 pruebas, 0 fallos**.
+**Última ejecución completa:** 10 de octubre de 2026 · **255 pruebas, 0 fallos**.
 
 | Suite | Pruebas | Herramienta | Necesita |
 |---|---:|---|---|
 | Android (unitarias JVM) | 85 | JUnit 4 + MockK | JDK 17 (Gradle lo descarga) |
 | PWA (unitarias, catálogos, paridad, contraste y tildes) | 72 | `node --test` | Node 20 o superior |
-| API y panel (integración + unitarias) | 90 | PHPUnit 11 | PHP 8.2 con `pdo_mysql` y un MySQL |
+| API y panel (integración + unitarias) | 91 | PHPUnit 11 | PHP 8.2 con `pdo_mysql` y un MySQL |
 | Punta a punta | 7 | `node --test` + Chrome/Edge | Node 22, PHP, MySQL y Chrome o Edge |
-| **Total** | **254** | | |
+| **Total** | **255** | | |
 
 Además corren en cada cambio: **PHPStan nivel 8** (0 errores), **Android Lint** (0 errores), la verificación del caché offline de la PWA y la de la paleta de diseño.
 
@@ -50,7 +50,7 @@ Las de punta a punta buscan Chrome o Edge en las rutas habituales; si está en o
 ```mermaid
 flowchart BT
     U["Unitarias · 85 Android + 72 PWA + 31 PHP"]
-    I["Integración · 59 PHP con MySQL real"]
+    I["Integración · 60 PHP con MySQL real"]
     E["Punta a punta · 7 en navegador real"]
     C["Campo · celular real (manual)"]
     U --> I --> E --> C
@@ -102,7 +102,7 @@ Se corren en dos husos horarios (`America/Bogota`, desfase negativo, y `Asia/Tok
 | `SincronizacionTest` | 21 | Integración | Token, lote válido, cursor compuesto, lote de más de 500, rechazo por fila (10 casos de datos inválidos), registro de rechazos y celulares, reloj adelantado, Last-Write-Wins, salud |
 | `PanelFuncionesTest` | 13 | Integración | Ficha, edición con las reglas de la sincronización, filtros, CSV filtrado, sesiones de celulares, desbloqueo, monitor, auditoría, CSP |
 | `AlcanceTest` | 4 | Integración | Descarga limitada a los municipios de cada encuestador |
-| `CatalogoTest` | 2 | Integración | Una base con el catálogo viejo (menos municipios, tildes dañadas) se completa y corrige sola; un celular con el catálogo nuevo puede enviar cualquier municipio |
+| `CatalogoTest` | 3 | Integración | Una base con el catálogo viejo (menos municipios, tildes dañadas) se completa y corrige sola; un código inexistente (95040) pasa al correcto y se retira; un celular con el catálogo nuevo puede enviar cualquier municipio |
 
 Las de integración levantan el servidor embebido de PHP contra una base desechable y hablan con él por HTTP, como lo haría un celular o un navegador.
 

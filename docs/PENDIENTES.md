@@ -17,7 +17,7 @@ Estado honesto del proyecto: qué falta, por qué no está y qué pasa si no se 
 | Panel de administración | ✅ Resumen, personas (ficha, edición, filtros, CSV, papelera), cuentas, monitor de sincronización y auditoría |
 | Diseño | ✅ Dirección «Cálida de territorio» en la PWA, el panel (incluido el acceso) y el inicio de Android; contraste AA verificado por prueba |
 | Privacidad | 🟡 Descarga por municipios y copias de seguridad cerradas; falta cifrado en el teléfono |
-| Pruebas automatizadas | ✅ 254: 85 Android, 72 PWA, 90 PHP, 7 de punta a punta. Ver [PRUEBAS.md](PRUEBAS.md) |
+| Pruebas automatizadas | ✅ 255: 85 Android, 72 PWA, 91 PHP, 7 de punta a punta. Ver [PRUEBAS.md](PRUEBAS.md) |
 | Catálogos | ✅ Los 1.122 municipios y las EPS de Colombia, con buscador, actualizados solos en teléfonos y servidor |
 | Despliegue | ✅ Producción al día con `main` |
 | Pruebas en celulares reales | ⏳ En curso; guía en [PRUEBAS-DE-CAMPO.md](PRUEBAS-DE-CAMPO.md) |
