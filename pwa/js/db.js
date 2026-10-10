@@ -344,7 +344,7 @@ export async function mezclarPersonasDescargadas(lista) {
  * Todo sale de IndexedDB: el encuestador puede verlo sin conexión, que es
  * cuando más falta le hace saber cuánto lleva y cuánto le queda por enviar.
  *
- * @returns {Promise<{hoy:number, total:number, pendientes:number, porDia:Array<{dia:string,total:number}>}>}
+ * @returns {Promise<{hoy:number, total:number, pendientes:number, porDia:Array<{dia:string,semana:string,total:number}>}>}
  */
 export async function resumenLocal(dias = 7) {
   const [personas, cola] = await Promise.all([getPersonas(), getAllSyncItems()]);
@@ -364,6 +364,8 @@ export async function resumenLocal(dias = 7) {
     const fin = ini + 86400000;
     porDia.push({
       dia: d.toLocaleDateString('es-CO', { day: '2-digit', month: '2-digit' }),
+      // Inicial del día de la semana para el eje del gráfico ("lu", "ma"…).
+      semana: d.toLocaleDateString('es-CO', { weekday: 'short' }).replace('.', '').slice(0, 2),
       total: vivas.filter(p => p.updated_at >= ini && p.updated_at < fin).length
     });
   }

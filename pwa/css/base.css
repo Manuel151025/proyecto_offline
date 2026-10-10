@@ -1,6 +1,16 @@
 /* Tokens de diseño, reset y contenedor de la app.
    Extraído de styles.css; el orden de carga en index.html preserva la cascada. */
 
+/* Figtree empaquetada con la app: el encuestador trabaja sin internet, así que
+   ninguna fuente puede depender de un servidor externo. Variable, 400–800. */
+@font-face {
+  font-family: 'Figtree';
+  src: url('../fonts/figtree-latin.woff2') format('woff2');
+  font-weight: 400 800;
+  font-style: normal;
+  font-display: swap;
+}
+
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 /* Paleta institucional única. Antes el login tenía su propia gama verde
@@ -11,37 +21,82 @@
   --primary: #12467E;
   --primary-dark: #0C325C;
   --primary-hover: #16599E;
-  --primary-tint: #EEF3F9;
+  --primary-tint: #E8EFF7;
   --primary-light: #7A9BC4;
   --on-primary: #ffffff;
+  --accent: #B4532A;
+  --accent-tint: #F8E9E1;
 
   /* Superficies y texto */
   --surface: #FFFFFF;
-  --surface-alt: #F7F9FC;
-  --bg: #F2F5F9;
-  --on-surface: #16202C;
-  --on-surface-secondary: #5B6878;
-  --on-surface-muted: #8695A8;
-  --divider: #DCE3EC;
-  --border-input: #C3CDDA;
+  --surface-alt: #FBFAF7;
+  --bg: #F6F4EF;
+  --on-surface: #1C2430;
+  --on-surface-secondary: #5A6370;
+  --on-surface-muted: #858B94;
+  --divider: #E4E0D8;
+  --border-input: #D8D3C9;
 
   /* Estados semánticos */
   --error: #B3261E;
-  --error-bg: #FCEEEE;
-  --warning: #A15C00;
-  --warning-bg: #FDF3E4;
-  --success: #1B7A4B;
-  --success-bg: #E8F5EE;
+  --error-bg: #FBEAE8;
+  --warning: #8A5200;
+  --warning-bg: #FBF0DC;
+  --success: #1E6B44;
+  --success-bg: #E5F3EB;
   --info: #12467E;
-  --info-bg: #EEF3F9;
+  --info-bg: #E8EFF7;
 
   /* Forma y profundidad. Sombras contenidas: lo institucional pide sobriedad,
      no relieve. La elevación se sugiere con bordes finos, no con desenfoques. */
-  --radius: 10px;
-  --radius-sm: 8px;
-  --shadow: 0 1px 2px rgba(22,32,44,0.06), 0 1px 3px rgba(22,32,44,0.08);
-  --shadow-lg: 0 4px 12px rgba(22,32,44,0.08), 0 1px 3px rgba(22,32,44,0.06);
-  --focus-ring: 0 0 0 3px rgba(18,70,126,0.16);
+  --radius: 18px;
+  --radius-sm: 14px;
+  --radius-lg: 22px;
+  --shadow: 0 1px 2px rgba(28,36,48,0.05);
+  --shadow-lg: 0 6px 18px rgba(28,36,48,0.10);
+  --focus-ring: 0 0 0 4px rgba(18,70,126,0.14);
+  --warning-border: #EED6A8;
+  --success-border: #BFE3D0;
+  --error-border: #F1C9C4;
+  --hero-text: #ffffff;
+  --font: 'Figtree', 'Segoe UI', Roboto, sans-serif;
+}
+
+/* Modo oscuro: sigue la preferencia del teléfono. No es un espejo de la
+   paleta clara (por eso no sale de design/tokens.json): el azul institucional
+   no contrasta sobre fondo oscuro y pasa a su versión clara. */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --primary: #9EC0E8;
+    --primary-dark: #C9DBF1;
+    --primary-hover: #B5D0EE;
+    --primary-tint: #23364D;
+    --on-primary: #0A2749;
+    --accent: #C8643A;
+    --accent-tint: #3A2419;
+    --surface: #1C2026;
+    --surface-alt: #22272E;
+    --bg: #121417;
+    --on-surface: #E8EAED;
+    --on-surface-secondary: #A9B2BE;
+    --on-surface-muted: #7D8692;
+    --divider: #2C323A;
+    --border-input: #3A414B;
+    --error: #F2B8B5;
+    --error-bg: #3D1C1A;
+    --error-border: #5C2B27;
+    --warning: #F2C26B;
+    --warning-bg: #3A2E17;
+    --warning-border: #5A4520;
+    --success: #7FD3A5;
+    --success-bg: #163626;
+    --success-border: #24513A;
+    --info: #9EC0E8;
+    --info-bg: #23364D;
+    --hero-text: #ffffff;
+    --shadow: none;
+    --shadow-lg: 0 6px 18px rgba(0,0,0,0.4);
+  }
 }
 
 /* Utilidad: debe ganar siempre. Sin !important pierde contra cualquier clase
@@ -52,7 +107,7 @@
 
 html, body {
   height: 100%;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: var(--font);
   font-size: 16px;
   color: var(--on-surface);
   background: var(--bg);
@@ -68,7 +123,10 @@ html, body {
   margin: 0 auto;
   background: var(--surface);
   box-shadow: var(--shadow-lg);
+  background: var(--bg);
 }
+
+button, input, select, textarea { font-family: inherit; }
 
 /* Respeta a quien pide menos animación en su sistema operativo. */
 @media (prefers-reduced-motion: reduce) {

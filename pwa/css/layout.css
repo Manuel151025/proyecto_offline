@@ -1,57 +1,65 @@
 /* Estructura: cabecera, área de contenido y navegación inferior.
-   Extraído de styles.css; el orden de carga en index.html preserva la cascada. */
+   Dirección visual "Cálida de territorio": cabecera clara sobre fondo cálido,
+   y la acción de registrar como botón terracota en el centro de la barra. */
 
-/* ---- Header ---- */
+/* ---- Cabecera ---- */
 .app-header {
-  background: var(--primary);
-  color: var(--on-primary);
-  padding: 0 16px;
-  height: 56px;
+  background: var(--bg);
+  color: var(--on-surface);
+  padding: 14px 16px 8px;
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 10px;
   flex-shrink: 0;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.2);
   z-index: 10;
 }
 
-.app-title {
-  font-size: 1.1rem;
-  font-weight: 600;
-  letter-spacing: 0.3px;
-}
+.app-brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.app-logo { width: 36px; height: 36px; flex-shrink: 0; }
+.app-title { font-size: 1.06rem; font-weight: 800; letter-spacing: -0.01em; line-height: 1.15; }
+.app-subtitle { font-size: 0.75rem; color: var(--on-surface-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 170px; }
 
+.app-header-actions { display: flex; align-items: center; gap: 8px; }
+
+/* Estado de conexión: punto + palabra; el color nunca va solo. */
 .online-badge {
-  width: 10px; height: 10px;
-  border-radius: 50%;
-  background: #81C784;
-  border: 2px solid rgba(255,255,255,0.5);
-  transition: background 0.3s;
-}
-.online-badge.offline { background: #EF9A9A; }
-
-.app-header-actions {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 12px;
+  gap: 6px;
+  height: 28px;
+  padding: 0 11px;
+  border-radius: 99px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  white-space: nowrap;
+  background: var(--success-bg);
+  color: var(--success);
 }
+.online-badge::before {
+  content: '';
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.online-badge.offline { background: var(--warning-bg); color: var(--warning); }
 
 .btn-salir {
-  background: rgba(255,255,255,0.14);
-  border: 1px solid rgba(255,255,255,0.25);
-  color: var(--on-primary);
-  font-family: inherit;
-  font-size: 0.78rem;
-  font-weight: 600;
-  padding: 5px 11px;
-  border-radius: 99px;
+  min-width: 44px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 0;
+  border-radius: 12px;
+  color: var(--on-surface-secondary);
   cursor: pointer;
-  transition: background 0.15s;
 }
-.btn-salir:hover { background: rgba(255,255,255,0.26); }
-.btn-salir:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+.btn-salir:hover { background: var(--surface); color: var(--on-surface); }
+.btn-salir:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
 
-/* ---- Main content ---- */
+/* ---- Contenido ---- */
 #app-root {
   flex: 1;
   overflow: hidden;
@@ -68,20 +76,24 @@
   flex: 1;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  padding: 12px 16px 80px;
+  padding: 8px 16px 32px;
 }
 
-/* ---- Bottom nav ---- */
+/* ---- Navegación inferior ---- */
 .bottom-nav {
   display: flex;
+  align-items: center;
+  justify-content: space-around;
   background: var(--surface);
   border-top: 1px solid var(--divider);
-  height: 60px;
+  height: 76px;
+  padding-bottom: env(safe-area-inset-bottom, 0);
   flex-shrink: 0;
 }
 
 .nav-item {
-  flex: 1;
+  min-width: 76px;
+  min-height: 52px;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -89,22 +101,29 @@
   gap: 3px;
   cursor: pointer;
   color: var(--on-surface-secondary);
-  font-size: 0.68rem;
-  font-weight: 500;
-  letter-spacing: 0.3px;
+  font-size: 0.75rem;
+  font-weight: 700;
   border: none;
   background: none;
-  padding: 8px 0;
+  border-radius: 14px;
   transition: color 0.2s;
   -webkit-tap-highlight-color: transparent;
 }
-.nav-item:hover { color: var(--primary); }
-.nav-item.active { color: var(--primary); }
-.nav-item.active .nav-icon { transform: scale(1.1); }
+.nav-item:hover, .nav-item.active { color: var(--primary); }
+.nav-item:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.nav-icon { width: 24px; height: 24px; }
 
-.nav-icon {
-  font-size: 1.4rem;
-  line-height: 1;
-  transition: transform 0.2s;
+/* La acción principal: registrar. El terracota se reserva para ella. */
+.nav-item.nav-fab {
+  min-width: 0;
+  width: 62px;
+  height: 62px;
+  margin-top: -28px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #ffffff;
+  box-shadow: 0 6px 16px rgba(180,83,42,0.35);
 }
-
+.nav-item.nav-fab:hover { color: #ffffff; filter: brightness(1.05); }
+.nav-item.nav-fab .nav-icon { width: 28px; height: 28px; }
+.nav-item.nav-fab span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); }

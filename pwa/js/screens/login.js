@@ -14,7 +14,7 @@ export async function render(container) {
       <div class="login-container">
         <header class="login-header">
           <div class="login-logo">
-            <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true">
+            <svg width="26" height="26" viewBox="0 0 24 24" aria-hidden="true">
               <path d="M10 3h4v7h7v4h-7v7h-4v-7H3v-4h7z" fill="#ffffff"/>
             </svg>
           </div>

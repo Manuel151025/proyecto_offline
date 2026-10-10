@@ -8,6 +8,7 @@ export async function render(container) {
   container.innerHTML = `
     <div class="screen">
       <div class="screen-content sync-screen">
+        <h1 class="sync-titulo">Envío de datos</h1>
         <div class="sync-status-card" id="sync-status-card">
           <div class="sync-connection" id="sync-connection">
             <span class="connection-dot" id="conn-dot"></span>
@@ -26,7 +27,7 @@ export async function render(container) {
           </div>
           <div class="count-card count-error">
             <div class="count-number" id="count-error">—</div>
-            <div class="count-label">Con error</div>
+            <div class="count-label">Por reintentar</div>
           </div>
           <div class="count-card count-rechazado">
             <div class="count-number" id="count-rechazado">—</div>
@@ -35,7 +36,7 @@ export async function render(container) {
         </div>
 
         <button class="btn btn-primary btn-full btn-sync" id="btn-sync">
-          &#8635; Sincronizar ahora
+          Sincronizar ahora
         </button>
 
         <div class="sync-history-title">Historial de cola</div>
@@ -71,7 +72,7 @@ export async function render(container) {
       showToast('Error: ' + err.message, 'error');
     } finally {
       btn.disabled = false;
-      btn.textContent = '⟳ Sincronizar ahora';
+      btn.textContent = 'Sincronizar ahora';
       await refreshScreen();
     }
   };

@@ -1,5 +1,6 @@
 // Subir esta versión en cada cambio de JS/CSS: el fetch es cache-first, así que
 // sin bump los navegadores seguirían sirviendo los archivos viejos.
+// v18: rediseño "Cálida de territorio" y fuente Figtree empaquetada (sin red).
 // v17: subida por lotes, cursor de descarga, reintentos, validación del formulario,
 //      rechazados visibles y subida en segundo plano desde el service worker.
 // v16: un registro rechazado por el servidor deja de reintentarse (bloqueaba la cola).
@@ -14,12 +15,13 @@
 // v7: .hidden pasa a !important (el spinner del login se veía siempre).
 // v6: styles.css se dividió en 7 hojas por responsabilidad.
 // v5: api.js y session.js ahora envían el token de autenticación en la sincronización.
-const CACHE = 'encuestas-v17';
+const CACHE = 'encuestas-v18';
 
 const ASSETS = [
   './index.html',
   './manifest.json',
   './icons/icon.svg',
+  './fonts/figtree-latin.woff2',
   './css/base.css',
   './css/layout.css',
   './css/components.css',

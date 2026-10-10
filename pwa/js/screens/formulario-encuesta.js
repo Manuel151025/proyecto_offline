@@ -35,9 +35,9 @@ export async function render(container, params) {
   container.innerHTML = `
     <div class="screen screen-form">
       <div class="form-header">
-        <button class="btn-back" id="btn-back">&#8592;</button>
+        <button class="btn-back" id="btn-back" aria-label="Volver"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg></button>
         <h2>${title}</h2>
-        ${isEdit ? '<button class="btn-delete" id="btn-delete" title="Eliminar">&#128465;</button>' : ''}
+        ${isEdit ? '<button class="btn-delete" id="btn-delete" title="Eliminar" aria-label="Eliminar persona"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M3 6h18M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6M10 11v6M14 11v6M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg></button>' : ''}
       </div>
       <div class="screen-content">
         <form id="encuesta-form" novalidate>

@@ -1,39 +1,50 @@
-/* Piezas reutilizables: búsqueda, tarjetas, insignias, FAB, estado vacío.
-   Extraído de styles.css; el orden de carga en index.html preserva la cascada. */
+/* Piezas reutilizables: búsqueda, tarjetas, estados, inicio y estado vacío.
+   Dirección "Cálida de territorio": esquinas generosas, bordes finos, cuerpo
+   de 15–16 px y objetivos táctiles de 48 px o más para el trabajo al sol. */
 
-/* ---- Search bar ---- */
-.screen-top {
-  padding: 12px 16px 4px;
-  background: var(--surface);
-  border-bottom: 1px solid var(--divider);
-  flex-shrink: 0;
+/* ---- Saludo de inicio ---- */
+.saludo { padding: 4px 0 14px; }
+.saludo h1 { font-size: 1.75rem; font-weight: 800; letter-spacing: -0.02em; line-height: 1.15; }
+.saludo p { font-size: 0.95rem; color: var(--on-surface-secondary); margin-top: 2px; }
+
+/* ---- Búsqueda ---- */
+.screen-top { padding: 0 16px 10px; flex-shrink: 0; }
+
+.search-label {
+  display: block;
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: var(--on-surface-secondary);
+  margin-bottom: 6px;
 }
-
 .search-bar {
   display: flex;
   align-items: center;
-  background: var(--bg);
-  border-radius: 24px;
-  padding: 8px 14px;
   gap: 8px;
+  height: 50px;
+  padding: 0 14px;
+  background: var(--surface);
+  border: 1.5px solid var(--border-input);
+  border-radius: var(--radius-sm);
 }
-.search-icon { color: var(--on-surface-secondary); font-size: 1rem; }
+.search-bar:focus-within { border-color: var(--primary); box-shadow: var(--focus-ring); }
+.search-icon { width: 18px; height: 18px; color: var(--on-surface-secondary); flex-shrink: 0; }
 .search-bar input {
   flex: 1;
+  min-width: 0;
   border: none;
   background: transparent;
   outline: none;
-  font-size: 0.9rem;
+  font-size: 1rem;
   color: var(--on-surface);
 }
 
-/* ---- Cards / Persona list ---- */
+/* ---- Tarjetas y lista de personas ---- */
 .card {
   background: var(--surface);
   border-radius: var(--radius);
-  box-shadow: var(--shadow);
-  margin-bottom: 10px;
-  padding: 14px;
+  margin-bottom: 8px;
+  padding: 12px 14px;
   border: 1px solid var(--divider);
 }
 
@@ -41,149 +52,127 @@
   display: flex;
   align-items: center;
   gap: 12px;
+  min-height: 68px;
   cursor: pointer;
-  transition: box-shadow 0.15s, transform 0.1s;
+  transition: transform 0.1s, border-color 0.15s;
 }
-.persona-card:active { transform: scale(0.98); box-shadow: none; }
+.persona-card:hover { border-color: var(--border-input); }
+.persona-card:active { transform: scale(0.985); }
+.persona-card:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
 
-/* Fondo tenue con texto de marca en lugar de blanco sobre azul claro: esa
-   combinación daba 2.87:1 de contraste, por debajo del mínimo AA de 4.5:1. */
 .persona-avatar {
   width: 44px; height: 44px;
   border-radius: 50%;
   background: var(--primary-tint);
   color: var(--primary);
-  border: 1px solid var(--divider);
   display: flex; align-items: center; justify-content: center;
-  font-weight: 700;
-  font-size: 0.95rem;
+  font-weight: 800;
+  font-size: 0.9rem;
   flex-shrink: 0;
 }
 
 .persona-info { flex: 1; min-width: 0; }
-.persona-name { font-weight: 600; font-size: 0.95rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.persona-doc { font-size: 0.8rem; color: var(--on-surface-secondary); margin-top: 2px; }
-.persona-meta { font-size: 0.75rem; color: var(--on-surface-secondary); margin-top: 1px; }
-
+.persona-name { font-weight: 700; font-size: 1rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.persona-doc { font-size: 0.82rem; color: var(--on-surface-secondary); margin-top: 2px; }
+.persona-meta { font-size: 0.8rem; color: var(--on-surface-secondary); margin-top: 1px; }
 .persona-status { flex-shrink: 0; }
 
-/* ---- Badges ---- */
-.badge {
-  font-size: 0.7rem;
-  font-weight: 600;
-  padding: 3px 8px;
-  border-radius: 99px;
-  text-transform: uppercase;
-  letter-spacing: 0.3px;
+.lista-titulo {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin: 18px 0 8px;
+  font-size: 1rem;
+  font-weight: 800;
 }
+.lista-titulo span { font-size: 0.85rem; font-weight: 600; color: var(--on-surface-secondary); }
+
+/* ---- Estados (siempre icono o punto + palabra) ---- */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 99px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.badge svg { width: 13px; height: 13px; }
 .badge-success, .status-sent { background: var(--success-bg); color: var(--success); }
 .badge-warning, .status-pending { background: var(--warning-bg); color: var(--warning); }
 .badge-error, .status-error { background: var(--error-bg); color: var(--error); }
 
-/* ---- FAB ---- */
-.fab {
-  position: fixed;
-  bottom: 72px;
-  right: calc(50% - 240px + 16px);
-  width: 56px; height: 56px;
-  border-radius: 50%;
-  background: var(--primary);
-  color: var(--on-primary);
-  border: none;
-  font-size: 1.6rem;
-  cursor: pointer;
-  box-shadow: var(--shadow-lg);
-  display: flex; align-items: center; justify-content: center;
-  transition: background 0.2s, transform 0.1s;
-  z-index: 20;
+/* ---- Inicio: tarjeta destacada ---- */
+.hero {
+  position: relative;
+  overflow: hidden;
+  background: #12467E;
+  color: var(--hero-text);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  margin-bottom: 12px;
 }
-@media (max-width: 480px) {
-  .fab { right: 16px; }
+@media (prefers-color-scheme: dark) {
+  .hero { background: #1A3A5F; border: 1px solid #2A4E78; }
 }
-.fab:active { transform: scale(0.94); }
-.fab:hover { background: var(--primary-dark); }
+.hero-curvas { position: absolute; right: -20px; bottom: -14px; width: 220px; height: 120px; pointer-events: none; }
+.hero-principal { position: relative; display: flex; align-items: baseline; gap: 10px; }
+.hero-n { font-size: 3rem; font-weight: 800; line-height: 1; }
+.hero-principal span:last-child { font-size: 1rem; font-weight: 600; }
+.hero-datos { position: relative; display: flex; gap: 10px; margin-top: 16px; }
+.hero-dato { flex: 1; background: rgba(255,255,255,0.12); border-radius: 14px; padding: 10px 12px; }
+.hero-dato b { display: block; font-size: 1.4rem; font-weight: 800; }
+.hero-dato span { font-size: 0.82rem; }
+.hero-dato.pendiente b { color: #F6C77A; }
+.hero-nota { position: relative; margin-top: 14px; font-size: 0.88rem; line-height: 1.4; }
 
-/* ---- Empty state ---- */
-.empty-state {
-  text-align: center;
-  padding: 48px 24px;
-  color: var(--on-surface-secondary);
-}
-.empty-icon { font-size: 3rem; display: block; margin-bottom: 12px; }
-.empty-title { font-size: 1rem; font-weight: 600; margin-bottom: 6px; color: var(--on-surface); }
-.empty-sub { font-size: 0.85rem; }
-
-
-/* ---- Resumen del dispositivo (pantalla de inicio) ----
-   Va arriba de la lista: abajo solo se vería con pocos registros y quedaría
-   enterrado justo cuando el resumen empieza a ser más útil. */
-.resumen {
+/* ---- Inicio: semana ---- */
+.semana {
   background: var(--surface);
   border: 1px solid var(--divider);
   border-radius: var(--radius);
-  padding: 14px;
-  margin-bottom: 12px;
+  padding: 14px 16px;
 }
+.semana-cabecera { display: flex; justify-content: space-between; align-items: baseline; }
+.semana-cabecera h2 { font-size: 0.95rem; font-weight: 700; }
+.semana-cabecera span { font-size: 0.82rem; color: var(--on-surface-secondary); }
 
-.resumen-cifras {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-  margin-bottom: 14px;
-}
-
-.resumen-dato {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  padding: 6px 4px;
-  border-radius: var(--radius-sm);
-  background: var(--primary-tint);
-}
-.resumen-n {
-  font-size: 1.5rem;
-  font-weight: 700;
-  line-height: 1;
-  color: var(--primary);
-}
-.resumen-t {
-  font-size: 0.66rem;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.4px;
-  color: var(--on-surface-secondary);
-}
-
-/* Lo que falta por enviar se destaca: es lo único que exige una acción. */
-.resumen-dato.pendiente { background: var(--warning-bg); }
-.resumen-dato.pendiente .resumen-n { color: var(--warning); }
-
-/* Gráfico en CSS puro, sin librerías: la app debe funcionar sin conexión y
-   sin descargar nada. */
+/* Gráfico en CSS puro, sin librerías: la app debe funcionar sin conexión. */
 .resumen-grafico {
-  display: flex;
-  align-items: flex-end;
-  gap: 4px;
-  height: 56px;
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 8px;
+  align-items: end;
+  height: 76px;
+  margin-top: 10px;
 }
 .mini-col {
-  flex: 1;
   display: flex;
   flex-direction: column;
   justify-content: flex-end;
   align-items: center;
-  gap: 3px;
+  gap: 4px;
   height: 100%;
 }
 .mini-barra {
-  width: 100%;
-  background: var(--primary);
-  border-radius: 3px 3px 0 0;
-  min-height: 2px;
+  width: min(22px, 100%);
+  background: #B9CCE3;
+  border-radius: 6px 6px 0 0;
+  min-height: 3px;
 }
-.mini-eti {
-  font-size: 0.58rem;
-  color: var(--on-surface-muted);
-  white-space: nowrap;
+@media (prefers-color-scheme: dark) { .mini-barra { background: #3A5A80; } }
+.mini-col.hoy .mini-barra { background: var(--accent); }
+.mini-eti { font-size: 0.72rem; color: var(--on-surface-secondary); white-space: nowrap; }
+.mini-col.hoy .mini-eti { font-weight: 800; color: var(--on-surface); }
+
+/* ---- Estado vacío ---- */
+.empty-state {
+  text-align: center;
+  padding: 40px 24px;
+  color: var(--on-surface-secondary);
 }
+.empty-icon { width: 44px; height: 44px; color: var(--on-surface-muted); margin-bottom: 10px; }
+.empty-title { font-size: 1.05rem; font-weight: 800; margin-bottom: 6px; color: var(--on-surface); }
+.empty-sub { font-size: 0.92rem; }
