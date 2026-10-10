@@ -780,20 +780,38 @@ if ($aviso !== null) {
 
 <?php if (!$loggedIn): ?>
 <body class="pagina-acceso">
-<div class="franja"></div>
 <main class="acceso">
-  <div class="marca">
-    <img src="../../pwa/icons/icon.svg" alt="" width="38" height="38">
-    <div>
-      <p class="marca-nombre">ColOffline</p>
-      <p class="marca-sub">Ministerio de Salud · Encuestas demográficas</p>
+  <section class="acceso-portada">
+    <svg class="acceso-curvas" viewBox="0 0 600 400" fill="none" stroke="#E7A07B" stroke-width="1.6" aria-hidden="true" focusable="false">
+      <path d="M-20 360 C90 250 170 300 260 220 S420 120 620 170"/>
+      <path d="M-20 390 C100 290 190 336 282 258 S440 162 620 205"/>
+      <path d="M-20 420 C110 330 210 372 304 296 S460 204 620 240"/>
+      <path d="M-20 450 C120 370 230 408 326 334 S480 246 620 276"/>
+    </svg>
+    <div class="marca marca-clara">
+      <img src="../../pwa/icons/icon.svg" alt="" width="40" height="40">
+      <div>
+        <p class="marca-nombre">ColOffline</p>
+        <p class="marca-sub">Ministerio de Salud · Encuestas demográficas</p>
+      </div>
     </div>
-  </div>
+    <div class="acceso-mensaje">
+      <p class="acceso-titular">Lo que se registra en campo, en un solo lugar.</p>
+      <ul class="acceso-puntos">
+        <li><?= icono('resumen', 20) ?><span>Avance diario por municipio y por encuestador.</span></li>
+        <li><?= icono('sincronizacion', 20) ?><span>Celulares sin enviar y registros rechazados con su motivo.</span></li>
+        <li><?= icono('cuentas', 20) ?><span>Cuentas, roles y municipios de cada encuestador.</span></li>
+      </ul>
+    </div>
+    <p class="acceso-pie">Acceso restringido a administradores. Cada acción queda en la auditoría.</p>
+  </section>
 
-  <section class="tarjeta acceso-tarjeta" aria-labelledby="titulo-acceso">
+  <section class="acceso-lado">
+  <div class="tarjeta acceso-tarjeta" role="region" aria-labelledby="titulo-acceso">
     <div class="titulo">
+      <span class="acceso-candado"><?= icono('cuentas', 20) ?></span>
       <h1 id="titulo-acceso">Panel de administración</h1>
-      <p><?= $modoArranque ? 'Configuración inicial del panel.' : 'Entra con una cuenta de administrador.' ?></p>
+      <p><?= $modoArranque ? 'Configuración inicial del panel.' : 'Entra con tu cuenta de administrador.' ?></p>
     </div>
 
     <?= $htmlAviso ?>
@@ -826,11 +844,12 @@ if ($aviso !== null) {
         </div>
       </div>
 
-      <button class="btn btn-primario btn-bloque" type="submit">Ingresar</button>
+      <button class="btn btn-primario btn-bloque btn-grande" type="submit">Ingresar</button>
     </form>
-  </section>
+  </div>
 
   <a class="acceso-volver" href="../../pwa/"><?= icono('volver', 16) ?>Volver a la app de encuestas</a>
+  </section>
 </main>
 </body>
 

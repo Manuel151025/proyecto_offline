@@ -195,19 +195,71 @@ ul, ol { list-style: none; }
 
 /* ======================================================= Acceso (login) */
 
-.pagina-acceso { min-height: 100vh; display: flex; flex-direction: column; }
-.franja { height: 4px; background: var(--primary); flex-shrink: 0; }
+/* Dos columnas en pantalla ancha: portada azul con la marca y lo que ofrece
+   el panel, y el formulario sobre el fondo cálido. En el celular la portada
+   se reduce a una banda y la tarjeta sube sobre ella, como en la app. */
+.pagina-acceso { min-height: 100vh; }
 
 .acceso {
-  flex: 1;
-  width: 100%;
-  max-width: 408px;
-  margin: 0 auto;
-  padding: 40px 16px 32px;
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+}
+
+.acceso-portada {
+  position: relative;
+  overflow: hidden;
+  background: var(--primary);
+  color: #fff;
+  padding: 44px 56px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: 32px;
+}
+.acceso-curvas { position: absolute; right: -40px; bottom: -30px; width: 620px; max-width: 120%; opacity: 0.75; pointer-events: none; }
+.acceso-portada > :not(.acceso-curvas) { position: relative; }
+
+.marca-clara .marca-nombre { color: #fff; font-size: 1.2rem; }
+.marca-clara .marca-sub { color: #D5E2F1; font-size: 0.82rem; }
+.marca-clara img { width: 40px; height: 40px; border-radius: 12px; background: #fff; padding: 3px; }
+
+.acceso-mensaje { max-width: 440px; }
+.acceso-titular { font-size: 2rem; font-weight: 800; line-height: 1.15; letter-spacing: -0.02em; }
+.acceso-puntos { margin-top: 24px; display: flex; flex-direction: column; gap: 14px; }
+.acceso-puntos li { display: flex; align-items: flex-start; gap: 12px; font-size: 0.98rem; line-height: 1.45; color: #E8EFF7; }
+.acceso-puntos svg {
+  flex-shrink: 0; width: 34px; height: 34px; padding: 7px;
+  border-radius: 10px; background: rgba(255, 255, 255, 0.12); color: #fff;
+}
+.acceso-pie { font-size: 0.8rem; color: #B9CCE3; }
+
+.acceso-lado {
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: 20px;
+  align-items: center;
+  gap: 18px;
+  padding: 40px 24px;
+  position: relative;
+  z-index: 1;
+}
+.acceso-lado .acceso-tarjeta { width: 100%; max-width: 400px; }
+
+.acceso-candado {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 44px; height: 44px; margin-bottom: 12px;
+  border-radius: 14px; background: var(--acento-tinte); color: var(--acento);
+}
+
+.btn-grande { min-height: 48px; font-size: 1rem; }
+
+@media (max-width: 860px) {
+  .acceso { grid-template-columns: 1fr; grid-template-rows: auto 1fr; }
+  .acceso-portada { padding: 28px 20px 84px; gap: 0; }
+  .acceso-mensaje, .acceso-pie { display: none; }
+  .acceso-curvas { width: 420px; }
+  .acceso-lado { justify-content: flex-start; margin-top: -60px; padding: 0 16px 32px; }
 }
 
 .marca { display: flex; align-items: center; gap: 12px; min-width: 0; }
@@ -215,8 +267,9 @@ ul, ol { list-style: none; }
 .marca-nombre { font-size: 1.05rem; font-weight: 800; line-height: 1.2; color: var(--texto); }
 .marca-sub { font-size: 0.75rem; color: var(--texto-2); line-height: 1.3; }
 
-.acceso-tarjeta { padding: 24px 22px; display: flex; flex-direction: column; gap: 16px; }
-.acceso-tarjeta h1 { font-size: 1.3rem; font-weight: 800; }
+.acceso-tarjeta { padding: 28px 26px; display: flex; flex-direction: column; gap: 16px; box-shadow: 0 12px 32px rgba(28, 36, 48, 0.10); }
+.acceso-tarjeta .input { min-height: 46px; }
+.acceso-tarjeta h1 { font-size: 1.45rem; font-weight: 800; letter-spacing: -0.01em; }
 .acceso-tarjeta .titulo p { font-size: 0.85rem; color: var(--texto-2); margin-top: 2px; }
 .acceso-tarjeta form .btn { margin-top: 20px; }
 
@@ -360,6 +413,8 @@ ul, ol { list-style: none; }
   transition: background-color 0.12s;
 }
 .grafico-col:hover .grafico-barra { background: var(--primary-hover); }
+/* Hoy en terracota, como en la app: el acento marca el día en curso. */
+.grafico-col.hoy .grafico-barra { background: var(--acento); }
 
 .grafico-valor {
   position: absolute; bottom: calc(var(--h) + 4px); left: 50%; transform: translateX(-50%);
@@ -494,6 +549,7 @@ ul, ol { list-style: none; }
 .nota-lista { padding: 12px 16px 0; font-size: 0.85rem; color: var(--texto-2); }
 .nota-lista + .tabla-contenedor, .nota-lista + .vacio { margin-top: 12px; border-top: 1px solid var(--divisor); }
 .tarjeta > .aviso { margin: 14px 16px 0; }
+.acceso-tarjeta > .aviso { margin: 0; }
 
 .paginacion {
   display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between;

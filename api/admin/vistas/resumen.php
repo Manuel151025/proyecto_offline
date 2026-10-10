@@ -83,7 +83,7 @@ $ultimoDia = count($porDia) - 1;
             <span class="grafico-guia" style="top: 50%"></span>
             <?php foreach ($porDia as $i => $d):
                 $etiqueta = etiquetaDia($d['dia']);
-                $borde = $i < 2 ? ' borde-ini' : ($i > $ultimoDia - 2 ? ' borde-fin' : ''); ?>
+                $borde = ($i < 2 ? ' borde-ini' : ($i > $ultimoDia - 2 ? ' borde-fin' : '')) . ($i === $ultimoDia ? ' hoy' : ''); ?>
               <div class="grafico-col<?= $borde ?>" style="--h: <?= round(100 * $d['total'] / $tope, 2) ?>%">
                 <span class="grafico-barra"></span>
                 <?php if ($i === $indiceMax): ?><span class="grafico-valor"><?= numero($d['total']) ?></span><?php endif; ?>
