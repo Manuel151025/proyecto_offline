@@ -10,6 +10,8 @@ API REST en PHP 8 sin framework. Todas las respuestas son JSON salvo el panel de
 |---|---|:---:|---|
 | `POST` | [`/auth/login.php`](#post-authloginphp) | — | Emitir token |
 | `POST` | [`/auth/logout.php`](#post-authlogoutphp) | Bearer | Revocar token |
+| `POST` | [`/auth/recuperar.php`](#post-authrecuperarphp) | — | «¿Olvidaste tu contraseña?»: enviar código al correo |
+| `POST` | [`/auth/restablecer.php`](#post-authrestablecerphp) | — | Fijar contraseña nueva con el código |
 | `POST` | [`/personas/sync.php`](#post-personassyncphp) | Bearer | **Subir** encuestas |
 | `GET` | [`/personas/cambios.php`](#get-personascambiosphp) | Bearer | **Bajar** cambios |
 | `GET` | [`/municipios/index.php`](#get-municipiosindexphp) | — | Catálogo DANE |
@@ -123,6 +125,55 @@ Revoca el token actual. **Idempotente**: siempre responde `200`, aunque el token
 ```json
 { "success": true, "message": "Sesión cerrada" }
 ```
+
+---
+
+## `POST /auth/recuperar.php`
+
+Paso 1 de «¿Olvidaste tu contraseña?». Si la cuenta existe, está activa y tiene correo, genera un **código de 6 dígitos** (vence en 15 minutos, se guarda solo su hash bcrypt, anula los anteriores) y lo envía por correo.
+
+```json
+{ "numero_documento": "1098765432" }
+```
+
+**Respuesta `200`**, siempre la misma, exista o no la cuenta y tenga o no correo (así no sirve para averiguar qué documentos están registrados):
+
+```json
+{
+  "success": true,
+  "message": "Si tu cuenta tiene un correo registrado, te enviamos un código de 6 dígitos. Revisa también la carpeta de spam. Si no te llega en unos minutos, pide a tu administrador que te asigne una contraseña nueva.",
+  "minutos": 15
+}
+```
+
+| Código | Cuándo |
+|---|---|
+| `400` | Documento vacío o con caracteres fuera de `[A-Za-z0-9-]` |
+| `429` | Más de 5 pedidos para el mismo documento en 15 minutos (`Retry-After`) |
+| `503` | El correo no está configurado (`SMTP_*`): la app le indica a la persona que pida el cambio a su administrador |
+
+---
+
+## `POST /auth/restablecer.php`
+
+Paso 2: con el código del correo, fija la contraseña nueva.
+
+```json
+{ "numero_documento": "1098765432", "codigo": "473152", "password": "ClaveNueva2026" }
+```
+
+**Respuesta `200`**: `{ "success": true, "message": "Listo. Ya puedes entrar con tu contraseña nueva." }`
+
+Al cambiarla: se marcan usados todos los códigos de la cuenta, se **revocan todas sus sesiones** (tokens de los celulares), se limpia el bloqueo por intentos de inicio de sesión y se envía un correo avisando del cambio.
+
+| Código | Cuándo |
+|---|---|
+| `400` | Código que no es de 6 dígitos · contraseña de menos de 10 caracteres · código equivocado, vencido, ya usado o anulado («El código no es válido o ya venció. Pide uno nuevo.») |
+| `429` | 5 códigos equivocados para el mismo documento en 15 minutos |
+
+Cada código admite **5 intentos**; al quinto error queda anulado aunque luego se escriba el correcto.
+
+**Correo.** Se envía por SMTP con `api/correo.php` (sin dependencias), configurado con `SMTP_HOST`, `SMTP_PUERTO`, `SMTP_USUARIO`, `SMTP_CLAVE`, `SMTP_REMITENTE`, `SMTP_NOMBRE`. Paso a paso con Gmail en [DESPLIEGUE.md](DESPLIEGUE.md#1--activar-olvidaste-tu-contraseña).
 
 ---
 
@@ -345,6 +396,9 @@ Toda acción responde con una redirección `303` y un aviso de un solo uso guard
 | `editar_persona` | Edita una persona con las mismas reglas que `sync.php`; sella ambas marcas para que llegue a los celulares |
 | `cerrar_sesiones` | Revoca los tokens de API de una cuenta (sus celulares deben volver a entrar) |
 | `desbloquear_cuenta` | Borra los intentos fallidos de una cuenta |
+| `probar_correo` | Envía un correo de prueba al correo de la cuenta del administrador, para comprobar la configuración `SMTP_*` |
+
+El formulario de cuentas (`save`) acepta además `email` (opcional, se guarda en minúsculas): es a donde llega el código de «¿Olvidaste tu contraseña?».
 
 Todas las acciones quedan en la tabla `auditoria_admin`, con antes y después cuando aplica. La contraseña nunca se registra. El panel envía `Content-Security-Policy` y solo carga recursos propios.
 

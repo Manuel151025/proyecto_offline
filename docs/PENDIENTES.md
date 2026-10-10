@@ -17,12 +17,23 @@ Estado honesto del proyecto: qué falta, por qué no está y qué pasa si no se 
 | Panel de administración | ✅ Resumen, personas (ficha, edición, filtros, CSV, papelera), cuentas, monitor de sincronización y auditoría |
 | Diseño | ✅ Dirección «Cálida de territorio» en la PWA, el panel (incluido el acceso) y el inicio de Android; contraste AA verificado por prueba |
 | Privacidad | 🟡 Descarga por municipios y copias de seguridad cerradas; falta cifrado en el teléfono |
-| Pruebas automatizadas | ✅ 255: 85 Android, 72 PWA, 91 PHP, 7 de punta a punta. Ver [PRUEBAS.md](PRUEBAS.md) |
+| Pruebas automatizadas | ✅ 271: 89 Android, 72 PWA, 102 PHP, 8 de punta a punta. Ver [PRUEBAS.md](PRUEBAS.md) |
+| Recuperar contraseña | 🟡 Programado y probado; falta poner la cuenta de Gmail en Dokploy ([DESPLIEGUE.md §1](DESPLIEGUE.md#1--activar-olvidaste-tu-contraseña)) |
+| Google Play | ⏳ App lista para firmar y subir (targetSdk 36, ficha e imágenes en `docs/play/`); falta la cuenta de desarrollador ([DESPLIEGUE.md §5](DESPLIEGUE.md#5--publicar-en-google-play)) |
 | Catálogos | ✅ Los 1.122 municipios y las EPS de Colombia, con buscador, actualizados solos en teléfonos y servidor |
 | Despliegue | ✅ Producción al día con `main` |
 | Pruebas en celulares reales | ⏳ En curso; guía en [PRUEBAS-DE-CAMPO.md](PRUEBAS-DE-CAMPO.md) |
 
 ---
+
+## 0 · Pasos que solo puedes hacer tú
+
+Todo el código está listo; estos pasos necesitan tus cuentas. El paso a paso está en [DESPLIEGUE.md](DESPLIEGUE.md#0--lista-de-cierre).
+
+1. **Correo para «¿Olvidaste tu contraseña?»**: cuenta de Gmail con verificación en 2 pasos, contraseña de aplicación y variables `SMTP_*` en Dokploy.
+2. **Retirar `ADMIN_PASSWORD`** de Dokploy si sigue definida.
+3. **Copias de seguridad automáticas** de la base (cron en el VPS).
+4. **Llave de firma de Android** y, si se va a publicar, **cuenta de Google Play**. Ojo: para publicar con el nombre «Ministerio de Salud» hace falta la autorización de la entidad.
 
 ## 1 · Pruebas en celulares reales
 

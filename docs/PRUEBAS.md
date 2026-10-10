@@ -2,15 +2,15 @@
 
 Inventario de las pruebas automáticas del sistema, qué cubre cada una y cómo correrlas.
 
-**Última ejecución completa:** 10 de octubre de 2026 · **255 pruebas, 0 fallos**.
+**Última ejecución completa:** 10 de octubre de 2026 · **271 pruebas, 0 fallos**.
 
 | Suite | Pruebas | Herramienta | Necesita |
 |---|---:|---|---|
-| Android (unitarias JVM) | 85 | JUnit 4 + MockK | JDK 17 (Gradle lo descarga) |
+| Android (unitarias JVM) | 89 | JUnit 4 + MockK | JDK 17 (Gradle lo descarga) |
 | PWA (unitarias, catálogos, paridad, contraste y tildes) | 72 | `node --test` | Node 20 o superior |
-| API y panel (integración + unitarias) | 91 | PHPUnit 11 | PHP 8.2 con `pdo_mysql` y un MySQL |
-| Punta a punta | 7 | `node --test` + Chrome/Edge | Node 22, PHP, MySQL y Chrome o Edge |
-| **Total** | **255** | | |
+| API y panel (integración + unitarias) | 102 | PHPUnit 11 | PHP 8.2 con `pdo_mysql` y un MySQL |
+| Punta a punta | 8 | `node --test` + Chrome/Edge | Node 22, PHP, MySQL y Chrome o Edge |
+| **Total** | **271** | | |
 
 Además corren en cada cambio: **PHPStan nivel 8** (0 errores), **Android Lint** (0 errores), la verificación del caché offline de la PWA y la de la paleta de diseño.
 
@@ -49,9 +49,9 @@ Las de punta a punta buscan Chrome o Edge en las rutas habituales; si está en o
 
 ```mermaid
 flowchart BT
-    U["Unitarias · 85 Android + 72 PWA + 31 PHP"]
-    I["Integración · 60 PHP con MySQL real"]
-    E["Punta a punta · 7 en navegador real"]
+    U["Unitarias · 89 Android + 72 PWA + 31 PHP"]
+    I["Integración · 71 PHP con MySQL real"]
+    E["Punta a punta · 8 en navegador real"]
     C["Campo · celular real (manual)"]
     U --> I --> E --> C
 ```
@@ -63,7 +63,7 @@ flowchart BT
 | Clase | Pruebas | Qué cubre |
 |---|---:|---|
 | `SyncRepositoryImplTest` | 23 | Envío por lotes de 100, confirmación parcial, rechazos terminales, descarga paginada con cursor, fallos de red |
-| `AuthRepositoryImplTest` | 10 | Inicio de sesión con y sin red, credenciales guardadas, cierre de sesión |
+| `AuthRepositoryImplTest` | 14 | Inicio de sesión con y sin red, credenciales guardadas, cierre de sesión, recuperación de contraseña (mensajes del servidor, sin red, credencial sin conexión actualizada) |
 | `ValidacionesTest` | 10 | Formato del documento por tipo, filtro de lo que se escribe, nombres, teléfono, textos libres, fecha |
 | `BuscadorCatalogoTest` | 8 | Catálogo completo con tildes; buscar municipio o departamento sin tildes; EPS |
 | `DecisionMezclaTest` | 6 | Qué conservar al descargar; nunca se pisa un cambio sin enviar |
@@ -102,6 +102,7 @@ Se corren en dos husos horarios (`America/Bogota`, desfase negativo, y `Asia/Tok
 | `SincronizacionTest` | 21 | Integración | Token, lote válido, cursor compuesto, lote de más de 500, rechazo por fila (10 casos de datos inválidos), registro de rechazos y celulares, reloj adelantado, Last-Write-Wins, salud |
 | `PanelFuncionesTest` | 13 | Integración | Ficha, edición con las reglas de la sincronización, filtros, CSV filtrado, sesiones de celulares, desbloqueo, monitor, auditoría, CSP |
 | `AlcanceTest` | 4 | Integración | Descarga limitada a los municipios de cada encuestador |
+| `RecuperacionTest` | 11 | Integración | «¿Olvidaste tu contraseña?» con un servidor SMTP falso: código por correo, cambio y cierre de sesiones, respuesta igual exista o no la cuenta, código de un solo uso, anulación tras 5 errores, vencimiento, política de contraseña, límite de pedidos, correo de prueba del panel y correo de cada cuenta |
 | `CatalogoTest` | 3 | Integración | Una base con el catálogo viejo (menos municipios, tildes dañadas) se completa y corrige sola; un código inexistente (95040) pasa al correcto y se retira; un celular con el catálogo nuevo puede enviar cualquier municipio |
 
 Las de integración levantan el servidor embebido de PHP contra una base desechable y hablan con él por HTTP, como lo haría un celular o un navegador.
@@ -119,6 +120,9 @@ Un navegador real (Chrome o Edge, sin ventana) recorre lo que hace una persona, 
 | 5 | Formulario | Lo que no corresponde no se puede escribir (`sdscf1ds5ds1c` → `151`, `584Jairo` → `Jairo`) y cada error se explica en su campo |
 | 6 | Sin señal | Busca el municipio («popa» → Popayán) y la EPS, registra a una persona sin red: queda **Pendiente**; al volver la señal pasa sola a **Enviada** |
 | 7 | De vuelta en el panel | La persona y el celular aparecen; ninguna página lanzó errores de JavaScript |
+| 8 | Olvidé mi contraseña | El administrador le pone correo al encuestador; en la app se pide el código, se lee del correo (SMTP falso), se cambia la contraseña y se entra con la nueva |
+
+Con `CAPTURAS_PLAY=docs/play` se ejecuta además un paso que toma las capturas de 1080×1920 para la ficha de Google Play.
 
 El control del navegador está en `tests/e2e/navegador.mjs` (protocolo DevTools con el `WebSocket` nativo de Node 22), sin Playwright ni Puppeteer. Con `CAPTURAS=<carpeta>` guarda una imagen de cada pantalla; las de [`docs/capturas/`](capturas/) salieron de ahí.
 

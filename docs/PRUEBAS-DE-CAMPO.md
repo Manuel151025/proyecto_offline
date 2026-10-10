@@ -36,6 +36,7 @@ Marca cada fila. «Tiempo» es lo que tarda en aparecer el registro en el panel 
 | 11 | Descarga de otro celular | Registrar en el teléfono A y sincronizar el B | La persona aparece en el B | ☐ | ☐ | |
 | 12 | Borrado desde el panel | Borrar en el panel y sincronizar | Desaparece del celular | ☐ | ☐ | |
 | 13 | Migración de la base (solo Android) | Instalar la versión nueva sobre la anterior con datos sin enviar | Los datos siguen ahí y suben | ☐ | n/a | — |
+| 14 | Olvidé mi contraseña | Con señal: «¿Olvidaste tu contraseña?» → código del correo → contraseña nueva | Llega el código (revisar spam); entra con la nueva; la sesión de otro celular con esa cuenta se cierra | ☐ | ☐ | |
 
 ## Antes de salir: lo que ya está probado solo
 
