@@ -1,5 +1,6 @@
 // Subir esta versión en cada cambio de JS/CSS: el fetch es cache-first, así que
 // sin bump los navegadores seguirían sirviendo los archivos viejos.
+// v20: login del panel, plural en la semana y pruebas de punta a punta.
 // v19: validación estricta por campo y filtro de lo que se escribe en el formulario.
 // v18: rediseño "Cálida de territorio" y fuente Figtree empaquetada (sin red).
 // v17: subida por lotes, cursor de descarga, reintentos, validación del formulario,
@@ -16,7 +17,7 @@
 // v7: .hidden pasa a !important (el spinner del login se veía siempre).
 // v6: styles.css se dividió en 7 hojas por responsabilidad.
 // v5: api.js y session.js ahora envían el token de autenticación en la sincronización.
-const CACHE = 'encuestas-v19';
+const CACHE = 'encuestas-v20';
 
 const ASSETS = [
   './index.html',

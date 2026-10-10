@@ -367,3 +367,53 @@ jobs:
             n=$((n + 1))
           done < <(find pwa -name '*.js' -type f)
           echo "✓ $n módulos validados"
+
+  e2e:
+    name: Punta a punta · panel y app en un navegador real
+    runs-on: ubuntu-latest
+    # Recorre lo que hace una persona: crea cuentas en el panel, entra a la
+    # app, registra sin señal, recupera la señal y comprueba que el registro
+    # llegó al panel. Usa una base y un servidor desechables.
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: root
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -proot"
+          --health-interval=5s --health-timeout=5s --health-retries=20
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Configurar PHP 8.2
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          extensions: pdo, pdo_mysql, mbstring
+
+      # Node 22 trae WebSocket nativo, con el que se controla el navegador
+      # sin instalar Playwright ni Puppeteer.
+      - name: Configurar Node 22
+        uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+
+      - name: Pruebas de punta a punta
+        env:
+          PRUEBAS_DB_HOST: 127.0.0.1
+          PRUEBAS_DB_USER: root
+          PRUEBAS_DB_PASS: root
+          NAVEGADOR: /usr/bin/google-chrome
+          CAPTURAS: capturas-e2e
+          TZ: America/Bogota
+        run: node --test tests/e2e/e2e.test.mjs
+
+      - name: Publicar capturas
+        if: always()
+        uses: actions/upload-artifact@v5
+        with:
+          name: capturas-e2e
+          path: capturas-e2e/
+          retention-days: 7

@@ -56,7 +56,7 @@ $limiteAlerta = (int)round(microtime(true) * 1000) - DIAS_ALERTA_DISPOSITIVO * 8
             <tr>
               <td><span class="celda-principal celda-codigo"><?= h($d['device_id']) ?></span></td>
               <td><?= !empty($d['encuestador']) ? h($d['encuestador']) : '<span class="apagado">—</span>' ?></td>
-              <td><?= h(ucfirst((string)($d['plataforma'] ?? '—'))) ?><span class="celda-sec"><?= !empty($d['version_app']) ? 'versión ' . h($d['version_app']) : '' ?></span></td>
+              <td><?= h(['pwa' => 'PWA (navegador)', 'android' => 'Android'][strtolower((string)($d['plataforma'] ?? ''))] ?? ucfirst((string)($d['plataforma'] ?? '—'))) ?><span class="celda-sec"><?= !empty($d['version_app']) ? 'versión ' . h($d['version_app']) : '' ?></span></td>
               <td class="celda-fecha"><?= h(haceCuanto($d['ultima_subida'])) ?></td>
               <td class="celda-fecha"><?= h(haceCuanto($d['ultima_descarga'])) ?></td>
               <td><span class="estado<?= $inactivo ? ' estado-alerta' : ' estado-activo' ?>"><?= $inactivo ? 'Sin sincronizar' : 'Al día' ?></span></td>

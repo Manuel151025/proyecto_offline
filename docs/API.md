@@ -179,7 +179,7 @@ Sube un lote de personas y encuestas. Resuelve conflictos por **Last-Write-Wins*
   "message": "Sincronización completada con 1 registro(s) rechazado(s).",
   "processed_encuestas": ["550e8400-e29b-41d4-a716-446655440000"],
   "rechazadas": [
-    { "id": "otro-uuid", "motivo": "El número de documento debe tener al menos 6 caracteres" }
+    { "id": "otro-uuid", "motivo": "El número de documento (CC) solo admite dígitos" }
   ]
 }
 ```
@@ -195,12 +195,28 @@ Sube un lote de personas y encuestas. Resuelve conflictos por **Last-Write-Wins*
 2. Si una persona se descarta, sus encuestas se rechazan también: la clave foránea apuntaría a una fila inexistente.
 3. **LWW:** si la persona ya existe y el `updated_at` entrante no es mayor, se ignora sin error.
 4. Máximo **500 registros** por arreglo (`413` si se excede).
-5. Tipos admitidos: `CC · TI · RC · CE · PP · NIT · PE`. Documento de 6 a 20 caracteres, solo `[A-Za-z0-9-]`.
-6. **Validación por fila** (rechazo con motivo, nunca `500`): nombres y apellidos sin dígitos; estrato de 1 a 6; correo con formato válido; fecha de nacimiento entre 1900 y hoy; `municipio_codigo` existente. Antes, un municipio desconocido violaba la clave foránea y tumbaba el lote entero.
+5. Tipos admitidos: `CC · TI · RC · CE · PP · NIT · PE`, cada uno con su formato (tabla de abajo).
+6. **Validación por fila** (rechazo con motivo, nunca `500`), con las reglas de la tabla. Antes, un municipio desconocido violaba la clave foránea y tumbaba el lote entero.
 7. **Relojes adelantados:** `updated_at` y `fecha_encuesta` se recortan a la hora del servidor + 5 minutos. Sin esto, un teléfono con la fecha mal puesta escribía registros que ninguna corrección posterior podía superar.
 8. Cada rechazo se guarda en `sync_rechazos` y el celular queda registrado en `dispositivos`, para el monitor del panel.
 
-Las reglas viven en [`api/personas/validacion.php`](../api/personas/validacion.php), compartido con la edición desde el panel.
+**Reglas por campo**
+
+| Campo | Regla | Motivo del rechazo (ejemplo) |
+|---|---|---|
+| `numero_documento` | Solo dígitos según el tipo: CC 6–10 · TI 10–11 · RC 10–11 · CE 6–10 · NIT 9–10 · PE 6–15. PP: letras y dígitos, 6–12 (se guarda en mayúsculas) | `El número de documento (CC) solo admite dígitos` |
+| `nombres`, `apellidos` | Obligatorios. Letras (con tildes y ñ), espacios, guion o apóstrofo; 2 a 60. Los espacios repetidos se colapsan | `El campo nombres no puede contener números` |
+| `telefono` | Opcional. `3` + 9 dígitos (celular) o `60` + 8 dígitos (fijo) | `El teléfono debe ser un celular de 10 dígitos…` |
+| `email` | Opcional. Formato válido, hasta 100 | `El correo electrónico no es válido` |
+| `direccion` | Opcional. 5–150; letras, dígitos, espacio y `# - . , / ° º`; al menos una letra | `El campo direccion debe tener entre 5 y 150 caracteres` |
+| `vereda` | Opcional. 3–100; letras, dígitos, espacio y `. ' -` | `El campo vereda tiene caracteres no permitidos` |
+| `eps` | Opcional. 3–50; letras, dígitos, espacio y `. & -` | |
+| `ocupacion` | Opcional. 3–60; letras, espacio y `, . -` | |
+| `estrato` | Opcional. Entero de 1 a 6 | `El estrato debe estar entre 1 y 6` |
+| `fecha_nacimiento` | Opcional. Entre 1900-01-01 y hoy (ms, medianoche UTC) | `La fecha de nacimiento no es válida` |
+| `municipio_codigo` | Opcional. Debe existir en `municipios` | `Municipio no reconocido: 99999` |
+
+Las reglas viven en [`api/personas/validacion.php`](../api/personas/validacion.php), compartido con la edición desde el panel. Son **las mismas** que aplican la PWA (`pwa/js/validacion.js`) y Android (`Validaciones.kt`); `pwa/tests/paridad.test.mjs` falla si alguna diverge.
 
 ---
 

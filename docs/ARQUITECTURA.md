@@ -13,6 +13,7 @@ Documento de referencia técnica del sistema de encuestas *offline-first* del Mi
 5. [Flujos principales](#5-flujos-principales)
 6. [Decisiones de arquitectura](#6-decisiones-de-arquitectura)
 7. [Estructura de carpetas](#7-estructura-de-carpetas)
+8. [Estrategia de pruebas](#8-estrategia-de-pruebas)
 
 ---
 
@@ -28,7 +29,7 @@ De ahí se derivan las tres propiedades que gobiernan todo el diseño:
 | **Nada se pierde ante un cierre inesperado** | Todo lo pendiente vive en disco, no en memoria (patrón Outbox). |
 | **Los conflictos se resuelven solos** | Dos encuestadores pueden tocar a la misma persona; el sistema decide sin intervención humana (Last-Write-Wins). |
 
-Hay **dos clientes independientes** —una app Android nativa y una PWA— que escriben contra la **misma API**. No comparten código: cada uno tiene su propia base local, su propia cola y su propia implementación de la sincronización. Lo que sí comparten es el **contrato** (la API) y las **reglas de resolución de conflictos**, que están replicadas deliberadamente en ambos y verificadas con pruebas equivalentes.
+Hay **dos clientes independientes** —una app Android nativa y una PWA— que escriben contra la **misma API**. No comparten código: cada uno tiene su propia base local, su propia cola y su propia implementación de la sincronización. Lo que sí comparten es el **contrato** (la API), las **reglas de resolución de conflictos**, las **reglas de validación** y la **paleta de diseño**: las reglas están replicadas deliberadamente en cada uno y una prueba de paridad exige que coincidan; la paleta sale de un único archivo (`design/tokens.json`).
 
 ---
 
@@ -39,7 +40,7 @@ graph TB
     subgraph Android["📱 App Android · Kotlin + Compose"]
         direction TB
         AP["<b>Presentation</b><br/>4 pantallas Compose<br/>ViewModels · StateFlow"]
-        AD["<b>Domain</b><br/>14 casos de uso<br/>DecisionMezcla · Validaciones<br/><i>Kotlin puro, sin framework</i>"]
+        AD["<b>Domain</b><br/>casos de uso<br/>DecisionMezcla · Validaciones<br/><i>Kotlin puro, sin framework</i>"]
         ADA["<b>Data</b><br/>Repositorios · Mappers · DTOs"]
         ARoom[("<b>Room v4</b><br/>personas · encuestas<br/>cola_sincronizacion · municipios")]
         APrefs[["SharedPreferences<br/><i>token · marca de descarga</i>"]]
@@ -53,13 +54,15 @@ graph TB
 
     subgraph PWA["🌐 PWA · JavaScript sin framework"]
         direction TB
-        PS["<b>Pantallas</b><br/>login · lista · formulario · sync"]
+        PS["<b>Pantallas</b><br/>login · inicio · formulario · envío"]
+        PV["<b>validacion.js</b><br/>limpiarCampo · validarPersona"]
         PR["router.js<br/><i>hash routing</i>"]
         PSync["<b>sync.js</b><br/>subida por lotes + descarga<br/>repartirRespuesta"]
         PDB["<b>db.js</b><br/>decidirMezcla"]
         PIDB[("<b>IndexedDB</b><br/>personas · sync_queue<br/>credenciales · municipios")]
-        PSW["<b>Service Worker</b> v16<br/><i>HTML red-primero</i><br/><i>estáticos caché-primero</i>"]
+        PSW["<b>Service Worker</b> v20<br/><i>HTML red-primero</i><br/><i>estáticos caché-primero</i><br/><i>subida en segundo plano</i>"]
         PR --> PS
+        PS --> PV
         PS --> PSync
         PS --> PDB
         PSync --> PDB
@@ -74,10 +77,11 @@ graph TB
         ESQ["<b>esquema.php</b><br/>automigración"]
         LOGIN["auth/login.php<br/><i>bcrypt → token</i>"]
         LOGOUT["auth/logout.php<br/><i>revoca</i>"]
+        VAL["<b>personas/validacion.php</b><br/>reglas por campo · DatoInvalido"]
         SYNC["personas/sync.php<br/><i>SUBIDA · LWW · transacción</i>"]
         CAMB["personas/cambios.php<br/><i>BAJADA · marca de agua</i>"]
         MUNI["municipios/index.php"]
-        ADMIN["admin/index.php<br/><i>panel · CSRF · sesión PHP</i>"]
+        ADMIN["admin/index.php<br/><i>panel · CSRF · sesión PHP</i><br/><i>vistas/: resumen · personas ·</i><br/><i>cuentas · sincronización · auditoría</i>"]
         ADMINQ["admin/consultas.php<br/><i>SQL del panel</i>"]
         LOGIN --> AUTH
         LOGIN --> RL
@@ -86,11 +90,13 @@ graph TB
         CAMB --> AUTH
         SYNC --> ESQ
         CAMB --> ESQ
+        SYNC --> VAL
+        ADMIN --> VAL
         ADMIN --> RL
         ADMIN --> ADMINQ
     end
 
-    DB[("🗄️ <b>MySQL 8.4</b><br/>municipios · encuestadores<br/>personas · encuestas<br/>sesiones · intentos_login")]
+    DB[("🗄️ <b>MySQL 8.4</b><br/>municipios · encuestadores<br/>personas · encuestas<br/>sesiones · intentos_login<br/>dispositivos · sync_rechazos<br/>auditoria_admin · encuestador_municipios")]
 
     AW ==>|"POST · Bearer"| SYNC
     AW ==>|"GET · Bearer"| CAMB
@@ -117,6 +123,8 @@ graph TB
     style DB fill:#12467E,color:#fff
     style PSync fill:#1B7A4B,color:#fff
     style PDB fill:#1B7A4B,color:#fff
+    style VAL fill:#B4532A,color:#fff
+    style PV fill:#B4532A,color:#fff
 ```
 
 ### Responsabilidades y fronteras
@@ -133,20 +141,22 @@ Lo que un componente **no** hace suele importar más que lo que hace: es la fron
 | `auth_token.php` | Emitir, validar y revocar tokens; resolver el rol | No decide qué puede hacer cada rol |
 | `rate_limit.php` | Contar fallos y calcular bloqueo | No responde por sí mismo (devuelve segundos) |
 | `esquema.php` | Crear columnas que falten | No mueve datos entre tablas |
+| `validacion.php` | Reglas de cada campo, compartidas por la sincronización y el panel | No decide qué hacer con la fila rechazada (eso es de `sync.php`) |
 | `sync.php` | Validar el lote, resolver LWW, transacción atómica | No confía en el `id_encuestador` del cliente |
 | `cambios.php` | Entregar lo cambiado desde una marca | No decide qué conserva el cliente |
 | Service Worker | Servir la app sin conexión | No cachea `/api/` |
 
 ### Las reglas duplicadas a propósito
 
-Dos piezas están **replicadas** en Android y en la PWA, y eso es intencional:
+Tres piezas están **replicadas**, y eso es intencional:
 
-| Regla | Android | PWA |
-|---|---|---|
-| Qué hacer con una persona descargada | [`DecisionMezcla.kt`](../app/src/main/java/com/minsalud/encuestas/domain/sync/DecisionMezcla.kt) | `decidirMezcla` en [`db.js`](../pwa/js/db.js) |
-| Qué se reintenta tras un envío parcial | `SyncRepositoryImpl` | `repartirRespuesta` en [`sync.js`](../pwa/js/sync.js) |
+| Regla | Android | PWA | Servidor | Qué las mantiene iguales |
+|---|---|---|---|---|
+| Qué hacer con una persona descargada | [`DecisionMezcla.kt`](../app/src/main/java/com/minsalud/encuestas/domain/sync/DecisionMezcla.kt) | `decidirMezcla` en [`db.js`](../pwa/js/db.js) | — | `DecisionMezclaTest.kt` y `mezcla.test.mjs` cubren los mismos casos |
+| Qué se reintenta tras un envío parcial | `SyncRepositoryImpl` | `repartirRespuesta` en [`sync.js`](../pwa/js/sync.js) | — | `SyncRepositoryImplTest` y `reparto.test.mjs` |
+| Validación de cada campo | [`Validaciones.kt`](../app/src/main/java/com/minsalud/encuestas/domain/validation/Validaciones.kt) | [`validacion.js`](../pwa/js/validacion.js) | [`validacion.php`](../api/personas/validacion.php) | [`paridad.test.mjs`](../pwa/tests/paridad.test.mjs) lee las tres fuentes y falla si difieren |
 
-No se comparte código porque las plataformas no lo permiten sin añadir un runtime intermedio que costaría más de lo que ahorra. Lo que sí se comparte es **la especificación y las pruebas**: `DecisionMezclaTest.kt` y `mezcla.test.mjs` cubren los mismos casos. Si un cliente cambia de criterio, la otra suite lo delata.
+No se comparte código porque las plataformas no lo permiten sin añadir un runtime intermedio que costaría más de lo que ahorra. Lo que sí se comparte es **la especificación y las pruebas**. Si un cliente cambia de criterio, otra suite lo delata.
 
 ---
 
@@ -172,7 +182,7 @@ graph TB
     end
 
     GH["🐙 GitHub<br/><i>main</i>"]
-    CI["⚙️ GitHub Actions<br/><i>android · php · pwa</i>"]
+    CI["⚙️ GitHub Actions<br/><i>android · php · pwa · e2e</i>"]
 
     AND -.->|"HTTPS<br/>cuando hay señal"| NGINX
     NAV -.->|HTTPS| NGINX
@@ -208,6 +218,10 @@ erDiagram
     ENCUESTADORES ||--o{ ENCUESTAS : "realiza"
     ENCUESTADORES ||--o{ SESIONES : "posee"
     PERSONAS ||--o{ ENCUESTAS : "es objeto de"
+    ENCUESTADORES ||--o{ ENCUESTADOR_MUNICIPIOS : "descarga"
+    MUNICIPIOS ||--o{ ENCUESTADOR_MUNICIPIOS : "asignado a"
+    ENCUESTADORES ||--o{ DISPOSITIVOS : "usa"
+    ENCUESTADORES ||--o{ AUDITORIA_ADMIN : "hace"
 
     MUNICIPIOS {
         varchar codigo PK "DIVIPOLA/DANE"
@@ -269,7 +283,45 @@ erDiagram
         varchar documento "clave del contador"
         bigint creado_en
     }
+
+    DISPOSITIVOS {
+        varchar device_id PK
+        int id_encuestador
+        varchar plataforma "android | pwa"
+        varchar version_app
+        bigint ultima_subida
+        bigint ultima_descarga
+        bigint ultima_actividad
+    }
+
+    SYNC_RECHAZOS {
+        int id PK
+        varchar id_encuesta
+        varchar tipo_documento
+        varchar numero_documento
+        varchar motivo "texto de DatoInvalido"
+        varchar device_id
+        int id_encuestador
+        bigint creado_en
+    }
+
+    AUDITORIA_ADMIN {
+        int id PK
+        int id_admin
+        varchar nombre_admin
+        varchar accion "entrar · borrar · crear cuenta…"
+        varchar objeto
+        text detalle
+        bigint creado_en
+    }
+
+    ENCUESTADOR_MUNICIPIOS {
+        int id_encuestador PK
+        varchar municipio_codigo PK
+    }
 ```
+
+Las cuatro últimas tablas las crea `api/esquema.php` la primera vez que se necesitan (ver [ADR-05](#adr-05--automigración-de-esquema)): no hace falta tocar la base a mano.
 
 ### Las dos marcas de tiempo
 
@@ -453,6 +505,70 @@ stateDiagram-v2
 
 El secreto compartido **se apaga solo**. No hay que acordarse de retirar nada para que deje de valer.
 
+### 5.6 Validación de un registro, en tres capas
+
+```mermaid
+flowchart TD
+    T["El encuestador escribe en un campo"] --> F{"limpiarCampo<br/><i>¿el carácter cabe en el campo?</i>"}
+    F -->|No| X["No entra<br/><i>letras en el teléfono, números en el nombre,<br/>más largo que el máximo</i>"]
+    F -->|Sí| G["Toca Guardar"]
+    G --> V{"validarPersona<br/><i>largos mínimos, formato por tipo de documento,<br/>teléfono 3… o 60…, fecha ≤ hoy</i>"}
+    V -->|Falla| E["Error debajo de cada campo<br/><i>no se guarda nada</i>"]
+    E --> T
+    V -->|Pasa| L["Se guarda en el teléfono<br/>+ evento PENDING en la cola"]
+    L --> S{"Servidor: validacion.php<br/><i>mismas reglas</i>"}
+    S -->|Pasa| OK["Persona guardada · SENT"]
+    S -->|Falla| R["Fila rechazada con su motivo<br/>RECHAZADO (terminal) · sync_rechazos"]
+    R --> C["El encuestador la ve en «Envío de datos»<br/>y la corrige con «Corregir»"]
+
+    style X fill:#B3261E,color:#fff
+    style E fill:#B3261E,color:#fff
+    style R fill:#B3261E,color:#fff
+    style OK fill:#1E6B44,color:#fff
+    style L fill:#12467E,color:#fff
+```
+
+Las dos primeras capas existen para que la tercera casi nunca actúe: un rechazo del servidor llega cuando el encuestador ya no está frente a la persona. La tercera existe porque la validación del cliente no protege nada frente a quien llama a la API con `curl`.
+
+| Campo | Regla |
+|---|---|
+| Documento | Solo dígitos según el tipo: CC 6–10 · TI y RC 10–11 · CE 6–10 · NIT 9–10 · PE 6–15. Solo el pasaporte (PP, 6–12) admite letras. |
+| Nombres y apellidos | Obligatorios, 2 a 60 caracteres: letras (con tildes y ñ), espacios, guion o apóstrofo. |
+| Teléfono | Opcional. Celular de 10 dígitos que empieza por 3, o fijo de 10 que empieza por 60. |
+| Correo | Opcional. Forma `algo@dominio.tld`, hasta 100. |
+| Dirección · vereda · EPS · ocupación | Opcionales. Largo mínimo (5 · 3 · 3 · 3) y máximo (150 · 100 · 50 · 60), caracteres permitidos y al menos una letra. |
+| Fecha de nacimiento | Opcional. Entre el 1 de enero de 1900 y hoy. |
+| Estrato | Opcional. Entero de 1 a 6. |
+| Municipio | Opcional. Debe existir en el catálogo. |
+
+### 5.7 Descarga limitada por municipios
+
+```mermaid
+flowchart LR
+    A["GET cambios.php<br/>con el token del encuestador"] --> B{"¿Tiene municipios<br/>asignados?"}
+    B -->|No| T["Recibe todas las personas"]
+    B -->|Sí| M["Recibe solo las de sus municipios<br/>+ las que él mismo registró"]
+
+    style M fill:#12467E,color:#fff
+```
+
+Un encuestador no necesita en su teléfono los datos de salud de todo el país. El administrador asigna municipios desde *Cuentas*; sin asignación, la cuenta descarga todo (comportamiento anterior, para no romper a nadie).
+
+### 5.8 Sistema de diseño: una paleta, tres superficies
+
+```mermaid
+flowchart LR
+    T[("design/tokens.json<br/><i>única fuente de la paleta</i>")] --> S["node scripts/tokens.mjs"]
+    S --> P["pwa/css/base.css<br/><i>--primary, --accent…</i>"]
+    S --> A["api/admin/admin.css<br/><i>--primary, --acento…</i>"]
+    S --> K["Theme.kt<br/><i>BrandPrimary, BrandAccent…</i>"]
+    CI["CI: tokens.mjs --verificar"] -.->|falla si alguien<br/>edita un color a mano| P & A & K
+
+    style T fill:#B4532A,color:#fff
+```
+
+La dirección visual es **«Cálida de territorio»**: azul institucional `#12467E`, fondo cálido `#F6F4EF` y un acento terracota `#B4532A` reservado para la acción de registrar y el día de hoy en los gráficos. La fuente **Figtree** va empaquetada en las tres superficies (`pwa/fonts/`, `res/font/`): no se descarga nada de terceros, así que la app se ve igual sin señal y no se filtra la IP de nadie a Google Fonts.
+
 ---
 
 ## 6. Decisiones de arquitectura
@@ -525,6 +641,32 @@ El secreto compartido **se apaga solo**. No hay que acordarse de retirar nada pa
 
 **Consecuencia.** No hay `node_modules` que servir ni bundle que invalidar; el Service Worker cachea archivos reales. El coste es que no hay reactividad automática: las pantallas se repintan a mano.
 
+### ADR-09 · Validación replicada en tres lugares, con prueba de paridad
+
+**Contexto.** El teléfono debe rechazar un dato malo mientras el encuestador sigue frente a la persona; el servidor no puede confiar en ningún cliente.
+
+**Decisión.** Las reglas viven en `validacion.js`, `Validaciones.kt` y `validacion.php`, con la misma tabla de formatos. `paridad.test.mjs` lee las tres y falla si difieren.
+
+**Alternativa descartada.** Un esquema JSON compartido exigiría un intérprete en cada plataforma y no cubre el filtro tecla a tecla.
+
+**Consecuencia aceptada.** Cambiar una regla obliga a tocar tres archivos; la prueba de paridad hace imposible olvidarse de uno.
+
+### ADR-10 · Paleta en un archivo y fuente empaquetada
+
+**Contexto.** La paleta estaba copiada a mano en la PWA, el panel y Android, y se desincronizaba.
+
+**Decisión.** `design/tokens.json` es la única fuente; `scripts/tokens.mjs` reescribe las tres y CI verifica que estén al día. Figtree se sirve desde el propio servidor y dentro del APK.
+
+**Consecuencia.** Un cambio de marca es un cambio en un archivo. La app no depende de ninguna red de terceros para verse bien.
+
+### ADR-11 · Pruebas de punta a punta sin Playwright
+
+**Contexto.** Faltaba una prueba que recorriera lo que hace una persona: panel → app → sin señal → con señal → panel.
+
+**Decisión.** `tests/e2e/` controla Chrome o Edge directamente por el protocolo DevTools con el `WebSocket` nativo de Node 22, sobre la misma base desechable de PHPUnit.
+
+**Por qué no Playwright.** Sumaría cientos de megas de dependencias a un proyecto que hoy no tiene `node_modules`, para usar una fracción mínima.
+
 ### Rotación de credenciales de base de datos
 
 Cambiar `DB_PASS` en el entorno **no cambia la contraseña de MySQL**: el `MYSQL_PASSWORD` del compose solo lo aplica el arranque sobre un volumen vacío. Secuencia sin corte de servicio (MySQL 8.0.14+):
@@ -547,14 +689,18 @@ ALTER USER 'encuestas_user'@'%' DISCARD OLD PASSWORD;
 proyecto_offline/
 ├── api/                         # API REST en PHP, sin framework
 │   ├── admin/
-│   │   ├── index.php            # Panel: vista + acciones
+│   │   ├── index.php            # Panel: acceso, acciones y estructura
+│   │   ├── vistas/              # resumen · personas · persona · cuentas · sincronización · auditoría
+│   │   ├── vista.php            # ayudantes de HTML (iconos, avisos, fechas)
+│   │   ├── admin.css admin.js   # estilos y mejoras progresivas
 │   │   └── consultas.php        # Todo el SQL del panel
 │   ├── auth/
 │   │   ├── login.php            # bcrypt → token
 │   │   └── logout.php           # revoca el token
 │   ├── personas/
 │   │   ├── sync.php             # SUBIDA · LWW · transacción
-│   │   └── cambios.php          # BAJADA · marca de agua
+│   │   ├── cambios.php          # BAJADA · marca de agua · por municipios
+│   │   └── validacion.php       # reglas por campo (sync y panel)
 │   ├── municipios/index.php
 │   ├── auth_token.php           # emitir / validar / rol
 │   ├── cors.php                 # lista blanca + cabeceras
@@ -579,21 +725,55 @@ proyecto_offline/
 │
 ├── pwa/                         # PWA sin framework
 │   ├── css/                     # 7 hojas por responsabilidad
+│   ├── fonts/                   # Figtree empaquetada
 │   ├── js/
-│   │   ├── screens/             # login · lista · formulario · sync
-│   │   ├── db.js                # IndexedDB + decidirMezcla
+│   │   ├── screens/             # login · inicio · formulario · envío
+│   │   ├── db.js                # IndexedDB + decidirMezcla + resumen del día
 │   │   ├── sync.js              # subida/bajada + repartirRespuesta
+│   │   ├── validacion.js        # limpiarCampo + validarPersona
 │   │   └── api.js router.js session.js utils.js
-│   ├── tests/                   # node --test, sin dependencias
+│   ├── tests/                   # node --test, sin dependencias (incluye paridad)
 │   └── sw.js                    # Service Worker
 │
+├── tests/
+│   ├── php/                     # PHPUnit: integración (API y panel) + unitarias de validación
+│   └── e2e/                     # navegador real: panel → app → sin señal → panel
+│
+├── design/tokens.json           # paleta: única fuente
+├── scripts/                     # tokens.mjs · check-pwa-assets.mjs
 ├── database/
 │   ├── schema.sql               # esquema completo + municipios DANE
 │   └── migrations/              # histórico versionado
 │
-├── docs/                        # esta documentación
-└── .github/workflows/ci.yml     # android · php · pwa
+├── docs/                        # esta documentación (+ capturas/)
+└── .github/workflows/ci.yml     # android · php · pwa · e2e
 ```
+
+---
+
+## 8. Estrategia de pruebas
+
+```mermaid
+flowchart BT
+    U["<b>Unitarias</b><br/>Android JVM · PWA (node --test) · PHP (validación)<br/><i>reglas, mezcla, reparto, fechas, filtros</i>"]
+    I["<b>Integración</b><br/>PHPUnit + MySQL real + servidor embebido<br/><i>sync, cursor, LWW, rechazos, panel, CSV, cuentas</i>"]
+    E["<b>Punta a punta</b><br/>tests/e2e · Chrome/Edge real<br/><i>panel → app → sin señal → con señal → panel</i>"]
+    G["<b>Guardas de CI</b><br/><i>fallos ya corregidos no pueden volver</i>"]
+    C["<b>Pruebas de campo</b><br/>celular real · docs/PRUEBAS-DE-CAMPO.md"]
+    U --> I --> E --> C
+    G -.-> U & I & E
+```
+
+| Capa | Dónde | Qué asegura |
+|---|---|---|
+| Unitarias | `app/src/test`, `pwa/tests`, `tests/php/ValidacionTest.php` | Cada regla por separado, con casos límite y en dos husos horarios |
+| Paridad | `pwa/tests/paridad.test.mjs` | Que las reglas de validación sean idénticas en PWA, servidor y Android |
+| Integración | `tests/php/*Test.php` | La API y el panel contra MySQL real, en modo estricto como producción |
+| Punta a punta | `tests/e2e/e2e.test.mjs` | El recorrido completo de una persona, en un navegador real |
+| Estáticas | PHPStan nivel 8, Android Lint, `check-pwa-assets`, `tokens --verificar` | Tipos, caché offline completa y paleta sin desviaciones |
+| Campo | [PRUEBAS-DE-CAMPO.md](PRUEBAS-DE-CAMPO.md) | Lo que solo un celular real revela: señal intermitente, batería, WorkManager |
+
+El inventario completo y cómo correr cada suite está en [PRUEBAS.md](PRUEBAS.md).
 
 ---
 
@@ -601,5 +781,7 @@ proyecto_offline/
 
 - [Historias de usuario](HISTORIAS-DE-USUARIO.md) — qué hace el sistema, con criterios de aceptación
 - [Referencia de la API](API.md) — endpoints, parámetros y respuestas
+- [Pruebas](PRUEBAS.md) — inventario de pruebas y cómo correrlas
+- [Manual de uso](MANUAL.md) — guía para encuestadores y administradores
 - [Pendientes y hoja de ruta](PENDIENTES.md) — qué falta y por qué
 - [README](../README.md) — puesta en marcha

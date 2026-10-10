@@ -66,3 +66,8 @@ phpunit.xml
 # Fuente de diseño y scripts de desarrollo: no se usan en ejecución.
 design/
 scripts/
+
+# Capturas de la documentación y pruebas de la PWA: solo sirven en el
+# repositorio. pwa/tests/ quedaba publicado en /pwa/tests/ sin necesidad.
+docs/
+pwa/tests/

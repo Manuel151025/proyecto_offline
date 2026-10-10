@@ -133,7 +133,7 @@ export async function render(container) {
           : 'Todo lo registrado ya llegó al servidor.'}</p>
       </section>
       <section class="semana" aria-label="Registros de los últimos 7 días">
-        <div class="semana-cabecera"><h2>Esta semana</h2><span>${semanaTotal} registros</span></div>
+        <div class="semana-cabecera"><h2>Esta semana</h2><span>${semanaTotal} ${semanaTotal === 1 ? 'registro' : 'registros'}</span></div>
         <div class="resumen-grafico">${barras}</div>
       </section>
     `;

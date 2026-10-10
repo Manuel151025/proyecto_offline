@@ -7,6 +7,19 @@ Cada tarea tiene un identificador, el qué, el dónde, cómo se comprueba que qu
 
 ---
 
+## Cierre (9 de octubre de 2026)
+
+| Fase | Estado final |
+|---|---|
+| F0 | ✅ Desplegado: el plan se mergeó en `main` (PR #44) y producción corre la versión actual |
+| F1 | ✅ |
+| F2 | 🟡 Todo el código; las pruebas en celulares reales (F2.20) están en curso con [PRUEBAS-DE-CAMPO.md](PRUEBAS-DE-CAMPO.md) |
+| F3 | ✅ Dirección «Cálida de territorio» elegida en el lienzo de diseño y aplicada a la PWA, el panel (incluido el acceso) y Android, con Figtree empaquetada. Android conserva tres pantallas solo con el tema heredado (ver [PENDIENTES](PENDIENTES.md#4--pantallas-de-android-con-rediseño-propio)) |
+| F4 | ✅ |
+| F5 | 🟡 Igual que el 8 de octubre: cifrado pospuesto y migraciones a la espera de un dispositivo |
+
+**Trabajo añadido después del plan:** validación estricta por campo con filtro al escribir, idéntica en las tres plataformas y vigilada por una prueba de paridad; pruebas de punta a punta en navegador real; prueba de contraste WCAG; manual de uso con capturas. **230 pruebas automáticas, 0 fallos.** Detalle en [PRUEBAS.md](PRUEBAS.md) y [PENDIENTES.md](PENDIENTES.md).
+
 ## Estado de ejecución (8 de octubre de 2026)
 
 Todo el trabajo está en la rama `feat/plan-de-trabajo`, con un commit por bloque.
@@ -25,7 +38,7 @@ Todo el trabajo está en la rama `feat/plan-de-trabajo`, con un commit por bloqu
 | F2 | 🟡 | Todo el código. F2.20 (pruebas en celulares reales) queda en [PRUEBAS-DE-CAMPO.md](PRUEBAS-DE-CAMPO.md). F2.19 no hacía falta: el reporte sí estaba expuesto |
 | F3 | 🟡 | F3.3 hecha (tokens como fuente única). F3.1–F3.2 requieren que lances `/design`; F3.4–F3.7 vienen después |
 | F4 | ✅ | Todo, incluida la CSP. El segundo factor (F4.8) se evaluó y no se implementó: ver [PENDIENTES](PENDIENTES.md#7--identidad-única-para-panel-y-aplicación) |
-| F5 | 🟡 | F5.1, F5.4 y F5.6 (salud y monitor) hechas. F5.5: prueba de migraciones escrita y compilada, falta un dispositivo para ejecutarla. F5.2 pospuesta con motivo en [PENDIENTES](PENDIENTES.md#4--cifrado-de-datos-en-el-teléfono). F5.3: ramas limpiadas; las actualizaciones de Dependabot quedan por revisar |
+| F5 | 🟡 | F5.1, F5.4 y F5.6 (salud y monitor) hechas. F5.5: prueba de migraciones escrita y compilada, falta un dispositivo para ejecutarla. F5.2 pospuesta con motivo en [PENDIENTES](PENDIENTES.md#3--cifrado-de-datos-en-el-teléfono). F5.3: ramas limpiadas; las actualizaciones de Dependabot quedan por revisar |
 
 **Fallos nuevos encontrados durante la ejecución:**
 - **PWA:** comparaba los rechazos del servidor con el id de la cola y no con el de la encuesta. Ningún rechazo se reconocía nunca: se daba por enviado.
