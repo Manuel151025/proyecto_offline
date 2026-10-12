@@ -222,6 +222,30 @@ function ultimoAsunto() {
   return m ? Buffer.from(m[1], 'base64').toString('utf8') : '';
 }
 
+test('panel: busca mientras se escribe y exporta a Excel con la búsqueda', async () => {
+  await p.tamano(1366, 860);
+  await p.ir(panel('personas'));
+  await p.evaluar('window.sinRecargar = true');
+
+  await p.escribir('#buscar', 'Rojas');
+  await p.esperar(`location.search.includes('q=Rojas') && document.querySelector('#resultados-personas').innerText.includes('Rojas')`, 15000, 'mostrar resultados al escribir');
+  assert.equal(await p.evaluar('window.sinRecargar === true'), true, 'la página no se recargó');
+  await p.captura(foto('panel-busqueda'));
+
+  // El botón de Excel lleva la búsqueda y entrega un .xlsx.
+  const enlace = await p.evaluar(`document.querySelector('#exportar-personas a').href`);
+  assert.match(enlace, /exportar=excel/);
+  assert.match(enlace, /q=Rojas/);
+  const bytes = await p.evaluar(`fetch(${JSON.stringify(enlace)}).then(r => r.arrayBuffer()).then(b => { const u = new Uint8Array(b); return u[0] === 0x50 && u[1] === 0x4B ? b.byteLength : 0; })`);
+  assert.ok(bytes > 2000, 'descargó un .xlsx');
+
+  await p.escribir('#buscar', 'xyzzy');
+  await p.esperar(`document.querySelector('#resultados-personas').innerText.includes('Sin resultados')`, 15000, 'avisar que no hay resultados');
+  await p.escribir('#buscar', '');
+  await p.esperar(`!location.search.includes('q=') && document.querySelector('#resultados-personas').innerText.includes('Rojas')`, 15000, 'volver a la lista completa');
+  assert.deepEqual(p.errores, [], 'sin excepciones de JavaScript');
+});
+
 test('olvidé mi contraseña: código por correo, contraseña nueva y entrar con ella', async () => {
   // El administrador le registra un correo al encuestador.
   await p.ir(panel('cuentas') + '&editar=3');

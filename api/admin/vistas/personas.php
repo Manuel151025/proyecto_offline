@@ -92,6 +92,8 @@
           . 'Restaurar devuelve la persona a todos los dispositivos en su próxima sincronización.') ?>
     <?php endif; ?>
 
+    <?php // Lo que se reemplaza al buscar mientras se escribe (admin.js). ?>
+    <div id="resultados-personas" aria-live="polite">
     <?php if (($busqueda !== '' || $hayFiltros) && $personas !== []): ?>
       <p class="nota-lista" role="status"><?= h(cantidad($totalPersonas, 'resultado', 'resultados')) ?><?= $busqueda !== '' ? ' para «' . h($busqueda) . '»' : ' con los filtros aplicados' ?></p>
     <?php endif; ?>
@@ -194,4 +196,5 @@
         </span>
       </nav>
     <?php endif; ?>
+    </div>
   </section>

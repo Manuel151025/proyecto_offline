@@ -280,6 +280,9 @@ ul, ol { list-style: none; }
   font-size: 0.85rem; font-weight: 500; text-decoration: none;
 }
 .acceso-volver:hover { text-decoration: underline; }
+#resultados-personas { transition: opacity 0.15s; }
+#resultados-personas[aria-busy="true"] { opacity: 0.55; }
+.exportar { display: inline-flex; align-items: center; gap: 6px; }
 .acceso-olvido { align-self: center; font-size: 0.9rem; font-weight: 600; text-decoration: none; }
 .acceso-olvido:hover { text-decoration: underline; }
 .campo-opcional { font-weight: 500; color: var(--texto-2); }

@@ -100,6 +100,54 @@ final class PanelFuncionesTest extends IntegracionTestCase
         $this->assertMatchesRegularExpression('/1[0-9] resultados con los filtros aplicados/', $html);
     }
 
+    public function testElExcelTraeDisenoFiltrosYResumenSinEjecutarFormulas(): void
+    {
+        $c = new Cliente();
+        $c->entrarPanel('2000000002', self::CLAVE);
+        $r = $c->get('api/admin/index.php?exportar=excel');
+
+        $this->assertSame(200, $r['codigo']);
+        $this->assertStringStartsWith('PK', $r['cuerpo'], 'es un ZIP (.xlsx)');
+        $archivo = tempnam(sys_get_temp_dir(), 'xlsx');
+        file_put_contents((string)$archivo, $r['cuerpo']);
+        $zip = new ZipArchive();
+        $this->assertTrue($zip->open((string)$archivo));
+        $hoja = (string)$zip->getFromName('xl/worksheets/sheet1.xml');
+        $resumen = (string)$zip->getFromName('xl/worksheets/sheet2.xml');
+        $estilos = (string)$zip->getFromName('xl/styles.xml');
+        $zip->close();
+        unlink((string)$archivo);
+
+        foreach ([$hoja, $resumen, $estilos] as $xml) {
+            $this->assertNotFalse(simplexml_load_string($xml), 'XML bien formado');
+        }
+        $this->assertStringContainsString('ColOffline · Personas registradas', $hoja);
+        $this->assertStringContainsString('<autoFilter', $hoja);
+        $this->assertStringContainsString('state="frozen"', $hoja);
+        $this->assertStringContainsString('FF12467E', $estilos, 'encabezado con el azul de la marca');
+        // El apellido que parece fórmula queda como texto: nunca <f>.
+        $this->assertStringContainsString('=HIPERVINCULO(&quot;http://x&quot;)', $hoja);
+        $this->assertStringNotContainsString('<f>', $hoja);
+        $this->assertStringContainsString('Total de personas', $resumen);
+        $this->assertSame(28, substr_count($hoja, '<row ') - 3, 'las 28 personas activas');
+
+        // Con búsqueda, solo lo que coincide.
+        $r = $c->get('api/admin/index.php?exportar=excel&q=Sandra');
+        file_put_contents((string)$archivo, $r['cuerpo']);
+        $zip->open((string)$archivo);
+        $hoja = (string)$zip->getFromName('xl/worksheets/sheet1.xml');
+        $zip->close();
+        unlink((string)$archivo);
+        $this->assertStringContainsString('búsqueda «Sandra»', $hoja);
+        $this->assertStringNotContainsString('>Juan<', $hoja);
+    }
+
+    public function testSinSesionNoSeExportaExcel(): void
+    {
+        $r = (new Cliente())->get('api/admin/index.php?exportar=excel');
+        $this->assertStringNotContainsString('PK', substr($r['cuerpo'], 0, 2));
+    }
+
     public function testElCsvExportaSoloLoFiltrado(): void
     {
         $csv = $this->admin()->get('api/admin/index.php?exportar=personas&municipio=11001')['cuerpo'];

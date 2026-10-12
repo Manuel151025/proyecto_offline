@@ -159,8 +159,8 @@ Totales de personas, encuestas, encuestadores y dispositivos; encuestas por día
 
 <img src="capturas/panel-personas.png" alt="Lista de personas" width="560">
 
-- **Buscar** por nombre completo o documento; **Filtros** por departamento, municipio, encuestador y fechas.
-- **Descargar CSV** exporta exactamente lo que estás viendo (abre bien en Excel, con tildes).
+- **Buscar** por nombre completo o documento: los resultados cambian **mientras escribes**, sin tocar «Buscar». **Filtros** por departamento, municipio, encuestador y fechas.
+- **Exportar Excel** descarga exactamente lo que estás viendo en un archivo listo para trabajar: encabezado de colores fijo al bajar, filtros en cada columna, fechas y edad, y una segunda hoja **Resumen** con totales por departamento, EPS y estrato. **CSV** sigue disponible para otros programas.
 - Al abrir una persona ves su **ficha**: todos los datos, el historial de encuestas y los cambios hechos desde el panel. Ahí puedes **editarla** (con las mismas reglas que el formulario de la app) o **borrarla**.
 - Lo borrado va a la **Papelera** y se puede restaurar. El borrado y la restauración llegan a todos los celulares en su siguiente sincronización.
 

@@ -151,7 +151,7 @@ Catálogo funcional del sistema. Cada historia incluye criterios de aceptación 
 7. El administrador registra el correo de cada cuenta y puede **enviar un correo de prueba** para comprobar la configuración. Sin correo, cambia la contraseña desde *Cuentas*.
 
 **Implementación** · [`recuperar.php`](../api/auth/recuperar.php) · [`restablecer.php`](../api/auth/restablecer.php) · [`correo.php`](../api/correo.php) · [`recuperar.js`](../pwa/js/screens/recuperar.js) · `RecuperarScreen.kt` · `RecuperarViewModel.kt`
-**Pruebas** · `RecuperacionTest` (PHP, 11, con servidor SMTP falso) · `AuthRepositoryImplTest` (Android) · E2E 8
+**Pruebas** · `RecuperacionTest` (PHP, 11, con servidor SMTP falso) · `AuthRepositoryImplTest` (Android) · E2E 9
 **Operación** · Configuración de Gmail paso a paso en [DESPLIEGUE.md](DESPLIEGUE.md#1--activar-olvidaste-tu-contraseña)
 
 ---
@@ -469,19 +469,22 @@ Catálogo funcional del sistema. Cada historia incluye criterios de aceptación 
 
 ---
 
-## HU-22 · Exportar a CSV ✅
+## HU-22 · Exportar a Excel y CSV ✅
 
 > **Como** administrador
-> **quiero** descargar los datos en CSV
-> **para** analizarlos en una hoja de cálculo.
+> **quiero** descargar los datos en un Excel bien presentado
+> **para** analizarlos y compartirlos sin tener que darles formato.
 
 **Criterios de aceptación**
 
-1. El archivo lleva **BOM UTF-8** para que Excel no destroce las tildes.
-2. Las fechas van legibles, no en milisegundos.
-3. Solo se exportan las personas activas.
+1. **Excel (.xlsx)** con título, fecha y filtro aplicados; encabezado en azul institucional que queda fijo al bajar; filtros en cada columna; filas alternadas; fechas reales de Excel y edad calculada; impresión horizontal ajustada al ancho.
+2. Una hoja **Resumen** con totales por departamento, EPS y estrato.
+3. Exporta lo mismo que muestra la tabla: búsqueda y filtros incluidos. Solo personas activas.
+4. Ningún texto se ejecuta como fórmula, ni en el Excel ni en el CSV.
+5. El **CSV** sigue disponible, con **BOM UTF-8** para que las tildes se vean bien.
 
-**Pruebas** · `PanelAdminTest::testElCsvNeutralizaFormulasYNoCorreLaFechaDeNacimiento` · `PanelFuncionesTest::testElCsvExportaSoloLoFiltrado`
+**Implementación** · [`api/admin/excel.php`](../api/admin/excel.php)
+**Pruebas** · `PanelFuncionesTest::testElExcelTraeDisenoFiltrosYResumenSinEjecutarFormulas` · `testSinSesionNoSeExportaExcel` · `PanelAdminTest::testElCsvNeutralizaFormulasYNoCorreLaFechaDeNacimiento` · `PanelFuncionesTest::testElCsvExportaSoloLoFiltrado` · E2E 8 · verificado abriéndolo en Microsoft Excel
 
 ---
 
@@ -614,7 +617,7 @@ Catálogo funcional del sistema. Cada historia incluye criterios de aceptación 
 
 ## HU-30 · Cobertura de pruebas ✅
 
-**Estado actual:** **271 pruebas automatizadas** — 89 en Android (JVM), 72 en la PWA, 102 de la API y el panel (71 de integración con MySQL real y 31 unitarias) y 8 de punta a punta en un navegador real. Inventario completo en [PRUEBAS.md](PRUEBAS.md).
+**Estado actual:** **274 pruebas automatizadas** — 89 en Android (JVM), 72 en la PWA, 104 de la API y el panel (73 de integración con MySQL real y 31 unitarias) y 9 de punta a punta en un navegador real. Inventario completo en [PRUEBAS.md](PRUEBAS.md).
 
 | Suite | Qué cubre |
 |---|---|

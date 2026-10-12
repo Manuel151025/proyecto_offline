@@ -17,7 +17,7 @@ Estado honesto del proyecto: qué falta, por qué no está y qué pasa si no se 
 | Panel de administración | ✅ Resumen, personas (ficha, edición, filtros, CSV, papelera), cuentas, monitor de sincronización y auditoría |
 | Diseño | ✅ Dirección «Cálida de territorio» en la PWA, el panel (incluido el acceso) y el inicio de Android; contraste AA verificado por prueba |
 | Privacidad | 🟡 Descarga por municipios y copias de seguridad cerradas; falta cifrado en el teléfono |
-| Pruebas automatizadas | ✅ 271: 89 Android, 72 PWA, 102 PHP, 8 de punta a punta. Ver [PRUEBAS.md](PRUEBAS.md) |
+| Pruebas automatizadas | ✅ 274: 89 Android, 72 PWA, 104 PHP, 9 de punta a punta. Ver [PRUEBAS.md](PRUEBAS.md) |
 | Recuperar contraseña | 🟡 Programado y probado; falta poner la cuenta de Gmail en Dokploy ([DESPLIEGUE.md §1](DESPLIEGUE.md#1--activar-olvidaste-tu-contraseña)) |
 | Google Play | ⏳ App lista para firmar y subir (targetSdk 36, ficha e imágenes en `docs/play/`); falta la cuenta de desarrollador ([DESPLIEGUE.md §5](DESPLIEGUE.md#5--publicar-en-google-play)) |
 | Catálogos | ✅ Los 1.122 municipios y las EPS de Colombia, con buscador, actualizados solos en teléfonos y servidor |

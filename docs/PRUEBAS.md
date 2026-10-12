@@ -2,15 +2,15 @@
 
 Inventario de las pruebas automáticas del sistema, qué cubre cada una y cómo correrlas.
 
-**Última ejecución completa:** 10 de octubre de 2026 · **271 pruebas, 0 fallos**.
+**Última ejecución completa:** 10 de octubre de 2026 · **274 pruebas, 0 fallos**.
 
 | Suite | Pruebas | Herramienta | Necesita |
 |---|---:|---|---|
 | Android (unitarias JVM) | 89 | JUnit 4 + MockK | JDK 17 (Gradle lo descarga) |
 | PWA (unitarias, catálogos, paridad, contraste y tildes) | 72 | `node --test` | Node 20 o superior |
-| API y panel (integración + unitarias) | 102 | PHPUnit 11 | PHP 8.2 con `pdo_mysql` y un MySQL |
-| Punta a punta | 8 | `node --test` + Chrome/Edge | Node 22, PHP, MySQL y Chrome o Edge |
-| **Total** | **271** | | |
+| API y panel (integración + unitarias) | 104 | PHPUnit 11 | PHP 8.2 con `pdo_mysql` y un MySQL |
+| Punta a punta | 9 | `node --test` + Chrome/Edge | Node 22, PHP, MySQL y Chrome o Edge |
+| **Total** | **274** | | |
 
 Además corren en cada cambio: **PHPStan nivel 8** (0 errores), **Android Lint** (0 errores), la verificación del caché offline de la PWA y la de la paleta de diseño.
 
@@ -50,8 +50,8 @@ Las de punta a punta buscan Chrome o Edge en las rutas habituales; si está en o
 ```mermaid
 flowchart BT
     U["Unitarias · 89 Android + 72 PWA + 31 PHP"]
-    I["Integración · 71 PHP con MySQL real"]
-    E["Punta a punta · 8 en navegador real"]
+    I["Integración · 73 PHP con MySQL real"]
+    E["Punta a punta · 9 en navegador real"]
     C["Campo · celular real (manual)"]
     U --> I --> E --> C
 ```
@@ -120,7 +120,8 @@ Un navegador real (Chrome o Edge, sin ventana) recorre lo que hace una persona, 
 | 5 | Formulario | Lo que no corresponde no se puede escribir (`sdscf1ds5ds1c` → `151`, `584Jairo` → `Jairo`) y cada error se explica en su campo |
 | 6 | Sin señal | Busca el municipio («popa» → Popayán) y la EPS, registra a una persona sin red: queda **Pendiente**; al volver la señal pasa sola a **Enviada** |
 | 7 | De vuelta en el panel | La persona y el celular aparecen; ninguna página lanzó errores de JavaScript |
-| 8 | Olvidé mi contraseña | El administrador le pone correo al encuestador; en la app se pide el código, se lee del correo (SMTP falso), se cambia la contraseña y se entra con la nueva |
+| 8 | Búsqueda y Excel | En el panel, la lista cambia mientras se escribe, sin recargar; el botón de Excel lleva la búsqueda y entrega un .xlsx |
+| 9 | Olvidé mi contraseña | El administrador le pone correo al encuestador; en la app se pide el código, se lee del correo (SMTP falso), se cambia la contraseña y se entra con la nueva |
 
 Con `CAPTURAS_PLAY=docs/play` se ejecuta además un paso que toma las capturas de 1080×1920 para la ficha de Google Play.
 

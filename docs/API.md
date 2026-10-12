@@ -381,6 +381,7 @@ Las fechas se muestran y los días se agrupan en hora de Colombia (`America/Bogo
 | `?seccion=cuentas&editar=<id>` | Edición de una cuenta, con sus sesiones en celulares, desbloqueo y municipios asignados |
 | `?seccion=sincronizacion` | Monitor: celulares, rechazos y equipos sin sincronizar hace más de 3 días |
 | `?seccion=auditoria` | Registro de acciones de los administradores |
+| `?exportar=excel` | **Excel (.xlsx) con diseño**, con la misma búsqueda y filtros que la tabla: hoja «Personas» (título, fecha y filtro aplicados, encabezado azul fijo, filas alternadas, filtros por columna, fechas reales, edad calculada, origen del registro, impresión horizontal) y hoja «Resumen» (totales por departamento, EPS y estrato). Generado sin librerías en `api/admin/excel.php`; el texto va como cadena, así que nada se ejecuta como fórmula |
 | `?exportar=personas` | CSV con BOM UTF-8, con la **misma búsqueda y filtros** que la tabla; las celdas que Excel ejecutaría como fórmula van precedidas de `'` |
 
 ### Acciones (POST)
