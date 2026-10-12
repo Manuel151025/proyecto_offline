@@ -26,6 +26,7 @@ require_once __DIR__ . '/../rate_limit.php';
 require_once __DIR__ . '/../personas/validacion.php';
 require_once __DIR__ . '/consultas.php';
 require_once __DIR__ . '/vista.php';
+require_once __DIR__ . '/excel.php';
 $pdo = conectarBD();
 asegurarCatalogoMunicipios($pdo);
 
@@ -589,6 +590,42 @@ unset($_SESSION['aviso']);
 $busqueda = mb_substr(textoGet('q'), 0, 100);
 $filtros = filtrosDeLaUrl($zona);
 
+// --- Exportación a Excel (.xlsx con diseño) -----------------------------------
+// Misma búsqueda y filtros que la tabla. Ver excel.php.
+if ($loggedIn && textoGet('exportar') === 'excel') {
+    $filas = personasParaExportar($pdo, $busqueda, $filtros);
+    $partes = [];
+    if ($busqueda !== '') {
+        $partes[] = 'búsqueda «' . $busqueda . '»';
+    }
+    if (isset($filtros['departamento'])) {
+        $partes[] = 'departamento ' . $filtros['departamento'];
+    }
+    if (isset($filtros['municipio'])) {
+        $partes[] = 'municipio ' . $filtros['municipio'];
+    }
+    if (isset($filtros['encuestador'])) {
+        $partes[] = 'un encuestador';
+    }
+    if (textoGet('desde') !== '' || textoGet('hasta') !== '') {
+        $partes[] = 'actualizadas ' . (textoGet('desde') !== '' ? 'desde ' . textoGet('desde') : '') . (textoGet('hasta') !== '' ? ' hasta ' . textoGet('hasta') : '');
+    }
+    try {
+        $archivo = generarExcelPersonas(array_values($filas), $partes === [] ? 'todas las personas activas' : 'filtro: ' . implode(', ', $partes), $zona);
+    } catch (RuntimeException $e) {
+        error_log('[admin] exportar Excel: ' . $e->getMessage());
+        avisar('error', 'No se pudo generar el archivo de Excel. Intenta de nuevo o descarga el CSV.');
+        redirigir(urlPanel(['seccion' => 'personas']));
+    }
+    auditar($pdo, 'exportar', 'personas', ['formato' => 'xlsx', 'filas' => count($filas)]);
+    header('Content-Type: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    header('Content-Disposition: attachment; filename="coloffline-personas-' . date('Y-m-d') . '.xlsx"');
+    header('Content-Length: ' . filesize($archivo));
+    readfile($archivo);
+    unlink($archivo);
+    exit;
+}
+
 // --- Exportación a CSV -------------------------------------------------------
 // Va antes de emitir HTML: una vez enviado el cuerpo ya no se pueden cambiar
 // las cabeceras.
@@ -934,9 +971,12 @@ if ($aviso !== null) {
       </div>
       <div class="encabezado-acciones">
         <?php if ($seccion === 'personas' && !$verBorradas && $totalActivas > 0): ?>
-          <a class="btn btn-secundario" href="<?= h(urlPanel(['exportar' => 'personas'] + array_diff_key($parametrosLista, ['seccion' => 1, 'borradas' => 1]))) ?>">
-            <?= icono('descargar', 16) ?>Exportar CSV
-          </a>
+          <span class="exportar" id="exportar-personas">
+            <a class="btn btn-primario" href="<?= h(urlPanel(['exportar' => 'excel'] + array_diff_key($parametrosLista, ['seccion' => 1, 'borradas' => 1, 'p' => 1]))) ?>">
+              <?= icono('descargar', 16) ?>Exportar Excel
+            </a>
+            <a class="btn btn-fantasma btn-sm" href="<?= h(urlPanel(['exportar' => 'personas'] + array_diff_key($parametrosLista, ['seccion' => 1, 'borradas' => 1, 'p' => 1]))) ?>" title="Texto plano separado por punto y coma">CSV</a>
+          </span>
         <?php elseif ($seccion === 'cuentas'): ?>
           <a class="btn btn-primario" href="<?= h(urlPanel(['seccion' => 'cuentas'])) ?>#form-cuenta">
             <?= icono('mas', 16) ?>Nueva cuenta
