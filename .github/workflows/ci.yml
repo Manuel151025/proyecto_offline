@@ -121,10 +121,10 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - name: Configurar PHP 8.2
+      - name: Configurar PHP 8.3
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.2'
+          php-version: '8.3'
           extensions: pdo, pdo_mysql, mbstring, curl
 
       - name: Validar sintaxis de todos los archivos PHP
@@ -393,10 +393,10 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - name: Configurar PHP 8.2
+      - name: Configurar PHP 8.3
         uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.2'
+          php-version: '8.3'
           extensions: pdo, pdo_mysql, mbstring
 
       # Node 22 trae WebSocket nativo, con el que se controla el navegador
